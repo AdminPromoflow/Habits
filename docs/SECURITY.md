@@ -8,7 +8,7 @@ La cuenta inicial de Aleina solo se crea desde CLI. Su correo está reservado en
 
 La recuperación pública envía un enlace de un solo uso que vence en 30 minutos. MySQL conserva únicamente su hash SHA-256 y la versión de autenticación; pedirlo no bloquea el acceso existente. Al confirmar la nueva contraseña se invalidan las sesiones, los demás enlaces y la activación inicial. No se inicia sesión automáticamente. Las cuentas suspendidas no pueden usar la recuperación. La respuesta no revela si el correo existe y se limitan solicitudes por IP, dirección y plataforma.
 
-En Hostinger se utiliza el transporte PHP `mail()` con el remitente del alojamiento, configurable mediante `mail_from`. La aceptación por el transporte no garantiza la llegada al buzón; los fallos se registran sin direcciones, contraseñas ni tokens. El transporte de archivos solo funciona en el servidor PHP de pruebas con una base `mi_rutina_test_*`, dentro de una carpeta bloqueada por HTTP. Las invitaciones y avisos de colaboración siguen entregándose **dentro de la aplicación**. El registro no incluye una verificación inicial de titularidad del correo.
+En Hostinger se utiliza el transporte PHP `mail()` con un remitente del dominio, configurable mediante `mail_from`. La aceptación por el transporte no garantiza la llegada al buzón; los fallos se registran sin direcciones, contraseñas ni tokens. El transporte de archivos solo funciona en el servidor PHP de pruebas con una base `mi_rutina_test_*`, dentro de una carpeta bloqueada por HTTP. Las invitaciones y avisos de colaboración siguen entregándose **dentro de la aplicación**. El registro no incluye una verificación inicial de titularidad del correo.
 
 ## Propiedad y permisos
 

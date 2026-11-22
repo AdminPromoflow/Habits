@@ -25,7 +25,7 @@ return [
     'secure_cookies' => true,
     'session_path' => __DIR__ . '/../storage/sessions',
     'mail_transport' => 'mail',
-    'mail_from' => '', // Remitente predeterminado del alojamiento.
+    'mail_from' => '', // Usa no-reply@aleinarossui.com.
 ];
 ```
 
@@ -53,7 +53,7 @@ Este comando invalida sesiones anteriores y genera un enlace que caduca en una h
 
 La pantalla de acceso incluye **Recuperar contraseña / Forgot password?**. La cuenta inicial utiliza `aleinarossui@gmail.com`. Aplica `003_password_recovery.sql` con el migrador antes de desplegar la recuperación; para esta instalación, `storage/hostinger-recovery.sql` contiene la migración, su checksum y la corrección autorizada del correo de Aleina, conservando su identificador y contenido.
 
-Configura `mail_transport` como `mail` en el `local.php` de producción. Un `mail_from` vacío conserva el remitente predeterminado del servidor Hostinger. Si se configura una dirección propia, debe pertenecer al dominio autorizado para enviar. Revisa el buzón y spam para comprobar la entrega. No copies los correos de prueba a producción.
+Configura `mail_transport` como `mail` en el `local.php` de producción. Un `mail_from` vacío usa `no-reply@` seguido del dominio de `app_url`; se incluyen también las cabeceras Date y Message-ID. Si se configura una dirección propia, debe pertenecer al dominio autorizado para enviar. Revisa el buzón y spam para comprobar la entrega. No copies los correos de prueba a producción.
 
 Los enlaces duran 30 minutos y solo pueden usarse una vez. Pedir un enlace no cambia la contraseña. El restablecimiento invalida las sesiones anteriores y requiere iniciar sesión de nuevo. La aplicación restringe las solicitudes a 3 por dirección/hora, 20 por IP/hora, 8 por minuto y 90 por día para toda la plataforma. Para mayor volumen y entregabilidad, integra un proveedor SMTP autenticado antes de ampliar límites.
 

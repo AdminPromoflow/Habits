@@ -19,13 +19,14 @@ final class Mailer {
             if ($written!==false) chmod($path,0600);
             return $written!==false;
         }
-        $headers=['MIME-Version'=>'1.0','Content-Type'=>'text/plain; charset=UTF-8','Content-Transfer-Encoding'=>'8bit'];
+        $domain=parse_url((string)config('app_url'),PHP_URL_HOST);
+        if (!is_string($domain) || !preg_match('/^[a-z0-9.-]+$/iD',$domain)) return false;
+        $headers=['MIME-Version'=>'1.0','Content-Type'=>'text/plain; charset=UTF-8','Content-Transfer-Encoding'=>'8bit',
+            'Date'=>gmdate('D, d M Y H:i:s').' +0000','Message-ID'=>'<'.bin2hex(random_bytes(16)).'@'.$domain.'>'];
         $from=(string)config('mail_from');
-        if ($from!=='') {
-            if (!filter_var($from,FILTER_VALIDATE_EMAIL) || preg_match('/[\r\n]/',$from)) return false;
-            $headers['From']='MI RUTINA <'.$from.'>';
-        }
-        // An empty From uses the hosting account's configured sender.
+        if ($from==='') $from='no-reply@'.$domain;
+        if (!filter_var($from,FILTER_VALIDATE_EMAIL) || preg_match('/[\r\n]/',$from)) return false;
+        $headers['From']='MI RUTINA <'.$from.'>';
         return mail($email,'=?UTF-8?B?'.base64_encode($dict['reset_email_subject']).'?=',$body,$headers);
     }
 }

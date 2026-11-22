@@ -11,5 +11,5 @@ return [
     'secure_cookies' => false, // MUST be true on HTTPS / Hostinger.
     'session_path' => __DIR__ . '/../storage/sessions',
     'mail_transport' => 'disabled', // Hostinger: mail; isolated automated tests: file.
-    'mail_from' => '', // Empty uses Hostinger's configured server sender.
+    'mail_from' => '', // Empty uses no-reply@ the trusted app_url domain.
 ];
