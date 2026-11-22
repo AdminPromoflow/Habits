@@ -1,0 +1,147 @@
+CREATE TABLE IF NOT EXISTS users (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ name VARCHAR(100) NOT NULL,
+ email VARCHAR(190) NOT NULL UNIQUE,
+ password_hash VARCHAR(255) NOT NULL,
+ status ENUM('active','suspended') NOT NULL DEFAULT 'active',
+ auth_version INT NOT NULL DEFAULT 1,
+ setup_token_hash CHAR(64) NULL,
+ setup_expires_at DATETIME NULL,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS user_roles (
+ user_id BIGINT UNSIGNED NOT NULL,
+ role ENUM('admin','user') NOT NULL,
+ PRIMARY KEY(user_id,role),
+ FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS user_settings (
+ user_id BIGINT UNSIGNED PRIMARY KEY,
+ language ENUM('en','es') NOT NULL DEFAULT 'en',
+ timezone VARCHAR(80) NOT NULL DEFAULT 'America/Bogota',
+ theme ENUM('light','dark') NOT NULL DEFAULT 'light',
+ notifications_enabled TINYINT(1) NOT NULL DEFAULT 1,
+ FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS habit_categories (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ owner_user_id BIGINT UNSIGNED NULL,
+ name VARCHAR(100) NOT NULL,
+ translation_key VARCHAR(50) NULL,
+ description TEXT NOT NULL,
+ icon VARCHAR(30) NOT NULL DEFAULT 'sparkles',
+ color CHAR(7) NOT NULL DEFAULT '#B8A4D4',
+ scope_key BIGINT UNSIGNED GENERATED ALWAYS AS (COALESCE(owner_user_id,0)) STORED,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE KEY category_unique(scope_key,name),
+ FOREIGN KEY(owner_user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS routines (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ owner_user_id BIGINT UNSIGNED NOT NULL,
+ category_id BIGINT UNSIGNED NOT NULL,
+ name VARCHAR(190) NOT NULL,
+ description TEXT NOT NULL,
+ start_date DATE NOT NULL,
+ end_date DATE NULL,
+ source_key VARCHAR(150) NULL,
+ UNIQUE(owner_user_id,source_key),
+ FOREIGN KEY(owner_user_id) REFERENCES users(id),
+ FOREIGN KEY(category_id) REFERENCES habit_categories(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS habits (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ owner_user_id BIGINT UNSIGNED NOT NULL,
+ category_id BIGINT UNSIGNED NOT NULL,
+ routine_id BIGINT UNSIGNED NULL,
+ name VARCHAR(190) NOT NULL,
+ description TEXT NOT NULL,
+ goal DECIMAL(10,2) NOT NULL DEFAULT 1,
+ unit VARCHAR(40) NOT NULL DEFAULT '',
+ schedule_days VARCHAR(30) NOT NULL DEFAULT '[1,2,3,4,5,6,7]',
+ scheduled_time TIME NULL,
+ start_date DATE NOT NULL,
+ end_date DATE NULL,
+ status ENUM('active','archived') NOT NULL DEFAULT 'active',
+ section VARCHAR(150) NOT NULL DEFAULT '',
+ sort_order INT NOT NULL DEFAULT 0,
+ source_key VARCHAR(190) NULL,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ UNIQUE(owner_user_id,source_key),
+ INDEX owner_category(owner_user_id,category_id),
+ FOREIGN KEY(owner_user_id) REFERENCES users(id),
+ FOREIGN KEY(category_id) REFERENCES habit_categories(id),
+ FOREIGN KEY(routine_id) REFERENCES routines(id),
+ CHECK(goal > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS habit_completions (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ habit_id BIGINT UNSIGNED NOT NULL,
+ user_id BIGINT UNSIGNED NOT NULL,
+ completed_on DATE NOT NULL,
+ amount DECIMAL(10,2) NOT NULL,
+ goal_at_time DECIMAL(10,2) NOT NULL,
+ note VARCHAR(1000) NOT NULL DEFAULT '',
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ UNIQUE(habit_id,user_id,completed_on),
+ INDEX user_date(user_id,completed_on),
+ FOREIGN KEY(habit_id) REFERENCES habits(id),
+ FOREIGN KEY(user_id) REFERENCES users(id),
+ CHECK(amount >= 0),
+ CHECK(goal_at_time > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS category_requests (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ user_id BIGINT UNSIGNED NOT NULL,
+ name VARCHAR(100) NOT NULL,
+ description TEXT NOT NULL,
+ icon VARCHAR(30) NOT NULL,
+ color CHAR(7) NOT NULL,
+ reason TEXT NOT NULL,
+ status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+ feedback TEXT NULL,
+ reviewed_by BIGINT UNSIGNED NULL,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ reviewed_at TIMESTAMP NULL,
+ FOREIGN KEY(user_id) REFERENCES users(id),
+ FOREIGN KEY(reviewed_by) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS habit_templates (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ category_id BIGINT UNSIGNED NOT NULL,
+ name VARCHAR(190) NOT NULL,
+ translation_key VARCHAR(50) NULL,
+ description TEXT NOT NULL,
+ goal DECIMAL(10,2) NOT NULL DEFAULT 1,
+ unit VARCHAR(40) NOT NULL DEFAULT '',
+ schedule_days VARCHAR(30) NOT NULL DEFAULT '[1,2,3,4,5,6,7]',
+ active TINYINT(1) NOT NULL DEFAULT 1,
+ FOREIGN KEY(category_id) REFERENCES habit_categories(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS notifications (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ user_id BIGINT UNSIGNED NOT NULL,
+ message_key VARCHAR(100) NOT NULL,
+ detail VARCHAR(1000) NOT NULL DEFAULT '',
+ is_read TINYINT(1) NOT NULL DEFAULT 0,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS wellness_entries (
+ user_id BIGINT UNSIGNED NOT NULL,
+ recorded_on DATE NOT NULL,
+ weight_kg DECIMAL(5,2) NOT NULL,
+ PRIMARY KEY(user_id,recorded_on),
+ FOREIGN KEY(user_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS platform_settings (
+ setting_key VARCHAR(100) PRIMARY KEY,
+ setting_value VARCHAR(1000) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS rate_limits (
+ bucket CHAR(64) PRIMARY KEY,
+ attempts INT NOT NULL DEFAULT 0,
+ expires_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -1,0 +1,7 @@
+/config/local.php
+/storage/*
+!/storage/.gitkeep
+/tmp/
+/.DS_Store
+/tests/.runtime/
+*.zip

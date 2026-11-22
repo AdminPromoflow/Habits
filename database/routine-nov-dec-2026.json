@@ -1,0 +1,411 @@
+{
+  "category": "Ejercicios",
+  "name": "Mi semana de entrenamiento",
+  "description": "Marca cada ejercicio realizado. Calienta antes de entrenar y ajusta las cargas a tu nivel.",
+  "start_date": "2026-11-23",
+  "end_date": "2026-12-31",
+  "source_key": "rutina-nov-dic-2026-v1",
+  "source_document": "rutina_semanal_pastel_compacta_nov_dic_2026.pdf",
+  "habits": [
+    {
+      "source_id": "day1-1",
+      "name": "Hip thrust con mancuerna",
+      "description": "2 x 12",
+      "schedule_days": [
+        1
+      ],
+      "scheduled_time": "10:00",
+      "section": "GLÚTEO MAYOR · PROYECCIÓN"
+    },
+    {
+      "source_id": "day1-2",
+      "name": "Sentadilla sumo",
+      "description": "2 x 12",
+      "schedule_days": [
+        1
+      ],
+      "scheduled_time": "10:00",
+      "section": "GLÚTEO MAYOR · PROYECCIÓN"
+    },
+    {
+      "source_id": "day1-3",
+      "name": "Peso muerto rumano",
+      "description": "2 x 10–12",
+      "schedule_days": [
+        1
+      ],
+      "scheduled_time": "12:00",
+      "section": "GLÚTEO MAYOR · PROYECCIÓN"
+    },
+    {
+      "source_id": "day1-4",
+      "name": "Puente de glúteos",
+      "description": "2 x 12",
+      "schedule_days": [
+        1
+      ],
+      "scheduled_time": "12:00",
+      "section": "GLÚTEO MAYOR · PROYECCIÓN"
+    },
+    {
+      "source_id": "day1-5",
+      "name": "Zancadas hacia atrás",
+      "description": "2 x 10/pierna",
+      "schedule_days": [
+        1
+      ],
+      "scheduled_time": "14:00",
+      "section": "GLÚTEO MAYOR · PROYECCIÓN"
+    },
+    {
+      "source_id": "day1-6",
+      "name": "Abducción lateral acostada",
+      "description": "2 x 15/lado",
+      "schedule_days": [
+        1
+      ],
+      "scheduled_time": "14:00",
+      "section": "GLÚTEO MAYOR · PROYECCIÓN"
+    },
+    {
+      "source_id": "day1-7",
+      "name": "Caminata suave",
+      "description": "5 min",
+      "schedule_days": [
+        1
+      ],
+      "scheduled_time": "16:00",
+      "section": "GLÚTEO MAYOR · PROYECCIÓN"
+    },
+    {
+      "source_id": "day1-8",
+      "name": "Movilidad y estiramientos",
+      "description": "5 min",
+      "schedule_days": [
+        1
+      ],
+      "scheduled_time": "16:00",
+      "section": "GLÚTEO MAYOR · PROYECCIÓN"
+    },
+    {
+      "source_id": "day2-1",
+      "name": "Remo con mancuernas",
+      "description": "2 x 10",
+      "schedule_days": [
+        2
+      ],
+      "scheduled_time": "10:00",
+      "section": "ESPALDA · BÍCEPS · POSTURA"
+    },
+    {
+      "source_id": "day2-2",
+      "name": "Movilidad de hombros",
+      "description": "2 min",
+      "schedule_days": [
+        2
+      ],
+      "scheduled_time": "10:00",
+      "section": "ESPALDA · BÍCEPS · POSTURA"
+    },
+    {
+      "source_id": "day2-3",
+      "name": "Curl de bíceps",
+      "description": "2 x 12",
+      "schedule_days": [
+        2
+      ],
+      "scheduled_time": "12:00",
+      "section": "ESPALDA · BÍCEPS · POSTURA"
+    },
+    {
+      "source_id": "day2-4",
+      "name": "Curl martillo",
+      "description": "2 x 10",
+      "schedule_days": [
+        2
+      ],
+      "scheduled_time": "12:00",
+      "section": "ESPALDA · BÍCEPS · POSTURA"
+    },
+    {
+      "source_id": "day2-5",
+      "name": "Aperturas inversas",
+      "description": "2 x 10",
+      "schedule_days": [
+        2
+      ],
+      "scheduled_time": "14:00",
+      "section": "ESPALDA · BÍCEPS · POSTURA"
+    },
+    {
+      "source_id": "day2-6",
+      "name": "Bird dog",
+      "description": "2 x 8/lado",
+      "schedule_days": [
+        2
+      ],
+      "scheduled_time": "14:00",
+      "section": "ESPALDA · BÍCEPS · POSTURA"
+    },
+    {
+      "source_id": "day2-7",
+      "name": "Caminata suave",
+      "description": "5 min",
+      "schedule_days": [
+        2
+      ],
+      "scheduled_time": "16:00",
+      "section": "ESPALDA · BÍCEPS · POSTURA"
+    },
+    {
+      "source_id": "day2-8",
+      "name": "Movilidad de espalda y cuello",
+      "description": "5 min",
+      "schedule_days": [
+        2
+      ],
+      "scheduled_time": "16:00",
+      "section": "ESPALDA · BÍCEPS · POSTURA"
+    },
+    {
+      "source_id": "day3-1",
+      "name": "Marcha rápida",
+      "description": "5 min",
+      "schedule_days": [
+        3
+      ],
+      "scheduled_time": "10:00",
+      "section": "CARDIO · ABDOMEN · MOVILIDAD"
+    },
+    {
+      "source_id": "day3-2",
+      "name": "Baile o pasos laterales",
+      "description": "5 min",
+      "schedule_days": [
+        3
+      ],
+      "scheduled_time": "10:00",
+      "section": "CARDIO · ABDOMEN · MOVILIDAD"
+    },
+    {
+      "source_id": "day3-3",
+      "name": "Plancha",
+      "description": "3 x 20 s",
+      "schedule_days": [
+        3
+      ],
+      "scheduled_time": "12:00",
+      "section": "CARDIO · ABDOMEN · MOVILIDAD"
+    },
+    {
+      "source_id": "day3-4",
+      "name": "Dead bug",
+      "description": "2 x 10",
+      "schedule_days": [
+        3
+      ],
+      "scheduled_time": "12:00",
+      "section": "CARDIO · ABDOMEN · MOVILIDAD"
+    },
+    {
+      "source_id": "day3-5",
+      "name": "Rodillas arriba sin saltos",
+      "description": "5 min",
+      "schedule_days": [
+        3
+      ],
+      "scheduled_time": "14:00",
+      "section": "CARDIO · ABDOMEN · MOVILIDAD"
+    },
+    {
+      "source_id": "day3-6",
+      "name": "Pasos laterales",
+      "description": "5 min",
+      "schedule_days": [
+        3
+      ],
+      "scheduled_time": "14:00",
+      "section": "CARDIO · ABDOMEN · MOVILIDAD"
+    },
+    {
+      "source_id": "day3-7",
+      "name": "Yoga suave",
+      "description": "5 min",
+      "schedule_days": [
+        3
+      ],
+      "scheduled_time": "16:00",
+      "section": "CARDIO · ABDOMEN · MOVILIDAD"
+    },
+    {
+      "source_id": "day3-8",
+      "name": "Movilidad y respiración",
+      "description": "5 min",
+      "schedule_days": [
+        3
+      ],
+      "scheduled_time": "16:00",
+      "section": "CARDIO · ABDOMEN · MOVILIDAD"
+    },
+    {
+      "source_id": "day4-1",
+      "name": "Press de pecho en suelo",
+      "description": "2 x 10",
+      "schedule_days": [
+        4
+      ],
+      "scheduled_time": "10:00",
+      "section": "PECHO · HOMBROS · TRÍCEPS"
+    },
+    {
+      "source_id": "day4-2",
+      "name": "Flexiones contra pared",
+      "description": "2 x 10",
+      "schedule_days": [
+        4
+      ],
+      "scheduled_time": "10:00",
+      "section": "PECHO · HOMBROS · TRÍCEPS"
+    },
+    {
+      "source_id": "day4-3",
+      "name": "Press de hombros",
+      "description": "2 x 10",
+      "schedule_days": [
+        4
+      ],
+      "scheduled_time": "12:00",
+      "section": "PECHO · HOMBROS · TRÍCEPS"
+    },
+    {
+      "source_id": "day4-4",
+      "name": "Elevaciones laterales",
+      "description": "2 x 10",
+      "schedule_days": [
+        4
+      ],
+      "scheduled_time": "12:00",
+      "section": "PECHO · HOMBROS · TRÍCEPS"
+    },
+    {
+      "source_id": "day4-5",
+      "name": "Extensión de tríceps",
+      "description": "2 x 12",
+      "schedule_days": [
+        4
+      ],
+      "scheduled_time": "14:00",
+      "section": "PECHO · HOMBROS · TRÍCEPS"
+    },
+    {
+      "source_id": "day4-6",
+      "name": "Patada de tríceps",
+      "description": "2 x 10",
+      "schedule_days": [
+        4
+      ],
+      "scheduled_time": "14:00",
+      "section": "PECHO · HOMBROS · TRÍCEPS"
+    },
+    {
+      "source_id": "day4-7",
+      "name": "Movilidad de hombros",
+      "description": "5 min",
+      "schedule_days": [
+        4
+      ],
+      "scheduled_time": "16:00",
+      "section": "PECHO · HOMBROS · TRÍCEPS"
+    },
+    {
+      "source_id": "day4-8",
+      "name": "Caminata y estiramientos",
+      "description": "5 min",
+      "schedule_days": [
+        4
+      ],
+      "scheduled_time": "16:00",
+      "section": "PECHO · HOMBROS · TRÍCEPS"
+    },
+    {
+      "source_id": "day5-1",
+      "name": "Abducción acostada",
+      "description": "2 x 15/lado",
+      "schedule_days": [
+        5
+      ],
+      "scheduled_time": "10:00",
+      "section": "GLÚTEO MEDIO · CADERA"
+    },
+    {
+      "source_id": "day5-2",
+      "name": "Elevación lateral de pie",
+      "description": "2 x 15/lado",
+      "schedule_days": [
+        5
+      ],
+      "scheduled_time": "10:00",
+      "section": "GLÚTEO MEDIO · CADERA"
+    },
+    {
+      "source_id": "day5-3",
+      "name": "Sentadilla búlgara con apoyo",
+      "description": "2 x 8/pierna",
+      "schedule_days": [
+        5
+      ],
+      "scheduled_time": "12:00",
+      "section": "GLÚTEO MEDIO · CADERA"
+    },
+    {
+      "source_id": "day5-4",
+      "name": "Peso muerto rumano",
+      "description": "2 x 10",
+      "schedule_days": [
+        5
+      ],
+      "scheduled_time": "12:00",
+      "section": "GLÚTEO MEDIO · CADERA"
+    },
+    {
+      "source_id": "day5-5",
+      "name": "Puente unilateral",
+      "description": "2 x 8/pierna",
+      "schedule_days": [
+        5
+      ],
+      "scheduled_time": "14:00",
+      "section": "GLÚTEO MEDIO · CADERA"
+    },
+    {
+      "source_id": "day5-6",
+      "name": "Pasos laterales semisentadilla",
+      "description": "2 x 12",
+      "schedule_days": [
+        5
+      ],
+      "scheduled_time": "14:00",
+      "section": "GLÚTEO MEDIO · CADERA"
+    },
+    {
+      "source_id": "day5-7",
+      "name": "Caminata suave",
+      "description": "5 min",
+      "schedule_days": [
+        5
+      ],
+      "scheduled_time": "16:00",
+      "section": "GLÚTEO MEDIO · CADERA"
+    },
+    {
+      "source_id": "day5-8",
+      "name": "Movilidad cadera y estiramientos",
+      "description": "5 min",
+      "schedule_days": [
+        5
+      ],
+      "scheduled_time": "16:00",
+      "section": "GLÚTEO MEDIO · CADERA"
+    }
+  ]
+}
