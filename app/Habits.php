@@ -46,6 +46,9 @@ final class Habits {
             $h=array_merge($h,$this->access($h));
             $h['schedule_days']=json_decode($h['schedule_days'],true);
             $h['progress_consent']=$this->db->one('SELECT progress_consent FROM habit_collaborators WHERE habit_id=? AND user_id=?',[$h['id'],$this->uid()])['progress_consent']??'none';
+            $h['group']=null;
+            $shared=$h['permission']!=='owner' || $this->db->one("SELECT s.id FROM habit_shares s WHERE s.owner_user_id=? AND s.status='accepted' AND (s.habit_id=? OR (s.category_id=? AND (s.include_future=1 OR EXISTS(SELECT 1 FROM share_habits sh WHERE sh.share_id=s.id AND sh.habit_id=?)))) LIMIT 1",[$this->uid(),$h['id'],$h['category_id'],$h['id']]);
+            if ($shared) $h['group']=$this->group(['habit_id'=>$h['id']]);
         }
         return $rows;
     }
@@ -106,8 +109,9 @@ final class Habits {
         $date=Validate::date($d['date']??$this->today());
         if ($date>$this->today() || !self::scheduled($h,$date) || $h['status']!=='active') fail('error_date');
         if ($h['permission']!=='owner') {
-            $joined=$this->db->one('SELECT DATE(joined_at) AS joined FROM habit_collaborators WHERE habit_id=? AND user_id=?',[$h['id'],$this->uid()]);
-            if (!$joined || $date<$joined['joined']) fail('error_date');
+            $joined=$this->db->one('SELECT joined_at FROM habit_collaborators WHERE habit_id=? AND user_id=?',[$h['id'],$this->uid()]);
+            $joinedDate=$joined?(new DateTimeImmutable($joined['joined_at'],new DateTimeZone('UTC')))->setTimezone(new DateTimeZone($this->user['timezone']))->format('Y-m-d'):null;
+            if (!$joinedDate || $date<$joinedDate) fail('error_date');
         }
         $amount=Validate::number($d['amount']??$h['goal']); $note=Validate::text($d,'note',1000,false);
         if ($amount===0.0) $this->db->run('DELETE FROM habit_completions WHERE habit_id=? AND user_id=? AND completed_on=?',[$h['id'],$this->uid(),$date]);
@@ -234,8 +238,9 @@ final class Habits {
         $h=$this->habit((int)($d['habit_id']??0));
         $end=Validate::date($d['end']??$this->today()); $start=Validate::date($d['start']??(new DateTimeImmutable($end))->modify('-29 days')->format('Y-m-d'));
         if ($end>$this->today() || $start>$end || (new DateTimeImmutable($start))->diff(new DateTimeImmutable($end))->days>365) fail('error_date');
-        $members=[['user_id'=>(int)$h['owner_user_id'],'name'=>$h['owner_name'],'progress_consent'=>'detailed','joined_at'=>$h['start_date']]];
-        foreach ($this->db->all("SELECT c.*,u.name FROM habit_collaborators c JOIN users u ON u.id=c.user_id AND u.status='active' WHERE c.habit_id=?",[$h['id']]) as $member) {
+        $members=[['user_id'=>(int)$h['owner_user_id'],'name'=>$h['owner_name'],'progress_consent'=>'detailed','joined_on'=>$h['start_date']]];
+        foreach ($this->db->all("SELECT c.*,u.name,us.timezone FROM habit_collaborators c JOIN users u ON u.id=c.user_id AND u.status='active' JOIN user_settings us ON us.user_id=u.id WHERE c.habit_id=?",[$h['id']]) as $member) {
+            $member['joined_on']=(new DateTimeImmutable($member['joined_at'],new DateTimeZone('UTC')))->setTimezone(new DateTimeZone($member['timezone']))->format('Y-m-d');
             try { $a=$this->access($h,(int)$member['user_id']); if (self::RANK[$a['permission']]>=2) $members[]=$member; } catch (AppError $e) { /* Revoked membership contributes nothing. */ }
         }
         $out=[]; $rates=[];
@@ -245,7 +250,7 @@ final class Habits {
             if ($uid!==$this->uid() && $h['permission']!=='owner' && self::VIS[$h['progress_visibility']]<self::VIS[$vis]) $vis=$h['progress_visibility'];
             $item=['user_id'=>$uid,'name'=>$member['name'],'visibility'=>$vis];
             if ($vis!=='none') {
-                $from=max($start,$h['start_date'],substr($member['joined_at'],0,10)); $expected=0;
+                $from=max($start,$h['start_date'],$member['joined_on']); $expected=0;
                 for ($date=new DateTimeImmutable($from);$date->format('Y-m-d')<=$end;$date=$date->modify('+1 day')) if (self::scheduled($h,$date->format('Y-m-d'))) $expected++;
                 $rows=$this->db->all('SELECT completed_on,amount,goal_at_time FROM habit_completions WHERE habit_id=? AND user_id=? AND completed_on BETWEEN ? AND ?',[$h['id'],$uid,$from,$end]);
                 $done=0; $fraction=0;
