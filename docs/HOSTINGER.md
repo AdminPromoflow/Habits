@@ -1,0 +1,69 @@
+# Instalar en Hostinger
+
+## Requisitos
+
+PHP 8.2 o posterior con `pdo_mysql`, `mbstring`, `json` y `session`; MySQL 8.0.16+ o MariaDB 10.4+; HTTPS y Apache/LiteSpeed con `.htaccess`. La aplicación funciona dentro de un subdirectorio como `/habits/` porque las rutas del frontend son relativas.
+
+## Sitio de esta instalación
+
+La sesión de hPanel revisada corresponde a **aleinarossui.com**. El repositorio Habits está conectado a `public_html/habits`. La base solicitada y creada en el panel es **u348170507_habits**, con usuario **u348170507_habits**. Estos nombres no son contraseñas. El archivo `config/local.php` de desarrollo contiene credenciales del MySQL local y no debe copiarse a producción.
+
+## Conexión de producción
+
+Crea directamente en el servidor `public_html/habits/config/local.php` (se excluye de Git):
+
+```php
+<?php
+return [
+    'db_host' => 'localhost',
+    'db_port' => 3306,
+    'db_name' => 'u348170507_habits',
+    'db_user' => 'u348170507_habits',
+    'db_password' => 'CONTRASEÑA_ELEGIDA_EN_HOSTINGER',
+    'db_socket' => '',
+    'app_url' => 'https://aleinarossui.com/habits',
+    'secure_cookies' => true,
+    'session_path' => __DIR__ . '/../storage/sessions',
+];
+```
+
+Completa la contraseña real directamente en el servidor. Conserva las comillas; si la contraseña contiene comillas simples o barras invertidas, hay que escaparlas en PHP. No incluyas este archivo en un commit. Los permisos deben permitir su lectura al proceso PHP del alojamiento (normalmente 600/640, según propietario), sin permitir acceso HTTP.
+
+El directorio `storage` y su subdirectorio `sessions` deben poder ser escritos por el usuario de PHP. No uses permisos 777. En Hostinger, PHP suele ejecutarse con el propietario de los archivos; comprueba los permisos reales.
+
+## Importar el esquema y los datos
+
+La exportación `storage/hostinger-mi-rutina.sql` se importa en **la nueva base vacía**, desde phpMyAdmin → Importar. No contiene `CREATE DATABASE`, `DROP DATABASE`, `GRANT`, procedimientos, disparadores ni definidores. Incluye tablas, cuenta de Aleina, roles, preferencias, categorías, plantillas y rutina. No incluye sesiones ni límites de intentos del entorno local.
+
+Si partes desde cero y tienes SSH, ejecuta `php bin/install.php` y `php bin/import-routine.php` después de guardar la conexión. Si ya importaste la exportación, ejecutar el instalador de nuevo es idempotente.
+
+Tras importar, el enlace de activación de Aleina utiliza el mismo token de un solo uso, reemplazando el origen local por `https://aleinarossui.com/habits/`. Si Aleina ya había activado su cuenta antes de exportar, inicia sesión con la misma contraseña. Para emitir un nuevo enlace, mediante SSH:
+
+```sh
+php bin/reset-password.php aleinaroseroy@gmail.com
+```
+
+Este comando invalida sesiones anteriores y genera un enlace que caduca en una hora. No envía correos.
+
+## Git y despliegues
+
+Sube los archivos de aplicación, incluidos `.htaccess`, `assets`, `app` y `translations`. Los archivos `config/local.php` y el contenido de `storage` no se versionan. No despliegues `tests/.runtime`, archivos SQL privados ni la carpeta `.git` a una ruta pública.
+
+Comprueba que la estrategia de despliegue de Hostinger conserva archivos no versionados. Si reemplaza todo `public_html/habits`, conserva la configuración y las sesiones fuera de la carpeta reemplazada y proporciona sus rutas/valores mediante variables `RUTINA_DB_*`, `RUTINA_APP_URL`, `RUTINA_SESSION_PATH` y `RUTINA_SECURE_COOKIES=1`.
+
+## Verificación en producción
+
+1. Abre `/habits/` y comprueba que aparece el formulario de acceso.
+2. Verifica que `/habits/config/local.php`, `/habits/storage/initial-access.txt` y `/habits/.git/config` devuelven 403/404.
+3. Inicia sesión, cambia el idioma, recarga y confirma que se conserva.
+4. Comprueba la categoría Ejercicios y la rutina de noviembre/diciembre.
+5. Comprueba que Aleina puede alternar entre el panel personal y administración.
+6. Verifica que las cookies de sesión sean `Secure`, `HttpOnly` y `SameSite=Lax`.
+7. Excluye `/habits/` y `/habits/api.php` del almacenamiento en caché de páginas/CDN. Las respuestas privadas envían `Cache-Control: no-store, private`.
+8. Conserva copias de seguridad de MySQL. Para futuras actualizaciones, respalda primero y ejecuta `php bin/migrate.php`; no vuelvas a importar una copia inicial encima de datos existentes.
+
+## Referencias oficiales consultadas
+
+- [Crear una base MySQL](https://www.hostinger.com/support/1583542-how-to-create-a-new-mysql-database-in-hostinger/)
+- [Importar y configurar una base](https://www.hostinger.com/support/1864324-how-to-upload-and-set-up-your-database-at-hostinger/)
+- [Seleccionar la versión de PHP](https://www.hostinger.com/support/1575755-how-to-change-the-php-version-of-your-hostinger-hosting-plan/)

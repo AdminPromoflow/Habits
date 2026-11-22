@@ -46,6 +46,11 @@ final class Habits {
             $h=array_merge($h,$this->access($h));
             $h['schedule_days']=json_decode($h['schedule_days'],true);
             $h['progress_consent']=$this->db->one('SELECT progress_consent FROM habit_collaborators WHERE habit_id=? AND user_id=?',[$h['id'],$this->uid()])['progress_consent']??'none';
+            $h['tracking_start']=$h['start_date'];
+            if ($h['permission']!=='owner') {
+                $joined=$this->db->one('SELECT joined_at FROM habit_collaborators WHERE habit_id=? AND user_id=?',[$h['id'],$this->uid()]);
+                $h['tracking_start']=$joined?max($h['start_date'],(new DateTimeImmutable($joined['joined_at'],new DateTimeZone('UTC')))->setTimezone(new DateTimeZone($this->user['timezone']))->format('Y-m-d')):$this->today();
+            }
             $h['group']=null;
             $shared=$h['permission']!=='owner' || $this->db->one("SELECT s.id FROM habit_shares s WHERE s.owner_user_id=? AND s.status='accepted' AND (s.habit_id=? OR (s.category_id=? AND (s.include_future=1 OR EXISTS(SELECT 1 FROM share_habits sh WHERE sh.share_id=s.id AND sh.habit_id=?)))) LIMIT 1",[$this->uid(),$h['id'],$h['category_id'],$h['id']]);
             if ($shared) $h['group']=$this->group(['habit_id'=>$h['id']]);

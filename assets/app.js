@@ -48,7 +48,7 @@ const today=()=>S.data?.today||new Intl.DateTimeFormat('en-CA',{timeZone:'Americ
 function dayLabel(n,long=false){return fmt(shift('2026-11-23',n-1),{weekday:long?'long':'short'});}
 function categoryName(c){return c.translation_key?t(c.translation_key):c.name;}
 function habitCategory(h){return h.category_key?t(h.category_key):h.category_name;}
-function scheduled(h,date){return date>=h.start_date&&(!h.end_date||date<=h.end_date)&&h.schedule_days.includes(dayNum(date));}
+function scheduled(h,date){return date>=(h.tracking_start||h.start_date)&&(!h.end_date||date<=h.end_date)&&h.schedule_days.includes(dayNum(date));}
 function completion(h,date){return S.data.completions.find(c=>Number(c.habit_id)===Number(h.id)&&c.completed_on===date);}
 function done(h,date){const c=completion(h,date);return !!c&&Number(c.amount)>=Number(c.goal_at_time);}
 function due(date,habits=S.data.habits){return habits.filter(h=>h.status==='active'&&h.permission!=='viewer'&&scheduled(h,date));}
