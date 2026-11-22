@@ -27,7 +27,9 @@ return [
 ];
 ```
 
-Completa la contraseña real directamente en el servidor. Conserva las comillas; si la contraseña contiene comillas simples o barras invertidas, hay que escaparlas en PHP. No incluyas este archivo en un commit. Los permisos deben permitir su lectura al proceso PHP del alojamiento (normalmente 600/640, según propietario), sin permitir acceso HTTP.
+En la instalación realizada, `local.php` lee la contraseña desde `config/database-password.txt` usando `rtrim(file_get_contents(...), "\r\n")`. Ese archivo contiene únicamente la contraseña, sin comillas, y también está excluido de Git y protegido por `.htaccess`. Este método evita problemas con caracteres especiales dentro de una cadena PHP.
+
+Si utilizas el ejemplo anterior, completa la contraseña real directamente en el servidor. Conserva las comillas; si la contraseña contiene comillas simples o barras invertidas, hay que escaparlas en PHP. No incluyas este archivo en un commit. Los permisos deben permitir su lectura al proceso PHP del alojamiento (normalmente 600/640, según propietario), sin permitir acceso HTTP.
 
 El directorio `storage` y su subdirectorio `sessions` deben poder ser escritos por el usuario de PHP. No uses permisos 777. En Hostinger, PHP suele ejecutarse con el propietario de los archivos; comprueba los permisos reales.
 

@@ -4,7 +4,7 @@ import os,sys,json,time,secrets,subprocess,urllib.request,urllib.error,http.cook
 ROOT=pathlib.Path(__file__).resolve().parent.parent
 PHP=os.environ.get('PHP_BIN','php')
 DB='mi_rutina_test_'+secrets.token_hex(5)
-PORT=int(os.environ.get('RUTINA_TEST_PORT','8783'))
+PORT=int(os.environ.get('RUTINA_TEST_PORT','8784'))
 BASE=f'http://127.0.0.1:{PORT}'
 env=dict(os.environ,RUTINA_DB_NAME=DB,RUTINA_DB_USER=os.environ.get('RUTINA_TEST_DB_USER','root'),RUTINA_DB_PASSWORD=os.environ.get('RUTINA_TEST_DB_PASSWORD',''),RUTINA_APP_URL=BASE,RUTINA_SESSION_PATH=str(ROOT/'tests/.runtime/sessions'),RUTINA_SECURE_COOKIES='0')
 (ROOT/'tests/.runtime').mkdir(exist_ok=True)
@@ -92,10 +92,13 @@ try:
  check(h1 in bob.ids() and h2 not in bob.ids(),'Accepted individual invitation exposes only the selected habit')
  owner.request('share',{'email':'bob@example.test','habit_ids':[h1],'permission':'participant'})
  check(len([r for r in owner.data()['outgoing'] if r['habit_id']==h1 and r['recipient_email']=='bob@example.test'])==1,'Duplicate active invitations are prevented')
+ owner.request('share',{'email':'viewer@example.test','habit_ids':[h2],'permission':'viewer'})
+ decline_inv=next(i for i in viewer.data()['incoming'] if i['habit_id']==h2);viewer.request('respond',{'id':decline_inv['id'],'status':'declined'})
+ check(h2 not in viewer.ids() and any(i['status']=='declined' for i in viewer.data()['incoming']),'Declining an invitation never activates access')
  owner.request('share',{'email':'nobody@example.test','habit_ids':[h2],'permission':'viewer'})
  check(any(r['recipient_email']=='nobody@example.test' and r['status']=='pending' and 'share_id' not in r for r in owner.data()['outgoing']),'Opaque pending receipts do not disclose account existence')
  owner.request('share',{'email':'viewer@example.test','habit_ids':[h1],'permission':'viewer','progress_visibility':'detailed'})
- vi=viewer.data()['incoming'][0];viewer.request('respond',{'id':vi['id'],'status':'accepted'})
+ vi=next(i for i in viewer.data()['incoming'] if i['habit_id']==h1);viewer.request('respond',{'id':vi['id'],'status':'accepted'})
  viewer.request('complete',{'habit_id':h1,'date':td,'amount':10},403);check(True,'Viewers cannot record completions')
  h=next(h for h in bob.data()['habits'] if h['id']==h1);h['name']='Illegal edit';bob.request('saveHabit',h,403);check(True,'Participants cannot edit habit details')
  bob.request('complete',{'habit_id':h1,'user_id':a['user']['id'],'date':td,'amount':10},403);check(True,'A participant cannot write another user’s completion record')
