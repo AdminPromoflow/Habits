@@ -2,7 +2,7 @@
 declare(strict_types=1);
 if (PHP_SAPI!=='cli') { http_response_code(404); exit; }
 require __DIR__.'/migrate.php';
-$db=database(); $email='aleinaroseroy@gmail.com';
+$db=database(); $email='aleinarossui@gmail.com';
 $u=$db->one('SELECT * FROM users WHERE email=?',[$email]);
 $token=null;
 $db->transaction(function() use($db,$email,&$u,&$token) {

@@ -40,7 +40,7 @@ final class Auth {
         if (($this->db->one("SELECT setting_value FROM platform_settings WHERE setting_key='registration_enabled'")['setting_value']??'1')!=='1') fail('error_registration',403);
         $email=Validate::email($d['email']??null); $name=Validate::text($d,'name',100); $password=Validate::password($d['password']??null);
         $language=Validate::choice($d['language']??'en',['en','es']);
-        if ($email==='aleinaroseroy@gmail.com') fail('error_registration');
+        if ($email==='aleinarossui@gmail.com') fail('error_registration');
         try {
             $id=$this->db->transaction(function() use($name,$email,$password,$language) {
                 $this->db->run('INSERT INTO users(name,email,password_hash) VALUES (?,?,?)',[$name,$email,password_hash($password,PASSWORD_DEFAULT)]); $id=$this->db->id();
@@ -54,11 +54,52 @@ final class Auth {
         $this->rate('setup:'.($_SERVER['REMOTE_ADDR']??'cli'),10,3600);
         $token=Validate::text($d,'token',128); $password=Validate::password($d['password']??null);
         $u=$this->db->transaction(function() use($token,$password) {
-            $u=$this->db->one('SELECT * FROM users WHERE setup_token_hash=? AND setup_expires_at>UTC_TIMESTAMP() FOR UPDATE',[hash('sha256',$token)]);
+            $u=$this->db->one("SELECT * FROM users WHERE setup_token_hash=? AND setup_expires_at>UTC_TIMESTAMP() AND status='active' FOR UPDATE",[hash('sha256',$token)]);
             if (!$u) fail('error_setup',403);
             $this->db->run('UPDATE users SET password_hash=?,setup_token_hash=NULL,setup_expires_at=NULL,auth_version=auth_version+1 WHERE id=?',[password_hash($password,PASSWORD_DEFAULT),$u['id']]);
             $u['auth_version']++; return $u;
         }); $this->signIn($u);
+    }
+    public function forgotPassword(array $d): void {
+        $email=Validate::email($d['email']??null);
+        $language=Validate::choice($d['language']??'en',['en','es']);
+        $this->rate('recovery-ip:'.($_SERVER['REMOTE_ADDR']??'cli'),20,3600);
+        $mailer=new Mailer();
+        if (!$mailer->ready()) fail('error_mail_unavailable',503);
+        // Apply the same limits and response to registered and unknown addresses.
+        try { $this->rate('recovery-email:'.$email,3,3600); }
+        catch (AppError $e) { if ($e->key==='error_rate') return; throw $e; }
+        $this->rate('recovery-global-minute',8,60);
+        $this->rate('recovery-global-day',90,86400);
+        $this->db->run('DELETE FROM password_resets WHERE expires_at<=UTC_TIMESTAMP()');
+        $u=$this->db->one("SELECT id,auth_version FROM users WHERE email=? AND status='active'",[$email]);
+        if (!$u) return;
+        $token=bin2hex(random_bytes(32)); $hash=hash('sha256',$token);
+        $this->db->run('INSERT INTO password_resets(token_hash,user_id,auth_version,expires_at) VALUES (?,?,?,?)',[$hash,$u['id'],$u['auth_version'],gmdate('Y-m-d H:i:s',time()+1800)]);
+        try { $sent=$mailer->recovery($email,$token,$language); }
+        catch (Throwable $e) { $sent=false; }
+        if (!$sent) {
+            $this->db->run('DELETE FROM password_resets WHERE token_hash=?',[$hash]);
+            error_log('MI RUTINA: password recovery mail was not accepted by the mail transport.');
+        }
+    }
+    public function resetPassword(array $d): void {
+        $this->rate('reset-ip:'.($_SERVER['REMOTE_ADDR']??'cli'),20,3600);
+        $token=Validate::text($d,'token',64);
+        if (!preg_match('/^[a-f0-9]{64}$/D',$token)) fail('error_reset',403);
+        $password=Validate::password($d['password']??null);
+        $this->db->transaction(function() use($token,$password) {
+            $hash=hash('sha256',$token);
+            $r=$this->db->one('SELECT user_id FROM password_resets WHERE token_hash=?',[$hash]);
+            if (!$r) fail('error_reset',403);
+            $u=$this->db->one('SELECT id,email,status,auth_version FROM users WHERE id=? FOR UPDATE',[$r['user_id']]);
+            $r=$this->db->one('SELECT auth_version FROM password_resets WHERE token_hash=? AND expires_at>UTC_TIMESTAMP() FOR UPDATE',[$hash]);
+            if (!$u || $u['status']!=='active' || !$r || (int)$r['auth_version']!==(int)$u['auth_version']) fail('error_reset',403);
+            $this->db->run('UPDATE users SET password_hash=?,setup_token_hash=NULL,setup_expires_at=NULL,auth_version=auth_version+1 WHERE id=?',[password_hash($password,PASSWORD_DEFAULT),$u['id']]);
+            $this->db->run('DELETE FROM password_resets WHERE user_id=?',[$u['id']]);
+            $this->db->run('DELETE FROM rate_limits WHERE bucket=?',[hash('sha256','login-email:'.$u['email'])]);
+        });
+        $this->logout();
     }
     public function logout(): void {
         $_SESSION=[]; session_regenerate_id(true); $_SESSION['csrf']=bin2hex(random_bytes(32));

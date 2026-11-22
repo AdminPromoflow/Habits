@@ -19,7 +19,7 @@ try {
         $d=json_decode($raw,true,32,JSON_THROW_ON_ERROR);
         if (!is_array($d)) fail('error_validation');
     }
-    $public=['login','register','setup','logout','language'];
+    $public=['login','register','setup','forgotPassword','resetPassword','logout','language'];
     if ($action==='bootstrap' && $method==='GET') {
         $user=$auth->user(); $lang=$user['language']??($_COOKIE['rutina_language']??'en'); if (!in_array($lang,['en','es'],true)) $lang='en';
         $result=['user'=>$user,'language'=>$lang,'translations'=>['en'=>require __DIR__.'/translations/en.php','es'=>require __DIR__.'/translations/es.php'],

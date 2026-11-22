@@ -10,4 +10,6 @@ return [
     'app_url' => 'http://localhost/Habits',
     'secure_cookies' => false, // MUST be true on HTTPS / Hostinger.
     'session_path' => __DIR__ . '/../storage/sessions',
+    'mail_transport' => 'disabled', // Hostinger: mail; isolated automated tests: file.
+    'mail_from' => '', // Empty uses Hostinger's configured server sender.
 ];

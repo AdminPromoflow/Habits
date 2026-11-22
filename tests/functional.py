@@ -6,7 +6,7 @@ PHP=os.environ.get('PHP_BIN','php')
 DB='mi_rutina_test_'+secrets.token_hex(5)
 PORT=int(os.environ.get('RUTINA_TEST_PORT','8784'))
 BASE=f'http://127.0.0.1:{PORT}'
-env=dict(os.environ,RUTINA_DB_NAME=DB,RUTINA_DB_USER=os.environ.get('RUTINA_TEST_DB_USER','root'),RUTINA_DB_PASSWORD=os.environ.get('RUTINA_TEST_DB_PASSWORD',''),RUTINA_APP_URL=BASE,RUTINA_SESSION_PATH=str(ROOT/'tests/.runtime/sessions'),RUTINA_SECURE_COOKIES='0')
+env=dict(os.environ,RUTINA_DB_NAME=DB,RUTINA_DB_USER=os.environ.get('RUTINA_TEST_DB_USER','root'),RUTINA_DB_PASSWORD=os.environ.get('RUTINA_TEST_DB_PASSWORD',''),RUTINA_APP_URL=BASE,RUTINA_SESSION_PATH=str(ROOT/'tests/.runtime/sessions'),RUTINA_SECURE_COOKIES='0',RUTINA_MAIL_TRANSPORT='file')
 (ROOT/'tests/.runtime').mkdir(exist_ok=True)
 PASSWORD='Test-only-password-2026'
 checks=0
@@ -59,18 +59,18 @@ try:
  guest.request('language',{'language':'es'});check(guest.boot()['language']=='es','Visitor language persists in a cookie')
  check(guest.request('language',{'language':'en'},419,csrf=False)['error']=='error_csrf','CSRF is enforced before mutation')
  guest.request('admin',expected=401);check(True,'Anonymous administrator access is denied')
- a=owner.login('aleinaroseroy@gmail.com');check(set(a['user']['roles'])=={'admin','user'},'Aleina has both roles in one account')
+ a=owner.login('aleinarossui@gmail.com');check(set(a['user']['roles'])=={'admin','user'},'Aleina has both roles in one account')
  check(len(a['data']['habits'])==40 and len(a['data']['routines'])==1,'Routine import is idempotent: 40 exercises, one routine')
  check(not a['data']['completions'],'PDF import does not fabricate completion history')
  bob.register('bob@example.test','Bob');eve.register('eve@example.test','Eve');viewer.register('viewer@example.test','Viewer')
  bob.request('admin',expected=403);check(True,'Normal users cannot read administration data')
  check(not bob.data()['habits'],'New users cannot see Aleina’s private routine')
  owner.request('language',{'language':'es'});check(owner.boot()['language']=='es','Spanish is stored for the signed-in account')
- device=Client();device.request('language',{'language':'en'});check(device.login('aleinaroseroy@gmail.com')['language']=='es','Database language overrides another device’s cookie')
+ device=Client();device.request('language',{'language':'en'});check(device.login('aleinarossui@gmail.com')['language']=='es','Database language overrides another device’s cookie')
  r=owner.request('logout',{});owner.csrf=r['csrf'];check(owner.boot()['language']=='es','Spanish remains selected after logout')
- owner.request('language',{'language':'en'});check(owner.login('aleinaroseroy@gmail.com')['language']=='es','Guest selection does not overwrite the account preference')
+ owner.request('language',{'language':'en'});check(owner.login('aleinarossui@gmail.com')['language']=='es','Guest selection does not overwrite the account preference')
  owner.request('language',{'language':'en'});check(device.boot()['language']=='en','English preference persists across existing device sessions')
- r=owner.request('logout',{});owner.csrf=r['csrf'];check(owner.login('aleinaroseroy@gmail.com')['language']=='en','English remains selected after logout and login')
+ r=owner.request('logout',{});owner.csrf=r['csrf'];check(owner.login('aleinarossui@gmail.com')['language']=='en','English remains selected after logout and login')
  check(set(owner.boot()['translations']['en'])==set(owner.boot()['translations']['es']),'Both centralized dictionaries cover identical interface keys')
  td=owner.data()['today'];past=(datetime.date.fromisoformat(td)-datetime.timedelta(days=10)).isoformat()
  category=owner.request('saveCategory',{'name':'Private exercise test','description':'Only Aleina','icon':'dumbbell','color':'#CBE8DD'})['id']
@@ -158,7 +158,53 @@ try:
  owner.request('weight',{'date':td,'weight_kg':60.5});check(not eve.data()['weights'],'Weight entries remain private')
  newpwd='Changed-test-password-2026';owner.request('password',{'current_password':PASSWORD,'password':newpwd});check(device.boot()['user'] is None,'Changing password invalidates other devices')
  owner.request('password',{'current_password':newpwd,'password':PASSWORD})
- for path in ['config/local.php','storage/initial-access.txt','database/routine-nov-dec-2026.json','.git/config','app/Habits.php','tests/provision.php']:
+ # Password recovery delivers only into a private test mailbox.
+ import re,hashlib
+ recovery=Client();recovery.register('recovery@example.test','Recovery')
+ recovery_guest=Client()
+ def fixture(action,email='recovery@example.test'):
+  return subprocess.check_output([PHP,'tests/recovery-fixture.php',action,email],cwd=ROOT,env=env,text=True)
+ def recover(email='recovery@example.test',language='es'):
+  before=set((ROOT/'tests/.runtime/mail').glob('*.json'))
+  result=recovery_guest.request('forgotPassword',{'email':email,'language':language})
+  files=set((ROOT/'tests/.runtime/mail').glob('*.json'))-before
+  messages=[json.loads(p.read_text()) for p in files]
+  return result,messages
+ recovery_guest.request('forgotPassword',{'email':'recovery@example.test'},419,csrf=False)
+ check(True,'Recovery requests require CSRF protection')
+ response,messages=recover()
+ unknown,empty=recover('unknown@example.test')
+ check(response==unknown and not empty and len(messages)==1,'Recovery responds identically for existing and unknown accounts')
+ message=messages[0];token=re.search(r'#reset=([a-f0-9]{64})',message['body']).group(1)
+ check(message['to']=='recovery@example.test' and '30 minutos' in message['body'] and BASE in message['body'],'Recovery email uses the requested language, trusted URL and expiry')
+ stored=json.loads(fixture('inspect'))
+ check(stored==[{'token_hash':hashlib.sha256(token.encode()).hexdigest()}],'Only a hash of the recovery token is stored in MySQL')
+ check(recovery.login('recovery@example.test')['user'] is not None,'Requesting recovery does not lock out the current password')
+ recovery_guest.request('resetPassword',{'token':'0'*64,'password':PASSWORD},403)
+ recovery_guest.request('resetPassword',{'token':token,'password':'short'},422)
+ fixture('expire');recovery_guest.request('resetPassword',{'token':token,'password':PASSWORD},403)
+ check(True,'Forged and expired tokens and weak replacement passwords are rejected')
+ _,messages=recover();token=re.search(r'#reset=([a-f0-9]{64})',messages[0]['body']).group(1)
+ replacement='Recovered-password-2026'
+ reset=recovery_guest.request('resetPassword',{'token':token,'password':replacement});recovery_guest.csrf=reset['csrf']
+ check(recovery.boot()['user'] is None and recovery_guest.boot()['user'] is None,'Reset invalidates other sessions and requires a fresh sign-in')
+ recovery_guest.request('resetPassword',{'token':token,'password':PASSWORD},403)
+ recovery_guest.request('login',{'email':'recovery@example.test','password':PASSWORD},401)
+ recovered=recovery_guest.request('login',{'email':'recovery@example.test','password':replacement});recovery_guest.csrf=recovered['csrf']
+ check(recovery_guest.boot()['user']['email']=='recovery@example.test','Reset token is single use; only the replacement password signs in')
+ _,messages=recover();token=re.search(r'#reset=([a-f0-9]{64})',messages[0]['body']).group(1)
+ recovery_guest.request('password',{'current_password':replacement,'password':PASSWORD})
+ recovery_guest.request('resetPassword',{'token':token,'password':replacement},403)
+ check(True,'Changing a password invalidates previously issued recovery links')
+ limited,empty=recover();check(set(limited)==set(response) and limited['csrf']==recovery_guest.csrf and not empty,'Per-address recovery limits do not reveal account existence')
+ dormant=Client();dormant.register('dormant@example.test','Dormant');fixture('setup','dormant@example.test')
+ _,messages=recover('dormant@example.test');token=re.search(r'#reset=([a-f0-9]{64})',messages[0]['body']).group(1)
+ r=recovery_guest.request('resetPassword',{'token':token,'password':PASSWORD});recovery_guest.csrf=r['csrf']
+ check(dormant.login('dormant@example.test')['user'] is not None,'Email recovery can activate an account whose initial setup is pending')
+ _,messages=recover('dormant@example.test');token=re.search(r'#reset=([a-f0-9]{64})',messages[0]['body']).group(1)
+ fixture('suspend','dormant@example.test');recovery_guest.request('resetPassword',{'token':token,'password':replacement},403)
+ _,empty=recover('dormant@example.test');check(not empty,'Suspended accounts cannot request or use password recovery')
+ for path in ['config/local.php','storage/initial-access.txt','database/routine-nov-dec-2026.json','.git/config','app/Habits.php','tests/provision.php','tests/.runtime/mail/']:
   try:urllib.request.urlopen(BASE+'/'+path);raise AssertionError('Private path exposed: '+path)
   except urllib.error.HTTPError as e:check(e.code==404,'HTTP denies '+path)
  subprocess.run([PHP,'tests/constraints.php'],cwd=ROOT,env=env,check=True)

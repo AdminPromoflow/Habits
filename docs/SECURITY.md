@@ -6,7 +6,9 @@ Contraseñas con `password_hash`/`password_verify`; sesiones regeneradas al entr
 
 La cuenta inicial de Aleina solo se crea desde CLI. Su correo está reservado en el registro público. La activación requiere un token aleatorio cuyo hash y fecha de caducidad se almacenan en MySQL; no hay contraseña predeterminada. Un cambio de contraseña o suspensión invalida otras sesiones con `auth_version`.
 
-La recuperación de contraseña es una operación administrativa CLI; no hay proveedor SMTP configurado. Las invitaciones y avisos se entregan **dentro de la aplicación**, no por email. El correo se usa como identificador de cuenta; esta versión no incluye verificación de titularidad mediante correo electrónico.
+La recuperación pública envía un enlace de un solo uso que vence en 30 minutos. MySQL conserva únicamente su hash SHA-256 y la versión de autenticación; pedirlo no bloquea el acceso existente. Al confirmar la nueva contraseña se invalidan las sesiones, los demás enlaces y la activación inicial. No se inicia sesión automáticamente. Las cuentas suspendidas no pueden usar la recuperación. La respuesta no revela si el correo existe y se limitan solicitudes por IP, dirección y plataforma.
+
+En Hostinger se utiliza el transporte PHP `mail()` con el remitente del alojamiento, configurable mediante `mail_from`. La aceptación por el transporte no garantiza la llegada al buzón; los fallos se registran sin direcciones, contraseñas ni tokens. El transporte de archivos solo funciona en el servidor PHP de pruebas con una base `mi_rutina_test_*`, dentro de una carpeta bloqueada por HTTP. Las invitaciones y avisos de colaboración siguen entregándose **dentro de la aplicación**. El registro no incluye una verificación inicial de titularidad del correo.
 
 ## Propiedad y permisos
 

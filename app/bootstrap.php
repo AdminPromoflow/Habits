@@ -7,7 +7,7 @@ spl_autoload_register(static function (string $class): void {
 date_default_timezone_set('UTC');
 $local = is_file(__DIR__.'/../config/local.php') ? require __DIR__.'/../config/local.php' : [];
 $config = array_replace(require __DIR__.'/../config/example.php', $local);
-foreach (['db_host','db_port','db_name','db_user','db_password','db_socket','app_url','session_path'] as $key) {
+foreach (['db_host','db_port','db_name','db_user','db_password','db_socket','app_url','session_path','mail_transport','mail_from'] as $key) {
     $value = getenv('RUTINA_'.strtoupper($key));
     if ($value !== false) $config[$key] = $value;
 }

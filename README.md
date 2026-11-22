@@ -5,7 +5,7 @@ Plataforma bilingüe de hábitos, rutinas y colaboración. PHP 8.2+, MySQL 8.0.1
 ## Abrir la instalación local
 
 - Aplicación: http://localhost:8782
-- Cuenta inicial: `AleinaRoseroy@gmail.com`, con roles `admin` y `user`.
+- Cuenta inicial: `aleinarossui@gmail.com`, con roles `admin` y `user`.
 - La contraseña se elige con el enlace privado de un solo uso en `storage/initial-access.txt`. No existe una contraseña predeterminada.
 - Iniciar el servidor: `php -S 127.0.0.1:8782 router.php`, desde esta carpeta, con PHP 8.2 o superior.
 - En este Mac, PHP compatible está en `/opt/homebrew/bin/php`. El PHP de Apache/XAMPP es 8.0 y no es la versión de producción recomendada.

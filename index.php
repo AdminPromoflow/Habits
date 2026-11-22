@@ -11,8 +11,8 @@ $lang=in_array($_COOKIE['rutina_language']??'en',['en','es'],true)?($_COOKIE['ru
 <meta name="description" content="MI RUTINA — Your private space for habits, routines and thoughtful collaboration.">
 <title>MI RUTINA · Your space to grow</title>
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="assets/app.css">
-<script src="assets/app.js" defer></script>
+<link rel="stylesheet" href="assets/app.css?v=<?= filemtime(__DIR__.'/assets/app.css') ?>">
+<script src="assets/app.js?v=<?= filemtime(__DIR__.'/assets/app.js') ?>" defer></script>
 </head>
 <body>
 <div id="app"><div class="boot"><span class="boot-flower">✳</span><span>MI RUTINA</span></div></div>

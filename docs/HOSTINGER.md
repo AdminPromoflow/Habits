@@ -24,6 +24,8 @@ return [
     'app_url' => 'https://aleinarossui.com/habits',
     'secure_cookies' => true,
     'session_path' => __DIR__ . '/../storage/sessions',
+    'mail_transport' => 'mail',
+    'mail_from' => '', // Remitente predeterminado del alojamiento.
 ];
 ```
 
@@ -42,10 +44,18 @@ Si partes desde cero y tienes SSH, ejecuta `php bin/install.php` y `php bin/impo
 Tras importar, el enlace de activación de Aleina utiliza el mismo token de un solo uso, reemplazando el origen local por `https://aleinarossui.com/habits/`. Si Aleina ya había activado su cuenta antes de exportar, inicia sesión con la misma contraseña. Para emitir un nuevo enlace, mediante SSH:
 
 ```sh
-php bin/reset-password.php aleinaroseroy@gmail.com
+php bin/reset-password.php aleinarossui@gmail.com
 ```
 
 Este comando invalida sesiones anteriores y genera un enlace que caduca en una hora. No envía correos.
+
+## Recuperación de contraseña
+
+La pantalla de acceso incluye **Recuperar contraseña / Forgot password?**. La cuenta inicial utiliza `aleinarossui@gmail.com`. Aplica `003_password_recovery.sql` con el migrador antes de desplegar la recuperación; para esta instalación, `storage/hostinger-recovery.sql` contiene la migración, su checksum y la corrección autorizada del correo de Aleina, conservando su identificador y contenido.
+
+Configura `mail_transport` como `mail` en el `local.php` de producción. Un `mail_from` vacío conserva el remitente predeterminado del servidor Hostinger. Si se configura una dirección propia, debe pertenecer al dominio autorizado para enviar. Revisa el buzón y spam para comprobar la entrega. No copies los correos de prueba a producción.
+
+Los enlaces duran 30 minutos y solo pueden usarse una vez. Pedir un enlace no cambia la contraseña. El restablecimiento invalida las sesiones anteriores y requiere iniciar sesión de nuevo. La aplicación restringe las solicitudes a 3 por dirección/hora, 20 por IP/hora, 8 por minuto y 90 por día para toda la plataforma. Para mayor volumen y entregabilidad, integra un proveedor SMTP autenticado antes de ampliar límites.
 
 ## Git y despliegues
 
@@ -69,3 +79,5 @@ Comprueba que la estrategia de despliegue de Hostinger conserva archivos no vers
 - [Crear una base MySQL](https://www.hostinger.com/support/1583542-how-to-create-a-new-mysql-database-in-hostinger/)
 - [Importar y configurar una base](https://www.hostinger.com/support/1864324-how-to-upload-and-set-up-your-database-at-hostinger/)
 - [Seleccionar la versión de PHP](https://www.hostinger.com/support/1575755-how-to-change-the-php-version-of-your-hostinger-hosting-plan/)
+- [Envío PHP en Hostinger](https://www.hostinger.com/tutorials/how-to-send-emails-using-php-mail-function/)
+- [Límites del alojamiento](https://www.hostinger.com/support/6976044-parameters-and-limits-of-hosting-plans-in-hostinger/)
