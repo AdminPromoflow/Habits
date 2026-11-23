@@ -12,6 +12,8 @@ En Hostinger se utiliza el transporte PHP `mail()` con un remitente del dominio,
 
 ## Propiedad y permisos
 
+Las categorías globales forman un catálogo. Cada usuario elige las suyas en Ajustes mediante `user_categories`; una cuenta nueva no recibe inscripciones automáticas. Las categorías privadas creadas por el usuario y las que ya contienen sus hábitos se conservan. La API exige haber elegido una categoría global antes de crear hábitos o rutinas. Las aprobaciones inscriben únicamente al solicitante. La retirada de una categoría nunca borra ni oculta hábitos existentes: primero deben moverse a otra categoría. Las categorías compartidas por otras personas siguen sujetas a sus invitaciones y no aparecen en el catálogo privado propio.
+
 `habits.owner_user_id` nunca se modifica mediante la API. Un administrador puede gestionar la plataforma pero no leer hábitos, notas, categorías privadas o historial de otros usuarios salvo por una invitación aceptada como usuario normal.
 
 - Lector: detalles y progreso permitido, sin escrituras.

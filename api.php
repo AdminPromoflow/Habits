@@ -54,6 +54,8 @@ try {
                     'archiveHabit'=>$service->archiveHabit($d),
                     'complete'=>$service->complete($d),
                     'saveCategory'=>['id'=>$service->saveCategory($d)],
+                    'joinCategory'=>$service->joinCategory($d),
+                    'leaveCategory'=>$service->leaveCategory($d),
                     'deleteCategory'=>$service->deleteCategory($d),
                     'saveRoutine'=>['id'=>$service->saveRoutine($d)],
                     'requestCategory'=>$service->requestCategory($d),

@@ -12,6 +12,24 @@ final class Habits {
         if (!$c) fail('error_not_found',404); return $c;
     }
     // Every access is derived from active server-side grants, never from the UI or collaborator cache.
+    public function selectedCategory(int $id, ?int $owner = null): array {
+        $owner??=$this->uid(); $c=$this->category($id,$owner);
+        if ($c['owner_user_id']===null && !$this->db->one('SELECT user_id FROM user_categories WHERE user_id=? AND category_id=? FOR UPDATE',[$owner,$id])) fail('error_category_not_selected');
+        return $c;
+    }
+    public function joinCategory(array $d): void {
+        $c=$this->category((int)($d['id']??0));
+        if ($c['owner_user_id']!==null) fail('error_validation');
+        $this->db->run('INSERT IGNORE INTO user_categories(user_id,category_id) VALUES (?,?)',[$this->uid(),$c['id']]);
+    }
+    public function leaveCategory(array $d): void {
+        $c=$this->category((int)($d['id']??0));
+        if ($c['owner_user_id']!==null) fail('error_validation');
+        // Membership never deletes, archives or conceals existing personal records.
+        $this->db->one('SELECT user_id FROM user_categories WHERE user_id=? AND category_id=? FOR UPDATE',[$this->uid(),$c['id']]);
+        if ($this->db->one('SELECT id FROM habits WHERE owner_user_id=? AND category_id=? LIMIT 1',[$this->uid(),$c['id']])) fail('error_category_has_habits');
+        $this->db->run('DELETE FROM user_categories WHERE user_id=? AND category_id=?',[$this->uid(),$c['id']]);
+    }
     public function grants(array $h, int $uid, bool $lock = false): array {
         return $this->db->all("SELECT s.* FROM habit_shares s JOIN users u ON u.id=s.owner_user_id AND u.status='active'
           WHERE s.recipient_user_id=? AND s.owner_user_id=? AND s.status='accepted'
@@ -62,10 +80,11 @@ final class Habits {
         $completions=$ids ? $this->db->all('SELECT habit_id,completed_on,amount,goal_at_time,note FROM habit_completions WHERE user_id=? AND habit_id IN ('.implode(',',array_fill(0,count($ids),'?')).') ORDER BY completed_on',array_merge([$this->uid()],$ids)) : [];
         return [
           'today'=>$this->today(),'habits'=>$habits,'completions'=>$completions,
-          'categories'=>$this->db->all('SELECT id,owner_user_id,name,translation_key,description,icon,color FROM habit_categories WHERE owner_user_id IS NULL OR owner_user_id=? ORDER BY owner_user_id IS NOT NULL DESC,id',[$this->uid()]),
+          'categories'=>$this->db->all('SELECT c.id,c.owner_user_id,c.name,c.translation_key,c.description,c.icon,c.color FROM habit_categories c WHERE c.owner_user_id=? OR (c.owner_user_id IS NULL AND EXISTS(SELECT 1 FROM user_categories uc WHERE uc.user_id=? AND uc.category_id=c.id)) ORDER BY c.owner_user_id IS NOT NULL DESC,c.id',[$this->uid(),$this->uid()]),
+          'category_catalog'=>$this->db->all('SELECT c.id,c.name,c.translation_key,c.description,c.icon,c.color,EXISTS(SELECT 1 FROM user_categories uc WHERE uc.user_id=? AND uc.category_id=c.id) AS selected FROM habit_categories c WHERE c.owner_user_id IS NULL ORDER BY c.id',[$this->uid()]),
           'routines'=>$this->db->all('SELECT * FROM routines WHERE owner_user_id=? ORDER BY id',[$this->uid()]),
           'requests'=>$this->db->all('SELECT * FROM category_requests WHERE user_id=? ORDER BY id DESC',[$this->uid()]),
-          'templates'=>$this->db->all('SELECT * FROM habit_templates WHERE active=1 ORDER BY id'),
+          'templates'=>$this->db->all('SELECT t.* FROM habit_templates t JOIN user_categories uc ON uc.category_id=t.category_id AND uc.user_id=? WHERE t.active=1 ORDER BY t.id',[$this->uid()]),
           'notifications'=>$this->db->all('SELECT * FROM notifications WHERE user_id=? ORDER BY id DESC LIMIT 50',[$this->uid()]),
           'weights'=>$this->db->all('SELECT recorded_on,weight_kg FROM wellness_entries WHERE user_id=? ORDER BY recorded_on',[$this->uid()]),
           'outgoing'=>$this->db->all('SELECT r.id,r.recipient_email,r.permission,r.progress_visibility,r.include_future,r.status,r.invitation_message,r.created_at,r.habit_id,r.category_id,COALESCE(h.name,c.name) AS resource_name,c.translation_key AS category_key FROM invitation_receipts r LEFT JOIN habits h ON h.id=r.habit_id LEFT JOIN habit_categories c ON c.id=r.category_id WHERE r.owner_user_id=? ORDER BY r.id DESC',[$this->uid()]),
@@ -75,7 +94,7 @@ final class Habits {
     public function saveHabit(array $d): int {
         $id=(int)($d['id']??0); $old=$id?$this->habit($id,'editor',true):null;
         $owner=$old?(int)$old['owner_user_id']:$this->uid();
-        $category=(int)($d['category_id']??$old['category_id']??0); $this->category($category,$owner);
+        $category=(int)($d['category_id']??$old['category_id']??0); $this->selectedCategory($category,$owner);
         $routine=!empty($d['routine_id'])?(int)$d['routine_id']:null;
         if ($old && $old['permission']!=='owner') { $category=(int)$old['category_id']; $routine=$old['routine_id']; }
         if ($routine && !$this->db->one('SELECT id FROM routines WHERE id=? AND owner_user_id=? AND category_id=?',[$routine,$owner,$category])) fail('error_validation');
@@ -140,7 +159,7 @@ final class Habits {
         $this->db->run('DELETE FROM habit_categories WHERE id=?',[$c['id']]);
     }
     public function saveRoutine(array $d): int {
-        $category=(int)($d['category_id']??0); $this->category($category);
+        $category=(int)($d['category_id']??0); $this->selectedCategory($category);
         $name=Validate::text($d,'name'); $desc=Validate::text($d,'description',3000,false);
         $start=Validate::date($d['start_date']??$this->today()); $end=!empty($d['end_date'])?Validate::date($d['end_date']):null;
         if ($end && $end<$start) fail('error_date');
@@ -156,7 +175,10 @@ final class Habits {
         $this->admin(); $r=$this->db->one('SELECT * FROM category_requests WHERE id=? FOR UPDATE',[(int)($d['id']??0)]);
         if (!$r || $r['status']!=='pending') fail('error_not_found',404);
         $status=Validate::choice($d['status']??'',['approved','rejected']); $feedback=Validate::text($d,'feedback',1000,$status==='rejected');
-        if ($status==='approved') { $category=$r; unset($category['id']); $this->saveCategory($category,true); }
+        if ($status==='approved') {
+            $category=$r; unset($category['id']); $categoryId=$this->saveCategory($category,true);
+            $this->db->run('INSERT IGNORE INTO user_categories(user_id,category_id) VALUES (?,?)',[$r['user_id'],$categoryId]);
+        }
         $this->db->run('UPDATE category_requests SET status=?,feedback=?,reviewed_by=?,reviewed_at=UTC_TIMESTAMP() WHERE id=?',[$status,$feedback,$this->uid(),$r['id']]);
         $this->notify((int)$r['user_id'],'notification_category_'.$status,$r['name'].($feedback?' — '.$feedback:''));
     }

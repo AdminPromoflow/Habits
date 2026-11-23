@@ -65,6 +65,21 @@ try:
  bob.register('bob@example.test','Bob');eve.register('eve@example.test','Eve');viewer.register('viewer@example.test','Viewer')
  bob.request('admin',expected=403);check(True,'Normal users cannot read administration data')
  check(not bob.data()['habits'],'New users cannot see Aleina’s private routine')
+ check(not bob.data()['categories'] and not bob.data()['templates'],'New users have no preselected categories or templates')
+ check([c['name'] for c in owner.data()['categories']]==['Ejercicios'],'Existing exercise category remains selected without enrolling global defaults')
+ catalog=bob.data()['category_catalog'];global_choice=next(c['id'] for c in catalog if c['translation_key']=='cat_learning')
+ check(len(catalog)==5 and all(not c['selected'] for c in catalog),'The global catalog is available for voluntary selection')
+ guest.request('joinCategory',{'id':global_choice},401)
+ bob.request('saveHabit',{'category_id':global_choice,'name':'Unselected habit'},422)
+ bob.request('saveRoutine',{'category_id':global_choice,'name':'Unselected routine'},422)
+ check(True,'The server requires authentication and category selection before creating habits or routines')
+ bob.request('joinCategory',{'id':global_choice,'user_id':a['user']['id']})
+ bob.request('joinCategory',{'id':global_choice})
+ check(len(bob.data()['categories'])==1 and all(c['id']!=global_choice for c in owner.data()['categories']),'Joining is idempotent and cannot enroll another user')
+ bob_other_device=Client();bob_other_device.login('bob@example.test')
+ check(bob_other_device.data()['categories'][0]['id']==global_choice and bob.data()['templates'],'Category selection and matching templates persist across devices')
+ bob.request('leaveCategory',{'id':global_choice})
+ check(not bob.data()['categories'] and not bob.data()['templates'],'Leaving an unused category removes it from personal choices and templates')
  owner.request('language',{'language':'es'});check(owner.boot()['language']=='es','Spanish is stored for the signed-in account')
  device=Client();device.request('language',{'language':'en'});check(device.login('aleinarossui@gmail.com')['language']=='es','Database language overrides another device’s cookie')
  r=owner.request('logout',{});owner.csrf=r['csrf'];check(owner.boot()['language']=='es','Spanish remains selected after logout')
@@ -77,6 +92,8 @@ try:
  other_category=owner.request('saveCategory',{'name':'Another private category','description':'','icon':'book','color':'#D4E5F7'})['id']
  bobcat=bob.request('saveCategory',{'name':'Bob private','description':'','color':'#F5C8D8'})['id']
  check(all(c['id']!=category for c in bob.data()['categories']),'Private category IDs cannot reveal category data')
+ bob.request('joinCategory',{'id':category},404)
+ check(all(c['id']!=category for c in bob.data()['category_catalog']),'The catalog never exposes or enrolls another user’s private categories')
  def newhabit(name,cat=category,client=owner):
   return client.request('saveHabit',{'name':name,'description':'2 x 12 — preserved','category_id':cat,'goal':10,'unit':'minutes','schedule_days':[1,2,3,4,5,6,7],'start_date':past})['id']
  def edit(hid,**changes):
@@ -146,9 +163,14 @@ try:
  check(bh not in owner.ids() and 'Bob secret habit' not in json.dumps(owner.request('admin')),'Administrator privileges do not expose private habit contents')
  future=(datetime.date.fromisoformat(td)+datetime.timedelta(days=1)).isoformat()
  owner.request('complete',{'habit_id':h1,'date':future,'amount':10},422);check(True,'Future completions cannot be fabricated')
- gc=next(c for c in owner.data()['categories'] if c['owner_user_id'] is None)
+ gc=owner.data()['category_catalog'][0]
+ owner.request('joinCategory',{'id':gc['id']});bob.request('joinCategory',{'id':gc['id']})
  owner.request('saveTemplate',{'category_id':gc['id'],'name':'A test template','description':'','goal':1,'schedule_days':[1,3,5],'active':True})
  check(any(x['name']=='A test template' for x in bob.data()['templates']),'Published administrator templates are available to users')
+ global_habit=newhabit('Chosen category habit',gc['id'],bob)
+ bob.request('leaveCategory',{'id':gc['id']},422)
+ check(global_habit in bob.ids(),'Removing a category cannot discard or hide existing habits')
+ check(all(c['name']!='Creative practice' for c in eve.data()['categories']),'Approval enrolls the requester without enrolling other users')
  bobid=bob.boot()['user']['id'];owner.request('manageUser',{'id':bobid,'status':'suspended','admin':False})
  check(bob.boot()['user'] is None,'Suspension invalidates existing sessions')
  owner.request('manageUser',{'id':a['user']['id'],'status':'suspended','admin':False},422);check(True,'The active administrator cannot remove their own access')

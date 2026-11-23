@@ -6,6 +6,7 @@ Plataforma bilingüe de hábitos, rutinas y colaboración. PHP 8.2+, MySQL 8.0.1
 
 - Aplicación: http://localhost:8782
 - Cuenta inicial: `aleinarossui@gmail.com`, con roles `admin` y `user`.
+- Categorías elegidas por cada persona en Ajustes. Mis hábitos muestra categorías con contenido y abre su tablero semanal; el catálogo global permanece disponible para inscribirse voluntariamente.
 - La contraseña se elige con el enlace privado de un solo uso en `storage/initial-access.txt`. No existe una contraseña predeterminada.
 - Iniciar el servidor: `php -S 127.0.0.1:8782 router.php`, desde esta carpeta, con PHP 8.2 o superior.
 - En este Mac, PHP compatible está en `/opt/homebrew/bin/php`. El PHP de Apache/XAMPP es 8.0 y no es la versión de producción recomendada.
