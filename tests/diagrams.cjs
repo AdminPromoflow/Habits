@@ -4,11 +4,14 @@ const { randomUUID } = require('node:crypto');
 const vm = require('node:vm');
 const { test } = require('node:test');
 
-function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diagrams: [] } } } = {}) {
+function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diagrams: [] } }, url = 'http://localhost/MyRemarkableMind/' } = {}) {
   const timers = new Map();
   const documentListeners = new Map();
   const windowListeners = new Map();
   let nextTimer = 0;
+  const navigations = [];
+  const location = { href: url, assign: (url) => navigations.push(url) };
+  const history = { replaceState: (state, unused, url) => { location.href = url; } };
   const elements = [];
   function listen(listeners, name, callback) {
     const previous = listeners.get(name);
@@ -74,6 +77,13 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
     return item;
   }
   const stage = element('mindmap-stage');
+  const title = element('diagram-title', 'diagram-title', stage);
+  const titleLabel = element('diagram-title-label', '', title);
+  const titleInput = Object.assign(element('diagram-title-input', '', title), {
+    value: '', hidden: true,
+    setSelectionRange(start, end) { this.selectionStart = start; this.selectionEnd = end; },
+  });
+  stage.insertAdjacentHTML = () => {};
   const root = element('diagram-root', 'diagram-root', stage);
   root.dataset.nodeKey = 'root';
   const node = element('diagram-node', 'diagram-node', root);
@@ -83,6 +93,14 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
   const widthHandle = element('diagram-width', 'diagram-handle diagram-handle-arrows', controls);
   const menu = element('diagram-menu', 'diagram-menu diagram-popover', root);
   const menuItem = element('diagram-menu-item', 'diagram-menu-item', menu);
+  const checkbox = element('diagram-checkbox', 'diagram-task-checkbox', node);
+  const checkboxTool = element('diagram-checkbox-tool', '', menu);
+  const checkboxMenu = element('diagram-checkbox-menu', 'diagram-checkbox-menu', menu);
+  const checkboxOptions = Object.fromEntries(['none', 'toggle', 'unchecked', 'checked'].map((state) => {
+    const option = element(`diagram-checkbox-${state}`, '', checkboxMenu);
+    option.dataset.state = state;
+    return [state, option];
+  }));
   const outside = element('outside');
   element('create-diagram', '', stage);
   const field = Object.assign(element('diagram-name', '', node), {
@@ -104,6 +122,7 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
     },
   });
   const context = vm.createContext({
+    URL, location, history,
     PageController: class {}, document,
     DiagramViewport: class {
       constructor(options) { this.options = options; this.reset(); }
@@ -124,7 +143,10 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
   });
   const HomePage = vm.runInContext(fs.readFileSync('view/home/home.js', 'utf8') + '\nHomePage;', context);
   const home = new HomePage();
-  if (draft) home.draft = { client_key: 'b15dcc74-7f1a-4d39-974e-ab2828e3e72f' };
+  if (draft) {
+    home.draft = { client_key: 'b15dcc74-7f1a-4d39-974e-ab2828e3e72f' };
+    home.diagramTitle = 'Nuevo diagrama';
+  }
   function dispatch(name, target, options = {}) {
     const event = {
       target, prevented: false,
@@ -137,7 +159,9 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
     return event;
   }
   return {
-    home, state, timers, stage, field, root, node, controls, tool, more, widthHandle, menu, menuItem, outside, document, windowListeners,
+    checkbox, checkboxTool, checkboxMenu, checkboxOptions,
+    change: (target) => dispatch('change', target),
+    home, state, timers, stage, field, root, node, controls, tool, more, widthHandle, menu, menuItem, outside, document, windowListeners, location, navigations, title, titleLabel, titleInput,
     addNodeElement(id, value = '') {
       const root = element(`diagram-root-${id}`, 'diagram-root', stage);
       root.dataset.nodeKey = id;
@@ -154,9 +178,9 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
       button: 0, buttons: 1, pointerId: 1, pointerType: 'mouse', isPrimary: true,
       clientX: 100, clientY: 100, ...options,
     }),
-    typeName(value) {
-      field.value = value;
-      documentListeners.get('input')({ target: field });
+    typeName(value, target = field) {
+      target.value = value;
+      documentListeners.get('input')({ target });
     },
     click: (target = node) => dispatch('click', target),
     doubleClick: (target = node) => dispatch('dblclick', target),
@@ -316,14 +340,15 @@ test('clicking outside deselects while decorative controls do not start actions'
   assert.equal(home.isEditing(), false);
 });
 
-test('leaving the editor saves its current name and returns to readonly selection', async () => {
+test('leaving the editor saves its node text without renaming the diagram', async () => {
   const { home, field, controls, doubleClick, typeName } = savedEditor();
   let requests = 0;
   home.makeRequest = async (action, data) => {
     requests++;
     assert.equal(data.id, 51);
     assert.equal(data.version, 1);
-    assert.equal(data.name, 'Nombre editado\nSegunda línea');
+    assert.equal(data.name, 'Idea guardada');
+    assert.equal(data.nodes[0].text, 'Nombre editado\nSegunda línea');
     return { id: 51, name: data.name, version: 2 };
   };
   doubleClick();
@@ -331,7 +356,8 @@ test('leaving the editor saves its current name and returns to readonly selectio
   field.blur();
   await new Promise(setImmediate);
   assert.equal(requests, 1);
-  assert.equal(home.active.name, 'Nombre editado\nSegunda línea');
+  assert.equal(home.active.name, 'Idea guardada');
+  assert.equal(home.active.nodes[0].text, 'Nombre editado\nSegunda línea');
   assert.equal(home.editing, false);
   assert.equal(home.selected, true);
   assert.equal(field.readOnly, true);
@@ -345,7 +371,8 @@ test('clicking outside an active editor saves and hides its controls', async () 
   typeName('Texto conservado al salir');
   click(outside);
   await new Promise(setImmediate);
-  assert.equal(home.active.name, 'Texto conservado al salir');
+  assert.equal(home.active.name, 'Idea guardada');
+  assert.equal(home.active.nodes[0].text, 'Texto conservado al salir');
   assert.equal(home.selected, false);
   assert.equal(home.editing, false);
   assert.equal(field.readOnly, true);
@@ -417,21 +444,25 @@ test('Shift Enter allows a native line break while Enter alone saves and leaves 
   assert.equal(field.blurred, true);
   assert.equal(home.editing, false);
   assert.equal(requests.length, 1);
-  assert.equal(requests[0].name, 'Primera línea\nSegunda línea');
+  assert.equal(requests[0].name, 'Nuevo diagrama');
+  assert.equal(requests[0].nodes[0].text, 'Primera línea\nSegunda línea');
   await new Promise(setImmediate);
-  assert.equal(home.active.name, 'Primera línea\nSegunda línea');
+  assert.equal(home.active.name, 'Nuevo diagrama');
+  assert.equal(home.active.nodes[0].text, 'Primera línea\nSegunda línea');
 });
 
-test('saved multiline names preserve leading, internal and trailing line breaks after reload', async () => {
+test('saved multiline node text preserves leading, internal and trailing line breaks after reload', async () => {
   const { home, state, timers, windowListeners } = editor();
   const name = '\nMi plan\nSegunda idea\n';
   home.name = name;
   home.makeRequest = async (action, data) => {
-    assert.equal(data.name, name);
+    assert.equal(data.name, 'Nuevo diagrama');
+    assert.equal(data.nodes[0].text, name);
     return { id: 32, name: data.name, version: 1 };
   };
   await home.save();
-  assert.equal(state.data.diagrams[0].name, name);
+  assert.equal(state.data.diagrams[0].name, 'Nuevo diagrama');
+  assert.equal(state.data.diagrams[0].nodes[0].text, name);
   assert.equal(home.isEditing(), false);
   assert.equal(timers.size, 0);
   const beforeUnload = { preventDefault() { this.prevented = true; } };
@@ -454,12 +485,14 @@ test('adding only a final line break is an unsaved change and gets persisted', a
   let requests = 0;
   home.makeRequest = async (action, data) => {
     requests++;
-    assert.equal(data.name, 'Idea guardada\n');
+    assert.equal(data.name, 'Idea guardada');
+    assert.equal(data.nodes[0].text, 'Idea guardada\n');
     return { id: 33, name: data.name, version: 2 };
   };
   await home.save();
   assert.equal(requests, 1);
-  assert.equal(home.active.name, 'Idea guardada\n');
+  assert.equal(home.active.name, 'Idea guardada');
+  assert.equal(home.active.nodes[0].text, 'Idea guardada\n');
   assert.equal(home.isEditing(), false);
 });
 
@@ -525,7 +558,7 @@ test('creating a diagram saves immediately without typing and restores after rel
   assert.equal(restored.active.id, 21);
 });
 
-test('typing while the initial creation is pending saves the new name afterward', async () => {
+test('typing while the initial creation is pending saves new node text afterward', async () => {
   const { home, state, timers, typeName } = editor({ draft: false });
   let finish;
   home.makeRequest = () => new Promise((resolve) => { finish = resolve; });
@@ -539,15 +572,17 @@ test('typing while the initial creation is pending saves the new name afterward'
   home.makeRequest = async (action, data) => {
     assert.equal(data.id, 22);
     assert.equal(data.version, 1);
-    assert.equal(data.name, 'Mi plan de hoy');
+    assert.equal(data.name, 'Nuevo diagrama');
+    assert.equal(data.nodes[0].text, 'Mi plan de hoy');
     return { id: 22, name: data.name, version: 2 };
   };
   await home.save();
-  assert.equal(state.data.diagrams[0].name, 'Mi plan de hoy');
+  assert.equal(state.data.diagrams[0].name, 'Nuevo diagrama');
+  assert.equal(state.data.diagrams[0].nodes[0].text, 'Mi plan de hoy');
   assert.equal(timers.size, 0);
 });
 
-test('repeated create clicks do not duplicate a pending or saved diagram', async () => {
+test('repeated clicks during creation are ignored, and a later click creates a separate diagram', async () => {
   const { home, state } = editor({ draft: false });
   let finish;
   let requests = 0;
@@ -562,10 +597,14 @@ test('repeated create clicks do not duplicate a pending or saved diagram', async
   assert.equal(home.draft.client_key, key);
   finish({ id: 23, name: 'Nuevo diagrama', version: 1 });
   await pending;
-  await home.handleAction('create-diagram');
-  assert.equal(requests, 1);
-  assert.equal(state.data.diagrams.length, 1);
-  assert.equal(home.active.id, 23);
+  const second = home.handleAction('create-diagram');
+  await new Promise(setImmediate);
+  assert.equal(requests, 2);
+  assert.notEqual(home.draft.client_key, key);
+  finish({ id: 24, name: 'Nuevo diagrama', version: 1 });
+  await second;
+  assert.equal(state.data.diagrams.length, 2);
+  assert.equal(home.active.id, 24);
 });
 
 test('failed initial creation retains its key and can be retried without typing', async () => {
@@ -590,14 +629,14 @@ test('failed initial creation retains its key and can be retried without typing'
   assert.equal(state.data.diagrams.length, 1);
 });
 
-test('typing during a save queues the latest name with the returned version', async () => {
+test('typing during a save queues the latest node text with the returned version', async () => {
   const { home, state, timers } = editor();
   let finish;
   home.name = 'First name';
   home.makeRequest = () => new Promise((resolve) => { finish = resolve; });
   const pending = home.save();
   home.name = 'Newest name';
-  finish({ id: 1, name: 'First name', version: 1 });
+  finish({ id: 1, name: 'Nuevo diagrama', version: 1 });
   await pending;
   assert.equal(home.name, 'Newest name');
   assert.equal(timers.size, 1);
@@ -605,11 +644,13 @@ test('typing during a save queues the latest name with the returned version', as
     assert.equal(action, 'saveDiagram');
     assert.equal(data.id, 1);
     assert.equal(data.version, 1);
-    assert.equal(data.name, 'Newest name');
+    assert.equal(data.name, 'Nuevo diagrama');
+    assert.equal(data.nodes[0].text, 'Newest name');
     return { id: 1, name: data.name, version: 2 };
   };
   await home.save();
-  assert.equal(state.data.diagrams[0].name, 'Newest name');
+  assert.equal(state.data.diagrams[0].name, 'Nuevo diagrama');
+  assert.equal(state.data.diagrams[0].nodes[0].text, 'Newest name');
   assert.equal(state.data.diagrams.length, 1);
   assert.equal(timers.size, 0);
 });
@@ -618,6 +659,7 @@ test('a lost create response can be retried without losing a later edit', async 
   const { home, timers } = editor();
   home.name = 'Original';
   const key = home.draft.client_key;
+  const originallySavedNodes = JSON.parse(JSON.stringify(home.snapshot()));
   home.makeRequest = async () => { throw new Error('Connection lost'); };
   await home.save();
   assert.equal(home.draft.client_key, key);
@@ -625,18 +667,20 @@ test('a lost create response can be retried without losing a later edit', async 
   home.name = 'Edited while offline';
   home.makeRequest = async (action, data) => {
     assert.equal(data.client_key, key);
-    return { id: 7, name: 'Original', version: 1 };
+    return { id: 7, name: 'Nuevo diagrama', nodes: originallySavedNodes, version: 1 };
   };
   await home.save();
   assert.equal(home.active.id, 7);
   assert.equal(timers.size, 1);
   home.makeRequest = async (action, data) => {
     assert.equal(data.id, 7);
-    assert.equal(data.name, 'Edited while offline');
+    assert.equal(data.name, 'Nuevo diagrama');
+    assert.equal(data.nodes[0].text, 'Edited while offline');
     return { id: 7, name: data.name, version: 2 };
   };
   await home.save();
-  assert.equal(home.active.name, 'Edited while offline');
+  assert.equal(home.active.name, 'Nuevo diagrama');
+  assert.equal(home.active.nodes[0].text, 'Edited while offline');
   assert.equal(home.error, '');
 });
 
@@ -658,6 +702,7 @@ test('a late response from a signed-out account cannot enter another account sta
 test('empty edits keep the saved name and restoring it clears validation errors', async () => {
   const { home } = editor();
   home.active = { id: 1, name: 'Saved', version: 2 };
+  home.diagramTitle = 'Saved';
   home.draft = null;
   home.makeRequest = () => { throw new Error('No request expected'); };
   home.name = '  ';
@@ -682,7 +727,8 @@ test('children persist their parent and inherit layout without changing the root
   assert.equal(child.parent_id, 'root');
   assert.equal(child.layout, null);
   assert.equal(home.selectedKey, child.id);
-  assert.equal(snapshot.name, 'Idea guardada');
+  assert.equal(child.text, '');
+  assert.equal(snapshot, undefined, 'a blank child is not sent to the database');
   home.name = 'Idea hija\nDetalle';
   await home.save();
   assert.equal(snapshot.name, 'Idea guardada');
@@ -697,6 +743,8 @@ test('applying a root layout replaces child overrides and persists the result af
   });
   await home.addChild();
   const childKey = home.selectedKey;
+  home.name = 'Idea hija';
+  await home.save();
   const childStyle = { mode: 'vertical', direction: 'bottom', vertical: 'auto', horizontal: 'auto' };
   const rootStyle = { mode: 'linear', direction: 'auto', vertical: 'compact', horizontal: 'ltr' };
   home.applyLayout(childKey, childStyle);
@@ -743,6 +791,8 @@ test('server node ordering does not create a perpetual save loop', async () => {
     id: data.id, name: data.name, nodes: JSON.parse(JSON.stringify(data.nodes)).reverse(), version: data.version + 1,
   });
   await home.addChild();
+  home.name = 'Idea hija';
+  await home.save();
   assert.equal(home.hasChanges(), false);
   assert.equal(timers.size, 0);
 });
@@ -1167,4 +1217,543 @@ test('changing a branch or entire diagram layout preserves each individual node 
   const restored = editor({ draft: false, state: JSON.parse(JSON.stringify(state)) });
   restored.home.render();
   assert.deepEqual(JSON.parse(JSON.stringify(restored.home.nodes.map(({ id, width }) => ({ id, width })))), widths);
+});
+
+function blankChildEditor() {
+  const fixture = savedEditor();
+  const fields = new Map();
+  const draw = fixture.home.drawStage.bind(fixture.home);
+  fixture.home.drawStage = () => {
+    for (const node of fixture.home.ensureTree()) {
+      if (node.id !== 'root' && !fields.has(node.id)) fields.set(node.id, fixture.addNodeElement(node.id, node.text));
+    }
+    draw();
+  };
+  return { ...fixture, fields };
+}
+
+test('a new child is empty, focused and editable, then Enter saves only its typed text', async () => {
+  const { home, fields, document, typeName, handleKey } = blankChildEditor();
+  const requests = [];
+  home.makeRequest = async (action, data) => {
+    requests.push(JSON.parse(JSON.stringify(data)));
+    return { id: data.id, name: data.name, nodes: data.nodes, version: data.version + 1 };
+  };
+  await home.addChild();
+  const key = home.selectedKey;
+  const child = fields.get(key);
+  assert.equal(document.activeElement, child.field);
+  assert.equal(child.field.value, '');
+  assert.equal(child.field.readOnly, false);
+  assert.equal(child.field.selectionStart, 0);
+  assert.equal(child.field.selectionEnd, 0);
+  assert.equal(JSON.parse(home.nodeContent(home.nodes.find((n) => n.id === key))).placeholder, '');
+  assert.equal(requests.length, 0);
+  assert.equal(home.error, '');
+  typeName('Mi idea\nCon detalle', child.field);
+  handleKey('Enter', child.field);
+  await new Promise(setImmediate);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].nodes.find((n) => n.id === key).text, 'Mi idea\nCon detalle');
+  assert.equal(home.childDrafts.has(key), false);
+  assert.equal(home.editing, false);
+  assert.equal(home.hasChanges(), false);
+});
+
+test('leaving an empty new child removes only the draft and saves other node changes', async () => {
+  const { home, fields } = blankChildEditor();
+  const requests = [];
+  home.makeRequest = async (action, data) => {
+    requests.push(JSON.parse(JSON.stringify(data)));
+    return { id: data.id, name: data.name, nodes: data.nodes, version: data.version + 1 };
+  };
+  await home.addChild();
+  const key = home.selectedKey;
+  home.nodes[0].width = 270;
+  fields.get(key).field.blur();
+  await new Promise(setImmediate);
+  assert.equal(home.nodes.length, 1);
+  assert.equal(home.nodes[0].width, 270);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].nodes.length, 1);
+  assert.equal(home.selectedKey, 'root');
+  assert.equal(home.error, '');
+});
+
+test('Escape cancels an unsent named child and an empty draft cannot own another child', async () => {
+  const { home, fields, typeName, handleKey } = blankChildEditor();
+  home.makeRequest = () => { throw new Error('Unsent drafts must not save'); };
+  await home.addChild();
+  const key = home.selectedKey;
+  await home.addChild();
+  assert.equal(home.nodes.length, 2);
+  assert.equal(home.selectedKey, key);
+  typeName('Todavía sin guardar', fields.get(key).field);
+  handleKey('Escape', fields.get(key).field);
+  await new Promise(setImmediate);
+  assert.equal(home.nodes.length, 1);
+  assert.equal(home.selectedKey, 'root');
+  assert.equal(home.nodes[0].text, 'Idea guardada');
+  assert.equal(home.hasChanges(), false);
+});
+
+test('a blank child does not block an unrelated pending save or later queued changes', async () => {
+  const { home, fields } = blankChildEditor();
+  let finish;
+  home.makeRequest = (action, data) => new Promise((resolve) => {
+    const copy = JSON.parse(JSON.stringify(data));
+    finish = () => resolve({ id: copy.id, name: copy.name, nodes: copy.nodes, version: copy.version + 1 });
+  });
+  home.name = 'Nombre actualizado';
+  const pending = home.save();
+  await home.addChild();
+  const key = home.selectedKey;
+  home.nodes[0].width = 310;
+  finish();
+  await pending;
+  assert.equal(home.childDrafts.has(key), true);
+  assert.equal(fields.get(key).field.readOnly, false);
+  let sent;
+  home.makeRequest = async (action, data) => {
+    sent = JSON.parse(JSON.stringify(data));
+    return { id: data.id, name: data.name, nodes: data.nodes, version: data.version + 1 };
+  };
+  await home.save();
+  assert.equal(sent.nodes.length, 1);
+  assert.equal(sent.nodes[0].width, 310);
+  assert.equal(home.nodes.length, 2);
+  assert.equal(home.error, '');
+});
+
+test('Escape never discards a child once its creation request has been submitted', async () => {
+  const { home, fields, typeName, handleKey } = blankChildEditor();
+  await home.addChild();
+  const key = home.selectedKey;
+  const field = fields.get(key).field;
+  typeName('Idea enviada', field);
+  let finish;
+  home.makeRequest = (action, data) => new Promise((resolve) => {
+    const copy = JSON.parse(JSON.stringify(data));
+    finish = () => resolve({ id: copy.id, name: copy.name, nodes: copy.nodes, version: copy.version + 1 });
+  });
+  const pending = home.save();
+  handleKey('Escape', field);
+  assert.ok(home.nodes.some((n) => n.id === key));
+  finish();
+  await pending;
+  typeName('Cambio posterior', field);
+  handleKey('Escape', field);
+  assert.equal(home.nodes.find((n) => n.id === key).text, 'Idea enviada');
+  assert.equal(home.childDrafts.has(key), false);
+  assert.equal(home.hasChanges(), false);
+});
+
+
+test('the URL selects an older diagram and reload keeps its own complete tree', () => {
+  const state = { user: { name: 'Aleina' }, data: { diagrams: [
+    { id: 52, name: 'Reciente', version: 1 },
+    { id: 51, name: 'Elegido', version: 3, nodes: [
+      { id: 'root', parent_id: null, text: 'Elegido', width: 310 },
+      { id: 'child', parent_id: 'root', text: 'Idea hija', width: 140 },
+    ] },
+  ] } };
+  const { home, location } = editor({ draft: false, state, url: 'http://localhost/MyRemarkableMind/?diagram=51' });
+  home.render();
+  assert.equal(home.active.id, 51);
+  assert.equal(home.nodes.length, 2);
+  assert.equal(home.nodes[1].width, 140);
+  assert.equal(new URL(location.href).searchParams.get('diagram'), '51');
+  const toolbar = JSON.parse(home.toolbarContent());
+  assert.match(toolbar.options, /value="51" selected/);
+  assert.match(toolbar.options, /value="52"/);
+  const restored = editor({ draft: false, state: JSON.parse(JSON.stringify(state)), url: location.href });
+  restored.home.render();
+  assert.equal(restored.home.active.id, 51);
+  assert.deepEqual(JSON.parse(JSON.stringify(restored.home.nodes)), state.data.diagrams[1].nodes);
+});
+
+test('unknown or inaccessible diagram URLs fall back to an owned diagram', async () => {
+  const state = { user: { name: 'Aleina' }, data: { diagrams: [{ id: 51, name: 'Privado', version: 1 }] } };
+  const { home, location, navigations } = editor({ draft: false, state, url: 'http://localhost/?diagram=999' });
+  home.render();
+  assert.equal(home.active.id, 51);
+  assert.equal(new URL(location.href).searchParams.get('diagram'), '51');
+  await home.openDiagram('999');
+  assert.equal(navigations.length, 0);
+});
+
+test('selecting another diagram triggers document navigation and preserves the installation path', async () => {
+  const { home, state, navigations, windowListeners } = savedEditor();
+  state.data.diagrams.push({ id: 52, name: 'Otro', version: 1 });
+  home.makeRequest = () => { throw new Error('No changes to save'); };
+  await home.openDiagram('52');
+  assert.deepEqual(navigations, ['http://localhost/MyRemarkableMind/?diagram=52']);
+  assert.equal(home.active.id, 51, 'the current tree is replaced only by the new document');
+  const event = { preventDefault() { this.prevented = true; } };
+  windowListeners.get('beforeunload')(event);
+  assert.equal(event.prevented, undefined);
+});
+
+test('switching waits for a pending save and flushes edits made during that request', async () => {
+  const { home, state, navigations } = savedEditor();
+  state.data.diagrams.push({ id: 52, name: 'Otro', version: 1 });
+  const requests = [];
+  const resolvers = [];
+  home.makeRequest = (action, data) => new Promise((resolve) => {
+    const snapshot = JSON.parse(JSON.stringify(data));
+    requests.push(snapshot);
+    resolvers.push(() => resolve({ ...snapshot, version: snapshot.version + 1 }));
+  });
+  home.name = 'Primera edición';
+  const save = home.save();
+  home.name = 'Edición más reciente';
+  const switching = home.openDiagram('52');
+  await home.openDiagram('51');
+  assert.equal(navigations.length, 0);
+  assert.equal(requests.length, 1);
+  resolvers[0]();
+  await save;
+  await new Promise(setImmediate);
+  assert.equal(requests.length, 2);
+  assert.equal(requests[1].version, 2);
+  assert.equal(requests[1].nodes[0].text, 'Edición más reciente');
+  assert.equal(navigations.length, 0);
+  resolvers[1]();
+  await switching;
+  assert.equal(navigations.length, 1);
+  assert.equal(home.hasChanges(), false);
+});
+
+test('a failed save prevents both switching and creating until it can be saved', async () => {
+  const { home, state, navigations } = savedEditor();
+  state.data.diagrams.push({ id: 52, name: 'Otro', version: 1 });
+  home.name = 'Cambio pendiente';
+  home.makeRequest = async () => { throw new Error('Connection lost'); };
+  await home.openDiagram('52');
+  await home.handleAction('create-diagram');
+  assert.equal(navigations.length, 0);
+  assert.equal(home.active.id, 51);
+  assert.equal(home.name, 'Cambio pendiente');
+  assert.equal(state.data.diagrams.length, 2);
+  assert.equal(home.switching, false);
+  home.makeRequest = async (action, data) => ({ ...data, version: data.version + 1 });
+  await home.openDiagram('52');
+  assert.equal(navigations.length, 1);
+});
+
+test('empty text in a saved node blocks navigation without losing the current edit', async () => {
+  const { home, state, navigations } = savedEditor();
+  state.data.diagrams.push({ id: 52, name: 'Otro', version: 1 });
+  home.name = '   ';
+  home.makeRequest = () => { throw new Error('Invalid edits must not be submitted'); };
+  await home.openDiagram('52');
+  assert.equal(navigations.length, 0);
+  assert.equal(home.active.id, 51);
+  assert.equal(home.error, 'diagram_name_required');
+});
+
+test('switching cannot navigate after the account is reset during a save', async () => {
+  const { home, state, navigations } = savedEditor();
+  state.data.diagrams.push({ id: 52, name: 'Otro', version: 1 });
+  let finish;
+  home.makeRequest = (action, data) => new Promise((resolve) => { finish = () => resolve({ ...data, version: data.version + 1 }); });
+  home.name = 'Pendiente';
+  const switching = home.openDiagram('52');
+  home.reset();
+  finish();
+  await switching;
+  assert.equal(navigations.length, 0);
+  assert.equal(home.active, null);
+});
+
+test('creating many diagrams preserves every earlier tree and starts with a clean canvas', async () => {
+  const { home, state, location } = savedEditor();
+  const original = JSON.parse(JSON.stringify(state.data.diagrams[0]));
+  const keys = new Set();
+  home.makeRequest = async (action, data) => {
+    assert.equal(data.id, undefined);
+    assert.equal(data.nodes.length, 1);
+    assert.equal(data.nodes[0].parent_id, null);
+    assert.equal(keys.has(data.client_key), false);
+    keys.add(data.client_key);
+    return { id: 51 + keys.size, name: data.name, nodes: data.nodes, version: 1 };
+  };
+  for (let i = 0; i < 12; i++) {
+    home.viewport.x = 150;
+    home.viewport.scale = 2;
+    await home.handleAction('create-diagram');
+    assert.equal(home.viewport.x, 0);
+    assert.equal(home.viewport.scale, 1);
+    assert.equal(new URL(location.href).searchParams.get('diagram'), String(home.active.id));
+  }
+  assert.equal(state.data.diagrams.length, 13);
+  assert.deepEqual(state.data.diagrams.find((d) => d.id === 51), original);
+});
+
+function titledEditor() {
+  const fixture = editor({ draft: false, state: {
+    user: { name: 'Aleina' }, data: { diagrams: [{
+      id: 51, name: 'Mi proyecto', version: 1,
+      nodes: [{ id: 'root', parent_id: null, text: 'Idea central', layout: null, x: null, y: null, width: 310 }],
+    }] },
+  } });
+  fixture.home.render();
+  fixture.home.drawStage();
+  return fixture;
+}
+
+test('the diagram title uses a separate editor opened by double click with the caret at the end', () => {
+  const { home, titleLabel, titleInput, field, click, doubleClick, document } = titledEditor();
+  home.makeRequest = () => { throw new Error('Opening the title editor must not save'); };
+  assert.equal(home.diagramTitle, 'Mi proyecto');
+  assert.equal(home.name, 'Idea central');
+  assert.equal(titleLabel.textContent, 'Mi proyecto');
+  assert.equal(titleInput.hidden, true);
+  click(titleLabel);
+  assert.equal(titleInput.hidden, true);
+  doubleClick(titleLabel);
+  assert.equal(titleInput.hidden, false);
+  assert.equal(titleLabel.hidden, true);
+  assert.equal(document.activeElement, titleInput);
+  assert.equal(titleInput.value, 'Mi proyecto');
+  assert.equal(titleInput.selectionStart, titleInput.value.length);
+  assert.equal(titleInput.selectionEnd, titleInput.value.length);
+  assert.equal(field.readOnly, true);
+  assert.equal(home.editing, false);
+});
+
+test('Enter saves a trimmed diagram title independently of its root text and reload restores both', async () => {
+  const { home, state, titleLabel, titleInput, doubleClick, handleKey } = titledEditor();
+  const originalNodes = JSON.parse(JSON.stringify(home.nodes));
+  const requests = [];
+  home.makeRequest = async (action, data) => {
+    requests.push(JSON.parse(JSON.stringify(data)));
+    return { ...data, version: data.version + 1 };
+  };
+  doubleClick(titleLabel);
+  titleInput.value = '  Mi nuevo proyecto  ';
+  assert.equal(handleKey('Enter', titleInput).prevented, true);
+  await new Promise(setImmediate);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].name, 'Mi nuevo proyecto');
+  assert.deepEqual(requests[0].nodes, originalNodes);
+  assert.equal(home.active.name, 'Mi nuevo proyecto');
+  assert.equal(home.active.nodes[0].text, 'Idea central');
+  assert.equal(home.name, 'Idea central');
+  assert.equal(titleInput.hidden, true);
+  assert.equal(titleLabel.hidden, false);
+  assert.equal(titleLabel.textContent, 'Mi nuevo proyecto');
+  assert.equal(home.hasChanges(), false);
+
+  const restored = editor({ draft: false, state: JSON.parse(JSON.stringify(state)) });
+  const page = JSON.parse(restored.home.render());
+  restored.home.drawStage();
+  assert.equal(JSON.parse(page.content).name, 'Idea central');
+  assert.ok(page.title, 'the title is supplied separately from the canvas nodes');
+  assert.equal(restored.home.diagramTitle, 'Mi nuevo proyecto');
+  assert.equal(restored.titleLabel.textContent, 'Mi nuevo proyecto');
+  assert.equal(restored.field.value, 'Idea central');
+});
+
+test('Enter and F2 open the title editor, and blur saves changes only once', async () => {
+  const { home, titleLabel, titleInput, handleKey, outside } = titledEditor();
+  const requests = [];
+  home.makeRequest = async (action, data) => {
+    requests.push(JSON.parse(JSON.stringify(data)));
+    return { ...data, version: data.version + 1 };
+  };
+  titleLabel.focus();
+  assert.equal(handleKey('Enter', titleLabel).prevented, true);
+  assert.equal(titleInput.hidden, false);
+  outside.focus();
+  await new Promise(setImmediate);
+  assert.equal(requests.length, 0);
+  assert.equal(handleKey('F2', titleLabel).prevented, true);
+  titleInput.value = 'Título al salir';
+  outside.focus();
+  await new Promise(setImmediate);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].name, 'Título al salir');
+  assert.equal(requests[0].nodes[0].text, 'Idea central');
+  assert.equal(home.hasChanges(), false);
+});
+
+test('Escape and an empty title restore the previous title without changing saved content', async () => {
+  const { home, titleLabel, titleInput, doubleClick, handleKey, document } = titledEditor();
+  home.makeRequest = () => { throw new Error('Cancelled or empty titles must not save'); };
+  for (const [value, key] of [['No guardar', 'Escape'], [' \t ', 'Enter']]) {
+    doubleClick(titleLabel);
+    titleInput.value = value;
+    assert.equal(handleKey(key, titleInput).prevented, true);
+    await new Promise(setImmediate);
+    assert.equal(home.diagramTitle, 'Mi proyecto');
+    assert.equal(home.active.name, 'Mi proyecto');
+    assert.equal(home.name, 'Idea central');
+    assert.equal(titleInput.hidden, true);
+    assert.equal(titleLabel.textContent, 'Mi proyecto');
+    assert.equal(document.activeElement, titleLabel);
+    assert.equal(home.hasChanges(), false);
+  }
+});
+
+test('renaming a title during an earlier save queues the newest title with the returned version', async () => {
+  const { home, titleLabel, titleInput, doubleClick, handleKey, timers } = titledEditor();
+  const requests = [];
+  let finish;
+  home.makeRequest = (action, data) => new Promise((resolve) => {
+    const copy = JSON.parse(JSON.stringify(data));
+    requests.push(copy);
+    finish = () => resolve({ ...copy, version: copy.version + 1 });
+  });
+  doubleClick(titleLabel);
+  titleInput.value = 'Primer título';
+  handleKey('Enter', titleInput);
+  const pending = home.savePromise;
+  doubleClick(titleLabel);
+  titleInput.value = 'Título más reciente';
+  handleKey('Enter', titleInput);
+  assert.equal(requests.length, 1);
+  finish();
+  await pending;
+  assert.equal(home.diagramTitle, 'Título más reciente');
+  assert.equal(home.active.name, 'Primer título');
+  assert.equal(timers.size, 1);
+  home.makeRequest = async (action, data) => {
+    requests.push(JSON.parse(JSON.stringify(data)));
+    return { ...data, version: data.version + 1 };
+  };
+  await home.save();
+  assert.equal(requests[1].name, 'Título más reciente');
+  assert.equal(requests[1].version, 2);
+  assert.equal(requests[1].nodes[0].text, 'Idea central');
+  assert.equal(home.active.name, 'Título más reciente');
+  assert.equal(home.hasChanges(), false);
+});
+
+test('account reset clears title editing and a late title response cannot restore private state', async () => {
+  const { home, state, titleLabel, titleInput, doubleClick, handleKey } = titledEditor();
+  let finish;
+  home.makeRequest = (action, data) => new Promise((resolve) => {
+    finish = () => resolve({ ...data, version: data.version + 1 });
+  });
+  doubleClick(titleLabel);
+  titleInput.value = 'Título privado';
+  handleKey('Enter', titleInput);
+  const pending = home.savePromise;
+  doubleClick(titleLabel);
+  assert.equal(titleInput.hidden, false);
+  home.reset();
+  state.data.diagrams = [];
+  finish();
+  await pending;
+  assert.equal(home.active, null);
+  assert.equal(home.diagramTitle, '');
+  assert.equal(home.titleEditing, false);
+  assert.equal(home.name, '');
+  assert.equal(state.data.diagrams.length, 0);
+});
+
+test('switching diagrams commits an active title edit before navigating', async () => {
+  const { home, state, titleLabel, titleInput, doubleClick, navigations } = titledEditor();
+  state.data.diagrams.push({ id: 52, name: 'Otro', version: 1 });
+  const requests = [];
+  home.makeRequest = async (action, data) => {
+    requests.push(JSON.parse(JSON.stringify(data)));
+    return { ...data, version: data.version + 1 };
+  };
+  doubleClick(titleLabel);
+  titleInput.value = 'Título antes de salir';
+  await home.openDiagram('52');
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].name, 'Título antes de salir');
+  assert.equal(requests[0].nodes[0].text, 'Idea central');
+  assert.equal(navigations.length, 1);
+  assert.equal(home.hasChanges(), false);
+});
+
+test('checkbox submenu reflects all three states, supports Escape and saves only the chosen state', async () => {
+  const { home, checkbox, checkboxTool, checkboxMenu, checkboxOptions, document, pressKey, state } = savedEditor();
+  const requests = [];
+  home.makeRequest = async (action, data) => {
+    requests.push(JSON.parse(JSON.stringify(data)));
+    return { ...data, version: data.version + 1 };
+  };
+  await home.handleAction('toggle-diagram-menu');
+  await home.handleAction('diagram-checkbox-menu');
+  assert.equal(checkboxMenu.hidden, false);
+  assert.equal(checkboxOptions.none.getAttribute('aria-checked'), 'true');
+  assert.equal(checkboxOptions.toggle.disabled, true);
+  assert.equal(checkbox.hidden, true);
+  assert.equal(requests.length, 0);
+  pressKey('ArrowDown', { target: checkboxOptions.none });
+  assert.equal(document.activeElement, checkboxOptions.unchecked, 'keyboard skips disabled toggle');
+  pressKey('Escape', { target: checkboxOptions.unchecked });
+  assert.equal(home.menuOpen, true);
+  assert.equal(checkboxMenu.hidden, true);
+  assert.equal(document.activeElement, checkboxTool);
+  for (const [option, value] of [['unchecked', false], ['checked', true], ['toggle', false], ['none', null]]) {
+    await home.handleAction('diagram-checkbox-menu');
+    await home.handleAction('diagram-checkbox-state', checkboxOptions[option]);
+    assert.equal(home.nodes[0].checkbox, value);
+    assert.equal(home.active.nodes[0].checkbox, value);
+    assert.equal(checkbox.hidden, value === null);
+    assert.equal(checkbox.checked, value === true);
+    assert.equal(home.menuOpen, false);
+    assert.equal(home.hasChanges(), false);
+    const restored = editor({ draft: false, state: JSON.parse(JSON.stringify(state)) });
+    restored.home.render();
+    restored.home.drawStage();
+    assert.equal(restored.home.nodes[0].checkbox, value);
+    assert.equal(restored.checkbox.hidden, value === null);
+    assert.equal(restored.checkbox.checked, value === true);
+  }
+  assert.equal(requests.length, 4);
+});
+
+test('direct checkbox changes survive selection and do not start dragging or text editing', async () => {
+  const { home, checkbox, node, change, click, doubleClick, pointer } = savedEditor();
+  home.makeRequest = async (action, data) => ({ ...data, version: data.version + 1 });
+  await home.setCheckbox(false);
+  home.selected = false;
+  checkbox.checked = true;
+  change(checkbox);
+  await home.save();
+  assert.equal(home.active.nodes[0].checkbox, true);
+  assert.equal(checkbox.checked, true);
+  assert.equal(node.getAttribute('role'), 'group');
+  pointer('pointerdown', checkbox);
+  pointer('pointermove', checkbox, { clientX: 200 });
+  assert.equal(home.drag, null);
+  click(checkbox);
+  doubleClick(checkbox);
+  assert.equal(home.editing, false);
+  checkbox.checked = false;
+  change(checkbox);
+  await home.save();
+  assert.equal(home.active.nodes[0].checkbox, false);
+});
+
+test('rapid checkbox changes queue the latest state and preserve sibling task states', async () => {
+  const { home, timers } = savedEditor();
+  home.nodes.push({ id: 'child', parent_id: 'root', text: 'Child', checkbox: false });
+  home.active.nodes = JSON.parse(JSON.stringify(home.nodes));
+  let finish;
+  const requests = [];
+  home.makeRequest = (action, data) => {
+    requests.push(JSON.parse(JSON.stringify(data)));
+    return new Promise((resolve) => { finish = resolve; });
+  };
+  const pending = home.setCheckbox(true);
+  home.setCheckbox(false);
+  finish({ ...requests[0], version: 2 });
+  await pending;
+  assert.equal(home.nodes[0].checkbox, false);
+  assert.equal(home.nodes[1].checkbox, false);
+  assert.equal(timers.size, 1);
+  home.makeRequest = async (action, data) => ({ ...data, version: data.version + 1 });
+  await home.save();
+  assert.equal(home.active.nodes[0].checkbox, false);
+  assert.equal(home.active.nodes[1].checkbox, false);
+  assert.equal(home.active.version, 3);
+  assert.equal(home.hasChanges(), false);
 });

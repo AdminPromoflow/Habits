@@ -8,8 +8,17 @@
       <h1>{{greeting}}</h1>
       <button class="btn primary" data-action="new-habit">{{plus}}{{newHabit}}</button>
     </div>
-    <div class="mindmap-stage" id="mindmap-stage" aria-label="{{diagramLabel}}">{{content}}</div>
+    <div class="diagram-toolbar" id="diagram-toolbar">{{diagramToolbar}}</div>
+    <div class="mindmap-stage" id="mindmap-stage" aria-label="{{diagramLabel}}">{{title}}{{content}}</div>
   </section>
+</template>
+
+<template id="view-diagram-toolbar">
+  <div class="diagram-picker">
+    <label for="diagram-select">{{label}}</label>
+    <select id="diagram-select" {{disabled}}>{{options}}</select>
+  </div>
+  <button type="button" class="btn secondary" data-action="create-diagram" {{disabled}}>{{plus}}{{createLabel}}</button>
 </template>
 
 <template id="view-diagram-start">
@@ -18,8 +27,17 @@
   </button>
 </template>
 
+<template id="view-diagram-title">
+  <div class="diagram-title" id="diagram-title">
+    <button type="button" id="diagram-title-label" aria-label="{{label}}" title="{{hint}}">{{name}}</button>
+    <input type="text" id="diagram-title-input" maxlength="120" value="{{name}}"
+      aria-label="{{label}}" autocomplete="off" spellcheck="true" hidden>
+  </div>
+</template>
+
 <template id="view-diagram-node">
   <div class="diagram-root" data-node-key="{{nodeKey}}" id="diagram-root{{suffix}}">
+    <div class="diagram-node-body">
     <div
       class="diagram-node"
       id="diagram-node{{suffix}}"
@@ -29,6 +47,9 @@
       aria-label="{{nodeLabel}}"
       aria-describedby="diagram-interaction-hint{{suffix}} diagram-status{{suffix}}"
     >
+      {{image}}
+      <input type="checkbox" class="diagram-task-checkbox" id="diagram-checkbox{{suffix}}"
+        aria-label="{{checkboxTaskLabel}}" hidden>
       <textarea
         id="diagram-name{{suffix}}"
         rows="1"
@@ -43,6 +64,7 @@
         aria-hidden="true"
       >
 {{name}}</textarea>
+      {{insideLabels}}
     </div>
     <span id="diagram-interaction-hint{{suffix}}" class="sr-only">{{hint}}</span>
     <div class="diagram-controls" id="diagram-controls{{suffix}}" hidden>
@@ -68,23 +90,34 @@
     </div>
     <div class="diagram-menu" id="diagram-menu{{suffix}}" role="menu" aria-label="{{menuLabel}}" hidden>
       <div class="diagram-menu-row" role="presentation">
-        <button type="button" role="menuitem" disabled aria-label="{{copyLabel}}" title="{{copyLabel}}">{{copyIcon}}</button>
-        <button type="button" role="menuitem" disabled aria-label="{{cutLabel}}" title="{{cutLabel}}">{{cutIcon}}</button>
-        <button type="button" role="menuitem" disabled aria-label="{{pasteLabel}}" title="{{pasteLabel}}">{{pasteIcon}}</button>
-        <button type="button" role="menuitem" disabled aria-label="{{trashLabel}}" title="{{trashLabel}}">{{trashIcon}}</button>
-        <button type="button" role="menuitem" disabled aria-label="{{imageLabel}}" title="{{imageLabel}}">{{imageIcon}}</button>
+        <button type="button" role="menuitem" data-action="copy-diagram-node" aria-label="{{copyLabel}}" title="{{copyLabel}}">{{copyIcon}}</button>
+        <button type="button" role="menuitem" data-action="cut-diagram-node" aria-label="{{cutLabel}}" title="{{cutLabel}}">{{cutIcon}}</button>
+        <button type="button" role="menuitem" id="diagram-paste{{suffix}}" data-action="paste-diagram-node" {{pasteDisabled}} aria-label="{{pasteLabel}}" title="{{pasteLabel}}">{{pasteIcon}}</button>
+        <button type="button" role="menuitem" data-action="delete-diagram-node" aria-label="{{trashLabel}}" title="{{trashLabel}}">{{trashIcon}}</button>
+        <button type="button" role="menuitem" data-action="image-diagram-node" aria-label="{{imageLabel}}" title="{{imageLabel}}">{{imageIcon}}</button>
         <button type="button" role="menuitem" disabled aria-label="{{formatLabel}}" title="{{formatLabel}}">{{formatIcon}}</button>
       </div>
       <div class="diagram-menu-row" role="presentation">
         <button type="button" role="menuitem" disabled aria-label="{{linkLabel}}" title="{{linkLabel}}">{{linkIcon}}</button>
-        <button type="button" role="menuitem" disabled aria-label="{{checkboxLabel}}" title="{{checkboxLabel}}">{{checkboxIcon}}</button>
+        <button type="button" role="menuitem" id="diagram-checkbox-tool{{suffix}}" data-action="diagram-checkbox-menu"
+          aria-haspopup="menu" aria-expanded="false" aria-controls="diagram-checkbox-menu{{suffix}}"
+          aria-label="{{checkboxLabel}}" title="{{checkboxLabel}}">{{checkboxIcon}}</button>
         <button type="button" role="menuitem" disabled aria-label="{{calendarLabel}}" title="{{calendarLabel}}">{{calendarIcon}}</button>
-        <button type="button" role="menuitem" disabled aria-label="{{tagLabel}}" title="{{tagLabel}}">{{tagIcon}}</button>
+        <button type="button" role="menuitem" data-action="labels-diagram-node" aria-label="{{tagLabel}}" title="{{tagLabel}}">{{tagIcon}}</button>
         <button type="button" role="menuitem" data-action="diagram-layout" aria-label="{{branchLabel}}" title="{{branchLabel}}">{{branchIcon}}</button>
         <button type="button" role="menuitem" disabled aria-label="{{resizeLabel}}" title="{{resizeLabel}}">{{resizeIcon}}</button>
       </div>
+      <div class="diagram-checkbox-menu" id="diagram-checkbox-menu{{suffix}}" role="menu" aria-label="{{checkboxLabel}}" hidden>
+        <button type="button" role="menuitemradio" aria-checked="false" id="diagram-checkbox-none{{suffix}}" data-action="diagram-checkbox-state" data-state="none"><span class="diagram-option-check" aria-hidden="true">✓</span>{{checkboxNoneLabel}}</button>
+        <button type="button" role="menuitem" id="diagram-checkbox-toggle{{suffix}}" data-action="diagram-checkbox-state" data-state="toggle"><span></span>{{checkboxToggleLabel}}</button>
+        <div role="separator"></div>
+        <button type="button" role="menuitemradio" aria-checked="false" id="diagram-checkbox-unchecked{{suffix}}" data-action="diagram-checkbox-state" data-state="unchecked"><span class="diagram-option-check" aria-hidden="true">✓</span>{{checkboxUncheckedLabel}}</button>
+        <button type="button" role="menuitemradio" aria-checked="false" id="diagram-checkbox-checked{{suffix}}" data-action="diagram-checkbox-state" data-state="checked"><span class="diagram-option-check" aria-hidden="true">✓</span>{{checkboxCheckedLabel}}</button>
+      </div>
     </div>
     <div id="diagram-status{{suffix}}" class="diagram-status sr-only" role="status" aria-live="polite"></div>
+    </div>
+    {{outsideLabels}}
   </div>
 </template>
 

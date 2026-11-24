@@ -90,7 +90,6 @@ class DiagramLayoutPanel {
 
   modeCard(mode) {
     const selected = mode === this.mode;
-    const disabled = mode === 'radial';
     const fromRoot = this.isRoot || this.scope === 'diagram';
     const inherited = fromRoot ? DiagramLayout.defaults('horizontal') : this.inherited;
     const label = mode === 'inherit'
@@ -99,7 +98,7 @@ class DiagramLayoutPanel {
     const preview = mode === 'inherit'
       ? `<span class="diagram-layout-inherited">${esc(label)}<small>(${esc(t(`diagram_layout_${inherited.mode}`))})</small></span>`
       : `<span class="diagram-layout-preview" aria-hidden="true">${DiagramLayout.preview(mode)}</span><span class="diagram-layout-label">${esc(label)}</span>`;
-    return `<button type="button" class="diagram-layout-card${selected ? ' is-selected' : ''}" data-layout-mode="${mode}" aria-pressed="${selected}"${disabled ? ` disabled title="${esc(t('diagram_layout_unavailable'))}"` : ''}>${preview}<span class="diagram-layout-tick" aria-hidden="true">✓</span></button>`;
+    return `<button type="button" class="diagram-layout-card${selected ? ' is-selected' : ''}" data-layout-mode="${mode}" aria-pressed="${selected}">${preview}<span class="diagram-layout-tick" aria-hidden="true">✓</span></button>`;
   }
 
   selectedSettings() {

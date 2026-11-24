@@ -8,6 +8,10 @@ final class DiagramsController
     public function handle(string $action, array $data): array
     {
         $diagrams = new DiagramsModel($this->db, $this->user);
-        return $action === 'diagrams' ? $diagrams->list() : $diagrams->save($data);
+        return match ($action) {
+            'diagrams' => $diagrams->list(),
+            'deleteDiagram' => $diagrams->delete($data),
+            default => $diagrams->save($data),
+        };
     }
 }

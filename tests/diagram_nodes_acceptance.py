@@ -15,27 +15,38 @@ def run(owner, other, guest, diagram_id, check):
         }, expected, module='diagrams')
 
     current = saved()
-    check(len(current['nodes']) == 1 and current['nodes'][0]['id'] == 'root' and current['nodes'][0]['text'] == current['name'], 'Existing name-only creation returns a matching root node')
+    check(len(current['nodes']) == 1 and current['nodes'][0]['id'] == 'root' and current['nodes'][0]['text'] == 'My first diagram', 'Title-only updates preserve the original root text')
     check(current['nodes'][0]['width'] is None, 'New and existing nodes without a custom width use the default')
     a, b, c = (str(uuid.uuid4()) for _ in range(3))
     root = current['nodes'][0]
+    root['text'] = 'Idea central independiente'
     root['layout'] = dict(mode='horizontal', direction='left', vertical='auto', horizontal='auto')
     root['width'] = 320.75
     nodes = [root,
              dict(id=a, parent_id='root', text='Rama uno\nSegunda línea', layout=None, x=None, y=None, width=160.25),
              dict(id=b, parent_id=a, text='Subrama', layout=dict(mode='vertical', direction='bottom', vertical='auto', horizontal='auto'), x=41.25, y=-73.5, width=None),
              dict(id=c, parent_id=b, text='Nieto', layout=None, x=None, y=None, width=440)]
-    first = persist(nodes)
-    check(first['nodes'] == nodes, 'Root style, inherited children, branch override, line breaks, positions and individual widths round-trip exactly')
+    first = persist(nodes, name='Mi mapa independiente')
+    check(first['name'] == 'Mi mapa independiente' and first['nodes'] == nodes, 'Independent title, root text, styles, line breaks, positions and widths round-trip exactly')
     reloaded = owner.boot()['data']['diagrams'][0]
-    check(reloaded['nodes'] == nodes, 'Layout choices, branch inheritance and widths survive a fresh bootstrap')
+    check(reloaded['name'] == first['name'] and reloaded['nodes'] == nodes, 'The title and central idea remain independent after a fresh bootstrap')
     persist(nodes, 404, client=other)
     guest.request('saveDiagram', dict(id=diagram_id, version=first['version'], name=first['name'], nodes=nodes), 401, module='diagrams')
     check(not other.request('diagrams', module='diagrams'), 'Other accounts cannot read or overwrite private tree nodes')
     owner.request('saveDiagram', dict(id=diagram_id, version=first['version'], name='Legacy rename'), module='diagrams')
     renamed = saved()
-    check(renamed['nodes'][0]['text'] == 'Legacy rename' and renamed['nodes'][1:] == nodes[1:] and renamed['nodes'][0]['layout'] == root['layout'] and renamed['nodes'][0]['width'] == root['width'], 'Name-only clients preserve descendants, layout overrides and individual widths')
+    check(renamed['name'] == 'Legacy rename' and renamed['nodes'] == nodes, 'Title-only updates preserve every node, text, style, position and width')
     nodes = renamed['nodes']
+    nodes[0]['text'] = 'Idea central revisada\nDetalle propio'
+    edited_root = persist(nodes)
+    check(edited_root['name'] == 'Legacy rename' and edited_root['nodes'][0]['text'] == nodes[0]['text'], 'Editing the central idea does not overwrite the diagram title')
+    renamed_with_tree = persist(nodes, name='Proyecto de aprendizaje')
+    check(renamed_with_tree['name'] == 'Proyecto de aprendizaje' and renamed_with_tree['nodes'] == nodes, 'Renaming with a full snapshot preserves the central idea and its descendants')
+    title_snapshot = saved()
+    for invalid_title in ['', '   \n ', 'x' * 121]:
+        persist(nodes, 422, name=invalid_title)
+        assert saved() == title_snapshot, 'Invalid title changed persisted data'
+    check(True, 'Empty and oversized diagram titles are rejected without changing the tree or version')
     legacy_nodes = copy.deepcopy(nodes)
     for node in legacy_nodes:
         node.pop('width')
@@ -48,7 +59,7 @@ def run(owner, other, guest, diagram_id, check):
     nodes[1]['width'] = 600
     nodes[2]['width'] = 234.567
     resized = persist(nodes)
-    check([node['width'] for node in resized['nodes']] == [100, 600, 234.57, 440], 'Minimum and maximum widths are accepted and fractional widths round to two decimals')
+    check(resized['name'] == 'Proyecto de aprendizaje' and [node['width'] for node in resized['nodes']] == [100, 600, 234.57, 440], 'Width limits and rounding preserve the independent diagram title')
     nodes = resized['nodes']
     nodes[1]['width'] = None
     reset = persist(nodes)
@@ -58,7 +69,7 @@ def run(owner, other, guest, diagram_id, check):
     nodes[1]['layout'] = dict(mode='matrix', direction='auto', vertical='bottom', horizontal='rtl')
     changed = persist(nodes)
     persist(renamed['nodes'], 409, version=renamed['version'])
-    check(saved()['nodes'] == changed['nodes'], 'Optimistic locking prevents stale trees from overwriting newer branch styles')
+    check(saved()['name'] == 'Proyecto de aprendizaje' and saved()['nodes'] == changed['nodes'], 'Style changes preserve the title and optimistic locking rejects stale snapshots')
     before = saved()
 
     def reject(mutator):
@@ -77,8 +88,9 @@ def run(owner, other, guest, diagram_id, check):
     reject(lambda n: n[1].update(text='   \n '))
     reject(lambda n: n[1].update(text='x' * 121))
     reject(lambda n: n[1].update(id='unsafe-id'))
-    reject(lambda n: n[0].update(text='Mismatch'))
-    check(True, 'Node names, root-name consistency and node identifiers are validated')
+    reject(lambda n: n[0].update(text='   \n '))
+    reject(lambda n: n[0].update(text='x' * 121))
+    check(True, 'Root and child names remain non-empty and bounded independently of the title')
     for field in ['mode', 'direction', 'vertical', 'horizontal']:
         reject(lambda n, field=field: n[0]['layout'].update({field: 'bad-value'}))
     reject(lambda n: n[1].update(x='10'))
@@ -101,6 +113,7 @@ def run(owner, other, guest, diagram_id, check):
     restored = persist(before['nodes'])
     check(restored['nodes'] == before['nodes'], 'Replacing a deep tree removes obsolete nodes while restoring the requested branch hierarchy')
     creation_key = str(uuid.uuid4())
-    created = owner.request('saveDiagram', dict(client_key=creation_key, name='Second tree', nodes=[dict(id='root', parent_id=None, text='Second tree', layout=None)]), module='diagrams')
+    created = owner.request('saveDiagram', dict(client_key=creation_key, name='Second tree', nodes=[dict(id='root', parent_id=None, text='Another central idea', layout=None)]), module='diagrams')
+    check(created['name'] == 'Second tree' and created['nodes'][0]['text'] == 'Another central idea', 'A new diagram can start with a title different from its central idea')
     repeated = owner.request('saveDiagram', dict(client_key=creation_key, name='Different retry', nodes=[dict(id='root', parent_id=None, text='Different retry', layout=None)]), module='diagrams')
     check(created == repeated, 'Idempotent creation retries cannot replace an existing root or its style')

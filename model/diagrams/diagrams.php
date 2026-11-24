@@ -22,7 +22,7 @@ final class DiagramsModel extends BaseModel
     public function save(array $data): array
     {
         $name = self::name($data, 'name');
-        $nodes = array_key_exists('nodes', $data) ? self::validateNodes($data['nodes'], $name) : null;
+        $nodes = array_key_exists('nodes', $data) ? self::validateNodes($data['nodes']) : null;
         $id = (int) ($data['id'] ?? 0);
         $writeNodes = true;
         if ($id) {
@@ -44,16 +44,23 @@ final class DiagramsModel extends BaseModel
                 $nodes ??= [self::rootNode($name)];
             }
         }
-        if ($writeNodes) {
-            if ($nodes !== null) $this->replaceNodes($id, $nodes);
-            else {
-                // Older clients may rename a diagram without supplying its tree.
-                $this->db->run("UPDATE diagram_nodes SET text=? WHERE diagram_id=? AND node_key='root'", [$name, $id]);
-            }
-        }
+        // The diagram title and the central idea are independent. A title-only
+        // update preserves every node, including the root text and its styling.
+        if ($writeNodes && $nodes !== null) $this->replaceNodes($id, $nodes);
         $diagram = $this->db->one('SELECT id,name,version,created_at,updated_at FROM diagrams WHERE id=? AND owner_user_id=?', [$id, $this->uid()]);
         $diagram['nodes'] = array_map(self::nodeResponse(...), $this->db->all('SELECT * FROM diagram_nodes WHERE diagram_id=? ORDER BY sort_order', [$id]));
         return $diagram;
+    }
+
+    public function delete(array $data): array
+    {
+        $id = (int) ($data['id'] ?? 0);
+        $diagram = $this->db->one('SELECT id,version FROM diagrams WHERE id=? AND owner_user_id=? FOR UPDATE', [$id, $this->uid()]);
+        if (!$diagram) fail('error_not_found', 404);
+        if ((int) ($data['version'] ?? 0) !== (int) $diagram['version']) fail('error_diagram_conflict', 409);
+        $this->db->run('UPDATE diagram_nodes SET parent_key=NULL WHERE diagram_id=?', [$id]);
+        $this->db->run('DELETE FROM diagrams WHERE id=? AND owner_user_id=?', [$id, $this->uid()]);
+        return ['id' => $id];
     }
 
     private static function name(array $data, string $key): string
@@ -67,7 +74,7 @@ final class DiagramsModel extends BaseModel
         return ['id' => 'root', 'parent_id' => null, 'text' => $name, 'layout' => null, 'x' => null, 'y' => null, 'width' => null];
     }
 
-    private static function validateNodes(mixed $input, string $name): array
+    private static function validateNodes(mixed $input): array
     {
         if (!is_array($input) || !array_is_list($input) || count($input) < 1 || count($input) > 200) fail('error_validation');
         $nodes = [];
@@ -79,7 +86,6 @@ final class DiagramsModel extends BaseModel
             $parent = $item['parent_id'];
             if (($id === 'root' && $parent !== null) || ($id !== 'root' && !is_string($parent))) fail('error_validation');
             $text = self::name($item, 'text');
-            if ($id === 'root' && $text !== $name) fail('error_validation');
             $layout = $item['layout'] ?? null;
             if ($layout !== null) {
                 if (!is_array($layout)) fail('error_validation');
@@ -102,6 +108,22 @@ final class DiagramsModel extends BaseModel
                 if ($width !== null && ((!is_int($width) && !is_float($width)) || !is_finite((float) $width) || $width < 100 || $width > 600)) fail('error_validation');
                 $node['width'] = $width === null ? null : round((float) $width, 2);
             }
+            if (array_key_exists('image', $item)) $node['image'] = self::image($item['image']);
+            if (array_key_exists('checkbox', $item)) {
+                if ($item['checkbox'] !== null && !is_bool($item['checkbox'])) fail('error_validation');
+                $node['checkbox'] = $item['checkbox'];
+            }
+            if (array_key_exists('labels', $item)) {
+                if (!is_array($item['labels']) || !array_is_list($item['labels']) || count($item['labels']) > 10) fail('error_validation');
+                $node['labels'] = [];
+                foreach ($item['labels'] as $label) {
+                    if (!is_array($label)) fail('error_validation');
+                    $node['labels'][] = [
+                        'text' => trim(Validate::text($label, 'text', 80)),
+                        'position' => Validate::choice($label['position'] ?? null, ['outside', 'inside']),
+                    ];
+                }
+            }
             $nodes[$id] = $node;
         }
         if (!isset($nodes['root'])) fail('error_validation');
@@ -118,25 +140,42 @@ final class DiagramsModel extends BaseModel
         return array_values($nodes);
     }
 
+    private static function image(mixed $image): ?string
+    {
+        if ($image === null) return null;
+        if (!is_string($image) || strlen($image) > 350000 || !preg_match('~^data:image/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$~D', $image, $parts)) fail('error_diagram_image');
+        $bytes = base64_decode($parts[2], true);
+        if ($bytes === false || strlen($bytes) > 262144) fail('error_diagram_image');
+        $size = @getimagesizefromstring($bytes);
+        if (!$size || $size['mime'] !== 'image/' . $parts[1] || $size[0] > 1024 || $size[1] > 1024) fail('error_diagram_image');
+        return $image;
+    }
+
     private function replaceNodes(int $id, array $nodes): void
     {
-        $existingWidths = [];
-        foreach ($nodes as $node) {
-            if (!array_key_exists('width', $node)) {
-                foreach ($this->db->all('SELECT node_key,node_width FROM diagram_nodes WHERE diagram_id=?', [$id]) as $existing) {
-                    $existingWidths[$existing['node_key']] = $existing['node_width'];
-                }
-                break;
-            }
+        $existingContent = [];
+        foreach ($this->db->all('SELECT node_key,node_width,image_data,labels_json,checkbox_state FROM diagram_nodes WHERE diagram_id=?', [$id]) as $existing) {
+            $existingContent[$existing['node_key']] = $existing;
         }
+        $imageBytes = 0;
+        foreach ($nodes as &$node) {
+            $existing = $existingContent[$node['id']] ?? [];
+            if (!array_key_exists('width', $node)) $node['width'] = $existing['node_width'] ?? null;
+            if (!array_key_exists('image', $node)) $node['image'] = $existing['image_data'] ?? null;
+            if (!array_key_exists('checkbox', $node)) $node['checkbox'] = $existing['checkbox_state'] ?? null;
+            if (!array_key_exists('labels', $node)) $node['labels'] = json_decode($existing['labels_json'] ?? '[]', true, 8, JSON_THROW_ON_ERROR);
+            $imageBytes += strlen($node['image'] ?? '');
+        }
+        unset($node);
+        if ($imageBytes > 2097152) fail('error_diagram_image_limit');
         // Detach old edges first: immediate SQL foreign keys also protect deep trees.
         $this->db->run('UPDATE diagram_nodes SET parent_key=NULL WHERE diagram_id=?', [$id]);
         $this->db->run('DELETE FROM diagram_nodes WHERE diagram_id=?', [$id]);
         foreach ($nodes as $position => $node) {
             $layout = $node['layout'];
             $this->db->run(
-                'INSERT INTO diagram_nodes(diagram_id,node_key,parent_key,text,sort_order,layout_mode,layout_direction,layout_vertical,layout_horizontal,position_x,position_y,node_width) VALUES (?,?,NULL,?,?,?,?,?,?,?,?,?)',
-                [$id, $node['id'], $node['text'], $position, $layout['mode'] ?? null, $layout['direction'] ?? null, $layout['vertical'] ?? null, $layout['horizontal'] ?? null, $node['x'], $node['y'], array_key_exists('width', $node) ? $node['width'] : ($existingWidths[$node['id']] ?? null)],
+                'INSERT INTO diagram_nodes(diagram_id,node_key,parent_key,text,sort_order,layout_mode,layout_direction,layout_vertical,layout_horizontal,position_x,position_y,node_width,image_data,labels_json,checkbox_state) VALUES (?,?,NULL,?,?,?,?,?,?,?,?,?,?,?,?)',
+                [$id, $node['id'], $node['text'], $position, $layout['mode'] ?? null, $layout['direction'] ?? null, $layout['vertical'] ?? null, $layout['horizontal'] ?? null, $node['x'], $node['y'], $node['width'], $node['image'], json_encode($node['labels'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE), $node['checkbox'] === null ? null : (int) $node['checkbox']],
             );
         }
         foreach ($nodes as $node) {
@@ -155,6 +194,9 @@ final class DiagramsModel extends BaseModel
             'x' => $node['position_x'] === null ? null : (float) $node['position_x'],
             'y' => $node['position_y'] === null ? null : (float) $node['position_y'],
             'width' => $node['node_width'] === null ? null : (float) $node['node_width'],
+            'image' => $node['image_data'],
+            'checkbox' => $node['checkbox_state'] === null ? null : (bool) $node['checkbox_state'],
+            'labels' => json_decode($node['labels_json'] ?? '[]', true, 8, JSON_THROW_ON_ERROR),
         ];
     }
 }

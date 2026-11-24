@@ -1,6 +1,9 @@
 async function bootstrap() {
   const r = await api('bootstrap');
-  if (S.user?.id !== r.user?.id) pageControllers.home.reset();
+  if (S.user?.id !== r.user?.id) {
+    if (S.user) pageControllers.home.nodeTools.clearClipboard();
+    pageControllers.home.reset();
+  }
   Object.assign(S, {
     user: r.user,
     language: r.language,

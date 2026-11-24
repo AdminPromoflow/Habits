@@ -99,10 +99,6 @@ dialog.diagram-layout-dialog {
   background: #e5ddec;
 }
 
-.diagram-layout-card:disabled {
-  opacity: 0.38;
-}
-
 .diagram-layout-preview {
   display: grid;
   place-items: center;

@@ -39,4 +39,5 @@ return [
     'platform' => 'admin',
     'diagrams' => 'diagrams',
     'saveDiagram' => 'diagrams',
+    'deleteDiagram' => 'diagrams',
 ];

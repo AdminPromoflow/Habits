@@ -40,7 +40,7 @@ final class Request
                 fail('error_method', 405);
             }
 
-            $data = $method === 'POST' ? self::body() : $_GET;
+            $data = $method === 'POST' ? self::body($action === 'saveDiagram' ? 3145728 : 100000) : $_GET;
             $db = database();
             $auth = new Auth($db);
             $user = in_array($action, self::PUBLIC_ACTIONS, true)
@@ -99,7 +99,7 @@ final class Request
         }
     }
 
-    private static function body(): array
+    private static function body(int $limit = 100000): array
     {
         if (!str_starts_with(strtolower($_SERVER['CONTENT_TYPE'] ?? ''), 'application/json')) {
             fail('error_validation', 415);
@@ -108,11 +108,11 @@ final class Request
         if (!is_string($token) || !hash_equals($_SESSION['csrf'], $token)) {
             fail('error_csrf', 419);
         }
-        if ((int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > 100000) {
+        if ((int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > $limit) {
             fail('error_validation', 413);
         }
-        $raw = file_get_contents('php://input', false, null, 0, 100001);
-        if (strlen($raw) > 100000) {
+        $raw = file_get_contents('php://input', false, null, 0, $limit + 1);
+        if (strlen($raw) > $limit) {
             fail('error_validation', 413);
         }
         $data = json_decode($raw, true, 32, JSON_THROW_ON_ERROR);
