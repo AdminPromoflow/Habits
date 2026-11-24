@@ -214,9 +214,9 @@ class DiagramConnections {
     const arrows = this.style().arrows || 'none';
     const right = this.rightEndpoint(edge.points);
     tools.innerHTML = `<button type="button" id="diagram-connection-more" class="diagram-handle diagram-connection-more" data-connection-action="menu" aria-label="${esc(t('diagram_connection_options'))}" aria-haspopup="menu" aria-expanded="${this.menuOpen}">⋯</button>` +
-      (this.menuOpen ? `<div id="diagram-connection-menu" class="diagram-connection-menu" role="${this.labelEditing ? 'group' : 'menu'}" aria-label="${esc(t('diagram_connection_options'))}">${this.labelEditing ?
+      (this.menuOpen ? `<div id="diagram-connection-menu" class="diagram-connection-menu${this.labelEditing ? ' is-label-editing' : ''}" role="${this.labelEditing ? 'group' : 'menu'}" aria-label="${esc(t('diagram_connection_options'))}">${this.labelEditing ?
         `<label for="diagram-connection-label-input">${esc(t('diagram_connection_text'))}</label><input id="diagram-connection-label-input" maxlength="120" value="${esc(draft || '')}"/>
-        <div class="diagram-connection-label-actions">${option('save-label', t('save'))}${option('cancel-label', t('cancel'))}</div>` :
+        <div class="diagram-connection-label-actions">${option('cancel-label', t('cancel'))}${option('save-label', t('diagram_connection_save'))}</div>` :
         option('delete', t('delete')) + option('label', t('diagram_connection_text')) + '<hr/>' +
         option('arrows-none', t('diagram_connection_no_arrows'), arrows === 'none') +
         option('arrows-right', t('diagram_connection_arrow_right'), arrows === right) +

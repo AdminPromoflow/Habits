@@ -1,5 +1,12 @@
 # Verificación realizada
 
+## Flechitas de topics y ruta exclusiva de diagramas — 24 de noviembre de 2026
+
+- Los cuadros muestran solamente → o ← para destinos específicos, sin icono de cadena ni contador. Una tarjeta al pasar el cursor o enfocar la flecha identifica Diagrama y Topic por separado; se mantiene fuera del zoom y del recorte del lienzo, admite varios orígenes y se cierra con Escape.
+- Los enlaces a diagramas completos desaparecen de los cuadros de origen y destino. Su ruta queda fija dentro de la esquina superior izquierda del fondo, incluye hijos seleccionables y abre vistas completas. Los enlaces a topics quedan excluidos de la jerarquía. Los recorridos antiguos que mezclaban ambos tipos no se reutilizan.
+- 143 pruebas del editor y navegación aprobadas. Cubren ambos tipos de enlace, cambio de diagrama completo a topic, hijos repetidos, varios niveles, ciclos y conservación de cambios pendientes antes de navegar.
+- Navegador local: una flecha mostró «Diagrama: Proyecto de aprendizaje / Topic: Subrama». Cambiar ese enlace a diagrama completo eliminó la flecha y añadió el hijo a la ruta. Navegar por «Second tree › Proyecto de aprendizaje › Título del conjunto», recargar y volver al padre conservó la jerarquía; el diagrama nieto no mostró flechas de regreso en sus cuadros. Sin errores de consola. La comprobación utiliza la base aislada, sin cambios de esquema.
+
 ## Enlaces de regreso y ruta de diagramas — 24 de noviembre de 2026
 
 - Cada destino deriva sus enlaces de regreso de los enlaces privados existentes, sin reemplazar su propio destino. Los enlaces al diagrama completo muestran el regreso en el cuadro principal. Un botón con contador permite escoger entre varios orígenes.

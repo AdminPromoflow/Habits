@@ -54,10 +54,11 @@ test('same-diagram returns work and explicit reciprocal or self links are not du
   assert.equal(nav.incoming(home.nodes[0]).length, 0);
 });
 
-test('whole-diagram links add their return to the destination root', () => {
+test('whole-diagram links use the path without adding any return arrow to topics', () => {
   const { nav, home } = harness([diagram(1, [topic('root', target(2))]), diagram(2, [topic('root'), topic('child')])], 2);
-  assert.equal(nav.incoming(home.nodes[0]).length, 1);
+  assert.equal(nav.incoming(home.nodes[0]).length, 0);
   assert.equal(nav.incoming(home.nodes[1]).length, 0);
+  assert.match(nav.html(), /Diagram 1/);
 });
 
 test('opening a child directly reconstructs its parent chain from saved links', () => {
@@ -78,16 +79,49 @@ test('the visited parent wins for a child with multiple parents and survives rel
   assert.deepEqual(plain(nav.trail()).map(item => item.diagram_id), [2, 3, 4]);
   const reloaded = harness(fixture, 4, { storage });
   assert.deepEqual(plain(reloaded.nav.trail()).map(item => item.diagram_id), [2, 3, 4]);
-  reloaded.nav.prepare(target(2, 'root'), 'root', { returning: true }); reloaded.choose(2);
-  assert.deepEqual(plain(reloaded.nav.trail()), [target(2, 'root')]);
+  reloaded.nav.prepare(target(2), 'root', { returning: true }); reloaded.choose(2);
+  assert.deepEqual(plain(reloaded.nav.trail()), [target(2)]);
 });
 
-test('breadcrumb navigation returns to the source topic through the normal save-protected flow', async () => {
+test('breadcrumb navigation opens the whole ancestor through the normal save-protected flow', async () => {
   const { nav, home } = harness([diagram(1, [topic('root'), topic('exit', target(2))]), diagram(2, [topic('root')])], 2);
   let received;
   home.links = { follow: async (...args) => { received = args; } };
   await nav.visit(0);
-  assert.deepEqual(plain(received), [target(1, 'exit'), { returning: true, trail: [target(1, 'exit')] }]);
+  assert.deepEqual(plain(received), [target(1), { returning: true, trail: [target(1, 'exit')] }]);
+});
+
+test('topic-only links keep their return arrows but never create a diagram hierarchy', () => {
+  const { nav, home, choose } = harness([diagram(1, [topic('root', target(2, 'child'))]), diagram(2, [topic('root'), topic('child')])], 1);
+  assert.equal(nav.html(), '');
+  nav.prepare(target(2, 'child'), 'root'); choose(2);
+  assert.equal(nav.html(), '');
+  assert.equal(nav.incoming(home.nodes[1]).length, 1);
+  nav.write([target(1, 'root'), target(2)]);
+  assert.deepEqual(plain(nav.trail()), [target(2)]);
+});
+
+test('the parent path lists distinct children and opens them without needing a topic arrow', async () => {
+  const fixture = [diagram(1, [topic('root', target(2)), topic('second', target(2)), topic('third', target(3)), topic('topic-only', target(4, 'root'))]),
+    diagram(2, [topic('root', target(5))]), diagram(3, [topic('root')]), diagram(4, [topic('root')]), diagram(5, [topic('root')])];
+  const { nav, home, choose } = harness(fixture, 1);
+  assert.deepEqual(plain(nav.children()).map(edge => edge.target_diagram), [2, 3]);
+  let received;
+  home.links = { follow: async (link, options) => { received = [link, options]; nav.prepare(link, 'unrelated-selected-topic', options); } };
+  await nav.visitChild(2); choose(2);
+  assert.equal(received[0].node_id, null);
+  assert.deepEqual(plain(nav.trail()), [target(1, 'root'), target(2)]);
+  assert.deepEqual(plain(nav.children()).map(edge => edge.target_diagram), [5]);
+  await nav.visitChild(5); choose(5);
+  assert.deepEqual(plain(nav.trail()).map(entry => entry.diagram_id), [1, 2, 5]);
+});
+
+test('changing a whole-diagram destination to a topic removes its parent path', () => {
+  const { nav, home, S } = harness([diagram(1, [topic('root', target(2))]), diagram(2, [topic('root')])], 2);
+  nav.write(nav.trail());
+  S.data.diagrams[0].nodes[0].link.node_id = 'root';
+  assert.equal(nav.html(), '');
+  assert.equal(nav.incoming(home.nodes[0]).length, 1);
 });
 
 test('removed, invalid and inaccessible destinations cannot generate breadcrumbs or returns', () => {

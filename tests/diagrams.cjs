@@ -19,6 +19,19 @@ test('topic links are included in dirty detection, saved snapshots and their vis
   assert.equal(JSON.parse(home.nodeContent(home.nodes[0])).topicLink, '');
 });
 
+test('whole-diagram destinations are absent from topic badges and topic arrows expose named destinations', () => {
+  const { home, state } = savedEditor();
+  state.data.diagrams.push({ id: 52, name: 'Destination diagram', nodes: [{ id: 'root', text: 'Specific topic' }] });
+  home.nodes[0].link = { diagram_id: 52, node_id: null };
+  assert.equal(home.links.badge(home.nodes[0]), '');
+  home.nodes[0].link.node_id = 'root';
+  const badge = home.links.badge(home.nodes[0]);
+  assert.match(badge, /→/);
+  assert.match(badge, /Destination diagram/);
+  assert.match(badge, /Specific topic/);
+  assert.doesNotMatch(badge, /<svg/);
+});
+
 test('links navigate to a topic or the overview with the source saved first', async () => {
   for (const nodeId of ['root', null]) {
     const { home, state, navigations } = savedEditor();

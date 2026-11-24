@@ -7,12 +7,15 @@ class DiagramLinks {
     this.arrival = null;
     this.navigation = new DiagramLinkNavigation(home);
     const show = event => {
+      if (this.tooltip?.contains(event.target)) { clearTimeout(this.tooltipTimer); return; }
       const button = event.target.closest?.('[data-topic-link-details]');
       if (button) this.showTooltip(button);
     };
     const leave = event => {
+      if (!this.tooltip) return;
       if (this.tooltip?.contains(event.relatedTarget) || this.tooltipButton?.contains(event.relatedTarget)) return;
-      this.hideTooltip();
+      clearTimeout(this.tooltipTimer);
+      this.tooltipTimer = setTimeout(() => this.hideTooltip(), 150);
     };
     document.addEventListener('pointerover', show);
     document.addEventListener('focusin', show);
@@ -21,8 +24,8 @@ class DiagramLinks {
     document.addEventListener('pointerdown', () => this.hideTooltip());
     document.addEventListener('click', () => this.hideTooltip());
     document.addEventListener('keydown', event => { if (event.key === 'Escape') this.hideTooltip(); });
-    window.addEventListener('resize', () => this.hideTooltip());
-    window.addEventListener('scroll', event => { if (!this.tooltip?.contains(event.target)) this.hideTooltip(); }, true);
+    window.addEventListener('resize', () => this.positionTooltip());
+    window.addEventListener('scroll', event => { if (!this.tooltip?.contains(event.target)) this.positionTooltip(); }, true);
   }
 
   badge(node) {
@@ -57,6 +60,7 @@ class DiagramLinks {
   }
 
   showTooltip(button) {
+    clearTimeout(this.tooltipTimer);
     if (this.tooltipButton === button) return;
     this.hideTooltip();
     const details = JSON.parse(button.dataset.topicLinkDetails);
@@ -69,6 +73,13 @@ class DiagramLinks {
     button.setAttribute('aria-describedby', tooltip.id);
     this.tooltip = tooltip;
     this.tooltipButton = button;
+    this.positionTooltip();
+  }
+
+  positionTooltip() {
+    const tooltip = this.tooltip, button = this.tooltipButton;
+    if (!tooltip || !button) return;
+    if (!button.isConnected) { this.hideTooltip(); return; }
     const anchor = button.getBoundingClientRect(), box = tooltip.getBoundingClientRect();
     const left = Math.max(8, Math.min(anchor.right - box.width, window.innerWidth - box.width - 8));
     const top = anchor.bottom + 8 + box.height <= window.innerHeight ? anchor.bottom + 8 : Math.max(8, anchor.top - box.height - 8);
@@ -77,6 +88,7 @@ class DiagramLinks {
   }
 
   hideTooltip() {
+    clearTimeout(this.tooltipTimer);
     this.tooltipButton?.removeAttribute('aria-describedby');
     this.tooltip?.remove();
     this.tooltip = null;

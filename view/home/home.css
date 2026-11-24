@@ -240,9 +240,9 @@
 }
 
 .diagram-node-body { position: relative; }
-.diagram-topic-links { position: absolute; right: 0; bottom: -26px; display: flex; gap: 3px; z-index: 1; }
+.diagram-topic-links { position: absolute; right: -40px; bottom: -22px; display: flex; gap: 3px; z-index: 1; }
 .diagram-topic-link { position: relative; width: 26px; height: 26px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--purple-dark); cursor: pointer; }
-.diagram-link-direction { font: 600 18px/1 system-ui, sans-serif; pointer-events: none; }
+.diagram-link-direction { font: 600 14px/1 system-ui, sans-serif; pointer-events: none; }
 .diagram-canvas-navigation { position: absolute; top: 12px; left: 16px; right: 16px; z-index: 6; pointer-events: none; }
 .diagram-canvas-navigation:empty { display: none; }
 .diagram-link-trail { width: fit-content; min-width: 0; max-width: 100%; padding: 4px 8px; overflow-x: auto; color: var(--purple-dark); background: var(--surface); border-radius: 6px; pointer-events: auto; }
@@ -617,7 +617,11 @@ button.diagram-handle-arrows { cursor: ew-resize; touch-action: none; }
 .diagram-connection-menu hr { border: 0; border-top: 1px solid #b8a4d440; margin: 5px 0; }
 .diagram-connection-menu label { display: block; padding: 5px 3px; font-size: 14px; }
 .diagram-connection-menu input { width: 100%; min-width: 0; margin: 4px 0; }
-.diagram-connection-label-actions { display: flex; }
+.diagram-connection-menu.is-label-editing { left: 50%; transform: translateX(-50%); width: 208px; text-align: center; }
+.diagram-connection-menu.is-label-editing label { padding: 3px 0; font-size: 13px; }
+.diagram-connection-menu.is-label-editing input { min-height: 32px; padding: 6px 8px; font-size: 13px; text-align: center; }
+.diagram-connection-label-actions { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 4px; }
+.diagram-connection-label-actions button { width: auto; min-width: 68px; min-height: 30px; padding: 6px 10px; font-size: 12px; line-height: 1.25; text-align: center; }
 .mindmap-stage:focus { outline: none; }
 .diagram-root.is-selected:not(.is-editing) .diagram-node { cursor: grab; touch-action: none; }
 .diagram-root.is-dragging .diagram-node { cursor: grabbing; }
