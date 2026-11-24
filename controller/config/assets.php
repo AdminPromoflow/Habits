@@ -38,6 +38,7 @@ return [
         'view/home/diagram-connections.js',
         'view/home/diagram-history.js',
         'view/mindspace/sheet.js',
+        'view/mindspace/link-targets.js',
         'view/mindspace/editors.js',
         'view/mindspace/mindspace.js',
         'view/home/home.js',

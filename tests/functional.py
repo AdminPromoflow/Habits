@@ -268,6 +268,8 @@ try:
  ms_owner=Client();ms_owner.register('mindspace@example.test','MindSpace tester')
  ms_other=Client();ms_other.register('mindspace-other@example.test','Other MindSpace tester')
  test_mindspace(ms_owner, ms_other, guest, check)
+ from item_links_acceptance import run as test_item_links
+ test_item_links(ms_owner, ms_other, guest, check)
  subprocess.run([PHP,'tests/constraints.php'],cwd=ROOT,env=env,check=True)
  (ROOT/'tests/.runtime/environment.json').write_text(json.dumps({'database':DB,'base_url':BASE,'env':{k:v for k,v in env.items() if k.startswith('RUTINA_')}},indent=2))
  check(True,'All tests ran against a dedicated MySQL database, without touching Aleina’s real data')

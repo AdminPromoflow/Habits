@@ -297,7 +297,7 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
   vm.runInContext(fs.readFileSync('view/home/diagram-routing.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('view/home/diagram-connections.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('view/home/diagram-history.js', 'utf8'), context);
-  for (const file of ['sheet', 'editors', 'mindspace']) vm.runInContext(fs.readFileSync(`view/mindspace/${file}.js`, 'utf8'), context);
+  for (const file of ['sheet', 'link-targets', 'editors', 'mindspace']) vm.runInContext(fs.readFileSync(`view/mindspace/${file}.js`, 'utf8'), context);
   const HomePage = vm.runInContext(fs.readFileSync('view/home/home.js', 'utf8') + '\nHomePage;', context);
   const home = new HomePage();
   if (draft) {
@@ -407,6 +407,64 @@ function savedEditor() {
   fixture.home.drawStage();
   return fixture;
 }
+
+test('item and cell links save the source before navigating across spaces', async () => {
+  for (const target of [null, {type:'cell', id:'B3'}]) {
+    const {home, state, navigations} = savedEditor();
+    const sheet = {id:71, mindspace_id:90, kind:'spreadsheet', name:'Budget', parent_id:null, content:{rows:20,columns:8,cells:{}}};
+    home.nodes[0].link = {item_id:sheet.id, target};
+    home.name = 'Pending source';
+    const calls = [];
+    home.makeRequest = async (action, data) => {
+      calls.push(action);
+      if (action === 'saveDiagram') return {...data, version:data.version+1};
+      return {diagrams:state.data.diagrams, habits:[], mindspace:{id:90, spaces:[{id:90,name:'Work'}],items:[sheet]}};
+    };
+    await home.links.follow(home.nodes[0].link);
+    assert.deepEqual(calls, ['saveDiagram','data']);
+    const url = new URL(navigations[0]);
+    assert.equal(url.searchParams.get('item'),'71');
+    assert.equal(url.searchParams.get('space'),'90');
+    assert.equal(url.searchParams.get('cell'),target?.id || null);
+    assert.equal(url.searchParams.has('diagram'),false);
+    assert.equal(home.active.nodes[0].link.item_id,71);
+    assert.equal(home.hasChanges(),false);
+    assert.match(home.links.badge(home.nodes[0]), /Budget/);
+  }
+});
+
+test('missing items, removed cells and source save failures keep the current editor open', async () => {
+  for (const problem of ['missing','cell','offline']) {
+    const {home,state,navigations} = savedEditor();
+    if (problem === 'offline') home.name = 'Unsaved source';
+    home.makeRequest = async () => {
+      if (problem === 'offline') throw new Error('Offline');
+      return {diagrams:state.data.diagrams, mindspace:{items:problem === 'missing' ? [] : [{id:71,kind:'spreadsheet',content:{rows:2,columns:2,cells:{}}}]},habits:[]};
+    };
+    await home.links.follow({item_id:71,target:{type:'cell',id:'B3'}});
+    assert.equal(navigations.length,0);
+    assert.equal(home.error,problem === 'offline' ? 'Offline' : 'error_diagram_link_missing');
+    assert.equal(home.active.id,51);
+  }
+});
+
+test('typing during an item lookup is saved before leaving the source', async () => {
+  const {home,state,navigations} = savedEditor();
+  let release; let lookups = 0;
+  const data = {diagrams:state.data.diagrams,habits:[],mindspace:{items:[{id:71,kind:'notes',content:{text:''}}]}};
+  home.makeRequest = async (action, payload) => {
+    if (action === 'saveDiagram') return {...payload,version:payload.version+1};
+    if (++lookups === 1) return new Promise(resolve => {release=resolve;});
+    return data;
+  };
+  const pending=home.links.follow({item_id:71,target:null});
+  await new Promise(setImmediate);
+  home.name='Typed during lookup'; release(data); await pending;
+  assert.equal(lookups,2);
+  assert.equal(home.nodes[0].text,'Typed during lookup');
+  assert.equal(home.hasChanges(),false);
+  assert.equal(navigations.length,1);
+});
 
 test('the more action toggles its panel without editing or saving the diagram', async () => {
   const { home, field, more, menu, controls } = savedEditor();

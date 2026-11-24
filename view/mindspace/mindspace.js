@@ -3,7 +3,7 @@
 class MindSpace extends PageController {
   constructor(home) {
     super(['ms-new','ms-new-kind','ms-open','ms-folder','ms-rename','ms-move','ms-retry',
-      'ms-sidebar-toggle','ms-sidebar-add','ms-space-open','ms-space-new','ms-entry-menu','ms-space-rename','ms-delete','ms-space-delete',
+      'ms-link-return','ms-sidebar-toggle','ms-sidebar-add','ms-space-open','ms-space-new','ms-entry-menu','ms-space-rename','ms-delete','ms-space-delete',
       'ms-card-new','ms-card-edit','ms-sprint','ms-habits-select','ms-habit-new','ms-sheet-row','ms-sheet-column','ms-sheet-export']);
     this.home = home;
     this.editor = new MindSpaceEditors(this);
@@ -61,7 +61,7 @@ class MindSpace extends PageController {
     this.generation = (this.generation || 0) + 1;
     this.active = null; this.draft = null; this.baseline = ''; this.busy = false;
     this.error = ''; this.savePromise = null; this.draggingId = null;
-    this.sidebarExpanded = undefined; this.treeExpanded = undefined;
+    this.sidebarExpanded = undefined; this.treeExpanded = undefined; this.linkArrival = null;
   }
   enabled() { return !!S.data?.mindspace; }
   allItems() { return S.data?.mindspace?.items || []; }
@@ -232,16 +232,35 @@ class MindSpace extends PageController {
       `<span aria-hidden="true">/</span><button type="button" data-action="ms-folder" data-id="${folder.id}" data-ms-drop="${folder.id}">${esc(folder.name)}</button>`).join('');
     return renderTemplate('mindspace', {
       spaceName:esc(this.spaceName()), intro:t('ms_intro'), tabsLabel:t('ms_tabs'), tabs:this.tabs(), plus:icon('plus'), addLabel:t('ms_add'),
-      pathLabel:t('ms_folder_path'), path,
+      pathLabel:t('ms_folder_path'), path, linkedFrom:this.linkedFrom(),
       name:esc(this.active?.name || t('ms_files')),
       actions:this.active ? `<button type="button" class="text-btn" data-action="ms-rename">${esc(t('ms_rename'))}</button><button type="button" class="text-btn" data-action="ms-move">${esc(t('ms_move'))}</button>` : '', content,
     });
   }
 
+  linkedFrom() {
+    if (!this.active || this.isDiagram()) return '';
+    const sources = (S.data.diagrams || []).flatMap(diagram => (diagram.nodes || []).filter(node => node.link?.item_id === this.active.id).map(node => ({diagram, node})));
+    if (!sources.length) return '';
+    return `<nav class="ms-linked-from" aria-label="${esc(t('ms_link_sources'))}"><span>${esc(t('ms_link_sources'))}</span>${sources.map(({diagram, node}) => `<button type="button" data-action="ms-link-return" data-diagram="${diagram.id}" data-node="${esc(node.id)}">← ${esc(diagram.name)} · ${esc(node.text || t('diagram_link_untitled'))}</button>`).join('')}</nav>`;
+  }
+  async returnToLink(button) {
+    const generation = this.generation, id = this.active?.id;
+    if (!await this.flush() || generation !== this.generation) return;
+    const diagrams = await this.home.makeRequest('diagrams');
+    if (generation !== this.generation) return;
+    const diagram = diagrams.find(entry => entry.id === Number(button.dataset.diagram));
+    if (!diagram?.nodes.some(node => node.id === button.dataset.node && node.link?.item_id === id)) throw new Error(t('error_diagram_link_missing'));
+    const item = this.allItems().find(entry => entry.diagram_id === diagram.id);
+    if (!item) throw new Error(t('error_diagram_link_missing'));
+    S.data.diagrams = diagrams;
+    await this.go(item, item.mindspace_id, {type:'topic', id:button.dataset.node});
+  }
   render() { return this.frame(!this.active || this.active.kind === 'folder' ? this.folderContent() : this.editor.render()); }
   renderDiagram(values) { return this.frame(renderTemplate('mindspace-diagram', values)); }
   mount() {
     this.status();
+    MindSpaceLinkTargets.arrive(this);
     document.querySelector('#mindspace-tabs [aria-selected="true"]')?.scrollIntoView({ block:'nearest', inline:'nearest' });
   }
   syncTabs() {
@@ -297,16 +316,17 @@ class MindSpace extends PageController {
   }
 
   async flush() { return this.isDiagram() ? this.home.finishBeforeSwitch() : await this.save(); }
-  async go(item, spaceId = this.spaceId()) {
+  async go(item, spaceId = this.spaceId(), target = null) {
     if (!await this.flush()) return;
     const url = new URL(location.href);
-    for (const key of ['diagram','topic','item','folder','space']) url.searchParams.delete(key);
+    for (const key of ['diagram','topic','item','folder','space','cell','card','habit']) url.searchParams.delete(key);
     if (item?.mindspace_id || spaceId) url.searchParams.set('space', item?.mindspace_id || spaceId);
     if (!item || item.kind === 'folder') url.searchParams.set('folder', String(item?.id || 0));
     else if (item.kind === 'diagram') url.searchParams.set('diagram', item.diagram_id);
     else url.searchParams.set('item', item.id);
     if (spaceId) this.rememberTree(`space-${item?.mindspace_id || spaceId}`, true);
     for (const folder of this.pathTo(item?.kind === 'folder' ? item.id : item?.parent_id, item?.mindspace_id || spaceId)) this.rememberTree(`item-${folder.id}`, true);
+    if (target && ['cell','card','habit','topic'].includes(target.type)) url.searchParams.set(target.type, target.id);
     // The creation request has finished; do not trigger beforeunload for its form.
     this.busy = false;
     location.assign(url.href);
@@ -447,6 +467,7 @@ class MindSpace extends PageController {
     document.querySelectorAll('.ms-drop-target').forEach(el => el.classList.remove('ms-drop-target'));
   }
   async handleAction(action, button) {
+    if (action === 'ms-link-return') return this.returnToLink(button);
     if (action === 'ms-sidebar-toggle') return this.toggleSidebar();
     if (action === 'ms-entry-menu') return this.entryMenu(button);
     if (action === 'ms-sidebar-add') {

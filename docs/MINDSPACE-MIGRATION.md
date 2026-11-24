@@ -50,3 +50,20 @@ Se preparó `tests/.runtime/hostinger-sidebar-context-2026-11-24.zip` con los oc
 - `view/mindspace/mindspace.css`
 
 El paquete conserva las rutas relativas y no incluye configuración, contraseñas, base de datos ni archivos de prueba. No se publicó durante esta verificación. Al publicarlo, conservar `config/local.php`, `config/database-password.txt` y `storage`, y recargar la aplicación para obtener las rutas y los recursos nuevos.
+
+## Enlaces desde diagramas a documentos y selecciones
+
+El paquete acumulativo `tests/.runtime/hostinger-mindspace-links-2026-11-24.zip` reemplaza al paquete anterior para publicar juntos los menús de la barra lateral y los enlaces a hojas, celdas, tarjetas, hábitos, notas y carpetas. Incluye los ocho archivos anteriores y estos ocho adicionales:
+
+- `controller/config/assets.php`
+- `model/diagrams/diagrams.php`
+- `view/home/diagram-links.js`
+- `view/home/home.js`
+- `view/home/home.css`
+- `view/mindspace/link-targets.js`
+- `view/mindspace/editors.js`
+- `view/mindspace/mindspace.php`
+
+No requiere SQL nuevo: utiliza `diagram_nodes.link_json` (012) y las tablas de MindSpace (013–014), ya verificadas en Hostinger. El código valida cada destino nuevo contra su cuenta y contenido. No se realizaron escrituras de prueba en producción ni se publicó este paquete.
+
+Validación local: 324 pruebas JavaScript, 226 comprobaciones HTTP en una base MySQL aislada y siete comprobaciones de esquema/código. En el navegador se comprobó el enlace a B3, la edición de la celda y el regreso al cuadro de origen conservando el cambio, además de abrir una tarjeta concreta de Kanban resaltada. Al publicar, subir los 16 archivos juntos y recargar la aplicación; la versión antigua del servidor no acepta el nuevo formato de enlace.

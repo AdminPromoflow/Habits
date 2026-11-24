@@ -91,7 +91,7 @@ class MindSpaceEditors {
       <button type="button" class="btn secondary" data-action="ms-habits-select">${esc(t('ms_choose_habits'))}</button><button type="button" class="btn primary" data-action="ms-habit-new">${icon('plus')}${esc(t('new_habit'))}</button></div>
       ${habits.length ? `<div class="ms-habit-list">${habits.map(habit => {
         const complete = done(habit, date), enabled = habit.status === 'active' && date <= today() && scheduled(habit, date);
-        return `<article class="ms-habit"><button type="button" role="checkbox" aria-checked="${complete}" aria-label="${esc(t('diagram_checkbox_task', { name:habit.name }))}" data-action="toggle-habit" data-id="${habit.id}" data-date="${date}" ${enabled ? '' : 'disabled'}>${complete ? icon('check') : ''}</button>
+        return `<article class="ms-habit" data-ms-habit="${habit.id}"><button type="button" role="checkbox" aria-checked="${complete}" aria-label="${esc(t('diagram_checkbox_task', { name:habit.name }))}" data-action="toggle-habit" data-id="${habit.id}" data-date="${date}" ${enabled ? '' : 'disabled'}>${complete ? icon('check') : ''}</button>
           <div><button type="button" class="ms-habit-name" data-action="habit-detail" data-id="${habit.id}" data-date="${date}">${esc(habit.name)}</button><small>${esc(goalLabel(habit))} · ${esc(habitCategory(habit))}</small></div></article>`;
       }).join('')}</div>` : `<div class="ms-empty">${icon('habits')}<p>${esc(t('ms_habits_empty'))}</p></div>`}</div>`;
   }

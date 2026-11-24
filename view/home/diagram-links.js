@@ -40,6 +40,11 @@ class DiagramLinks {
   }
 
   targetDetails(link) {
+    if (link.item_id) {
+      const item = this.home.mindspace.allItems().find(entry => entry.id === link.item_id);
+      return {diagram:item?.name || t('diagram_link_unavailable'), topic:item ? MindSpaceLinkTargets.label(item, link.target) : t('diagram_link_unavailable'),
+        kindLabel:item ? t(`ms_kind_${item.kind}`) : t('ms_link_element'), partLabel:t(`ms_link_${link.target?.type || 'destination'}`)};
+    }
     const diagram = this.navigation.catalog().find(item => item.id === link.diagram_id);
     if (link.node_id === null) return { diagram: diagram?.name || t('diagram_link_unavailable'), topic: null };
     const node = diagram?.nodes?.find(item => item.id === link.node_id);
@@ -48,16 +53,16 @@ class DiagramLinks {
   }
 
   arrowButton(action, direction, label, details, attributes = '') {
-    const description = details.map(item => `${t('diagram_link_diagram')}: ${item.diagram}. ${item.topic === null ? t('diagram_link_whole') : `${t('diagram_link_topic_name')}: ${item.topic}`}`).join('\n');
+    const description = details.map(item => `${item.kindLabel || t('diagram_link_diagram')}: ${item.diagram}. ${item.topic === null ? t('diagram_link_whole') : `${item.partLabel || t('diagram_link_topic_name')}: ${item.topic}`}`).join('\n');
     return `<button type="button" class="diagram-topic-link" data-action="${action}" ${attributes}
       data-topic-link-details="${esc(JSON.stringify(details))}" aria-label="${esc(label)}" aria-description="${esc(description)}">
       <span class="diagram-link-direction" aria-hidden="true">${direction === 'back' ? '←' : '→'}</span></button>`;
   }
 
   detailsHtml(details) {
-    return details.map(item => `<span class="diagram-link-detail"><span class="diagram-link-detail-label">${esc(t('diagram_link_diagram'))}</span>
+    return details.map(item => `<span class="diagram-link-detail"><span class="diagram-link-detail-label">${esc(item.kindLabel || t('diagram_link_diagram'))}</span>
       <strong>${esc(item.diagram)}</strong>${item.topic === null ? `<span>${esc(t('diagram_link_whole'))}</span>`
-        : `<span class="diagram-link-detail-label">${esc(t('diagram_link_topic_name'))}</span>
+        : `<span class="diagram-link-detail-label">${esc(item.partLabel || t('diagram_link_topic_name'))}</span>
           <span class="diagram-link-detail-topic">${esc(item.topic)}</span>`}</span>`).join('');
   }
 
@@ -122,108 +127,112 @@ class DiagramLinks {
       home.syncNodeState();
       const diagrams = await home.makeRequest('diagrams');
       if (generation !== home.generation) return;
+      const mindspace = home.mindspace.enabled() ? await home.makeRequest('mindspace') : null;
+      if (generation !== home.generation) return;
+      if (mindspace) S.data.mindspace = mindspace;
       // Use the current editor snapshot for targets in this same diagram.
       const current = { ...home.active, nodes: home.snapshot(), connections: home.connections,
         hidden_connections: home.hiddenConnections, connection_styles: home.connectionStyles };
       const items = diagrams.map(item => item.id === current.id ? current : item);
-      this.showPicker(node, items, generation);
+      this.showPicker(node, items, generation, mindspace?.items || []);
     } catch (error) {
       if (generation === home.generation) home.showStatus(error.message, true);
     } finally { this.busy = false; }
   }
 
-  showPicker(node, diagrams, generation) {
+  showPicker(node, diagrams, generation, items = []) {
     const home = this.home;
-    let target = diagrams.find(item => item.id === node.link?.diagram_id) || diagrams.find(item => item.id === home.active.id) || diagrams[0];
+    const documents = [...diagrams.map(item => ({...item, kind:'diagram', key:`diagram:${item.id}`})),
+      ...items.filter(item => item.kind !== 'diagram').map(item => ({...item, key:`item:${item.id}`}))];
+    const savedKey = node.link?.item_id ? `item:${node.link.item_id}` : `diagram:${node.link?.diagram_id}`;
+    let target = documents.find(item => item.key === savedKey) || documents.find(item => item.key === `diagram:${home.active.id}`) || documents[0];
     if (!target) return;
-    let key = target.nodes.some(item => item.id === node.link?.node_id) ? node.link.node_id : null;
-    let scope = key ? 'node' : 'diagram';
-    let scale = 1, plan;
+    let key = target.key === savedKey ? (target.kind === 'diagram' ? node.link.node_id : node.link.target?.id) : null;
+    let scope = key ? 'part' : 'whole', scale = 1, plan;
+    const targetType = () => target.kind === 'diagram' ? 'topic' : MindSpaceLinkTargets.type(target);
+    const choices = () => target.kind === 'diagram' ? target.nodes.map((item, index) => ({id:item.id, label:item.text || `${t('diagram_link_untitled')} ${index + 1}`})) : MindSpaceLinkTargets.choices(target);
+    const linkValue = () => target.kind === 'diagram' ? {diagram_id:target.id, node_id:scope === 'part' ? key : null}
+      : {item_id:target.id, target:scope === 'part' ? {type:targetType(), id:key} : null};
+    const validTarget = () => scope === 'whole' || (target.kind === 'diagram' ? choices().some(item => item.id === key) : MindSpaceLinkTargets.valid(target, linkValue().target));
+    const optionLabel = item => {
+      const entry = item.kind === 'diagram' ? items.find(file => file.diagram_id === item.id) : item;
+      const path = entry && home.mindspace.enabled() ? [home.mindspace.spaceName(entry.mindspace_id), ...home.mindspace.pathTo(entry.parent_id, entry.mindspace_id).map(folder => folder.name)].join(' / ') : '';
+      return [path, t(`ms_kind_${item.kind}`), item.name].filter(Boolean).join(' · ');
+    };
     openModal('diagram_option_link', `<form id="diagram-link-form">
-      <label class="field"><span>${esc(t('diagram_link_diagram'))}</span><select id="diagram-link-diagram">
-        ${diagrams.map(item => `<option value="${item.id}">${esc(item.name)}</option>`).join('')}</select></label>
+      <label class="field"><span>${esc(t('ms_link_element'))}</span><select id="diagram-link-diagram">
+        ${documents.map(item => `<option value="${item.key}">${esc(optionLabel(item))}</option>`).join('')}</select></label>
       <fieldset class="diagram-link-scope"><legend>${esc(t('diagram_link_destination'))}</legend>
-        <label><input type="radio" name="link-scope" value="diagram">${esc(t('diagram_link_whole'))}</label>
-        <label><input type="radio" name="link-scope" value="node">${esc(t('diagram_link_topic'))}</label>
+        <label><input type="radio" name="link-scope" value="whole"><span id="diagram-link-whole-label"></span></label>
+        <label id="diagram-link-part-option"><input type="radio" name="link-scope" value="part"><span id="diagram-link-part-label"></span></label>
       </fieldset>
-      <p class="muted">${esc(t('diagram_link_hint'))}</p>
+      <p class="muted">${esc(t('ms_link_hint'))}</p>
       <div class="diagram-link-preview-tools">
-        <span>${esc(t('diagram_link_preview'))}</span><div>
+        <span>${esc(t('ms_link_preview'))}</span><div id="diagram-link-zoom-tools">
         <button type="button" class="btn ghost" data-preview-zoom="out" aria-label="${esc(t('diagram_link_zoom_out'))}">−</button>
         <button type="button" class="btn ghost" data-preview-zoom="in" aria-label="${esc(t('diagram_link_zoom_in'))}">+</button>
         <button type="button" class="btn ghost" data-preview-zoom="fit">${esc(t('diagram_link_fit'))}</button></div>
       </div>
-      <div class="diagram-link-preview" tabindex="0" aria-label="${esc(t('diagram_link_preview'))}"></div>
-      <label class="field diagram-link-topic-field"><span>${esc(t('diagram_link_topic'))}</span><select id="diagram-link-node"></select></label>
+      <div class="diagram-link-preview" tabindex="0" aria-label="${esc(t('ms_link_preview'))}"></div>
+      <label class="field diagram-link-topic-field"><span id="diagram-link-part-field-label"></span><select id="diagram-link-node"></select></label>
+      <label class="field diagram-link-cell-field"><span>${esc(t('ms_link_cell'))}</span><input id="diagram-link-cell" placeholder="B3" maxlength="5" autocomplete="off" spellcheck="false"><small>${esc(t('ms_link_cell_hint'))}</small></label>
       <p class="diagram-link-selection" role="status"></p>
       ${formFooter('save', node.link ? `<button type="button" class="btn danger" id="diagram-link-remove">${esc(t('diagram_link_remove'))}</button>` : '')}
     </form>`, true);
-    const form = document.getElementById('diagram-link-form');
-    const select = form.querySelector('#diagram-link-diagram');
-    const topic = form.querySelector('#diagram-link-node');
-    const preview = form.querySelector('.diagram-link-preview');
+    const form = document.getElementById('diagram-link-form'), select = form.querySelector('#diagram-link-diagram');
+    const topic = form.querySelector('#diagram-link-node'), cell = form.querySelector('#diagram-link-cell'), preview = form.querySelector('.diagram-link-preview');
     const valid = () => generation === home.generation && home.nodes.includes(node) && form.isConnected;
     const update = () => {
+      const type = targetType(), selected = choices().find(item => item.id === key);
+      if (!type) scope = 'whole';
       form.querySelectorAll('[name="link-scope"]').forEach(radio => { radio.checked = radio.value === scope; });
-      form.querySelector('.diagram-link-topic-field').hidden = scope !== 'node';
-      topic.value = key || '';
-      preview.querySelectorAll('[data-link-target]').forEach(item => {
-        item.setAttribute('aria-pressed', String(scope === 'node' && item.dataset.linkTarget === key));
-      });
-      const selected = target.nodes.find(item => item.id === key);
-      form.querySelector('.diagram-link-selection').textContent = scope === 'diagram'
-        ? `${t('diagram_link_whole')}: ${target.name}`
-        : selected ? `${target.name} → ${selected.text || t('diagram_link_untitled')}` : t('diagram_link_choose_topic');
-      form.querySelector('[type="submit"]').disabled = scope === 'node' && !selected;
+      form.querySelector('#diagram-link-whole-label').textContent = t(target.kind === 'diagram' ? 'diagram_link_whole' : 'ms_link_whole');
+      form.querySelector('#diagram-link-part-option').hidden = !type;
+      form.querySelector('#diagram-link-part-label').textContent = t(type === 'topic' ? 'diagram_link_topic' : `ms_link_${type}`);
+      form.querySelector('#diagram-link-part-field-label').textContent = t(type === 'topic' ? 'diagram_link_topic' : `ms_link_${type}`);
+      form.querySelector('.diagram-link-topic-field').hidden = scope !== 'part' || type === 'cell';
+      form.querySelector('.diagram-link-cell-field').hidden = scope !== 'part' || type !== 'cell';
+      form.querySelector('#diagram-link-zoom-tools').hidden = target.kind !== 'diagram';
+      topic.value = key || ''; cell.value = type === 'cell' ? key || '' : '';
+      preview.querySelectorAll('[data-link-target]').forEach(item => item.setAttribute('aria-pressed', String(scope === 'part' && item.dataset.linkTarget === key)));
+      form.querySelector('.diagram-link-selection').textContent = scope === 'whole'
+        ? `${t(target.kind === 'diagram' ? 'diagram_link_whole' : 'ms_link_whole')}: ${target.name}`
+        : validTarget() ? `${target.name} → ${type === 'cell' ? key : selected.label}` : t(type === 'cell' ? 'ms_link_cell_invalid' : 'ms_link_choose_part');
+      form.querySelector('[type="submit"]').disabled = !validTarget();
     };
-    const zoom = (value) => {
-      scale = value;
-      const svg = preview.querySelector('svg');
-      svg.style.width = `${plan.width * scale}px`;
-      svg.style.height = `${plan.height * scale}px`;
+    const zoom = value => {
+      if (!plan) return;
+      scale = value; const svg = preview.querySelector('svg');
+      svg.style.width = `${plan.width * scale}px`; svg.style.height = `${plan.height * scale}px`;
     };
-    const fit = () => zoom(Math.min(1, Math.max(1, preview.clientWidth - 24) / plan.width, 280 / plan.height));
+    const fit = () => { if (plan) zoom(Math.min(1, Math.max(1, preview.clientWidth - 24) / plan.width, 280 / plan.height)); };
     const draw = () => {
-      const result = this.preview(target);
-      plan = result.plan;
-      preview.innerHTML = result.html;
-      topic.innerHTML = `<option value="">${esc(t('diagram_link_choose_topic'))}</option>` + target.nodes.map((item, index) =>
-        `<option value="${esc(item.id)}">${esc(item.text || `${t('diagram_link_untitled')} ${index + 1}`)}</option>`).join('');
-      fit(); update();
-      preview.scrollLeft = 0; preview.scrollTop = 0;
+      const result = target.kind === 'diagram' ? this.preview(target) : {html:MindSpaceLinkTargets.preview(target), plan:null};
+      plan = result.plan; preview.innerHTML = result.html;
+      preview.classList.toggle('is-sheet-preview', target.kind === 'spreadsheet');
+      topic.innerHTML = `<option value="">${esc(t('ms_link_choose_part'))}</option>` + choices().map(item => `<option value="${esc(item.id)}">${esc(item.label)}</option>`).join('');
+      fit(); update(); preview.scrollLeft = 0; preview.scrollTop = 0;
     };
-    select.value = String(target.id);
-    select.addEventListener('change', () => {
-      target = diagrams.find(item => String(item.id) === select.value);
-      key = null; draw();
-    });
+    select.value = target.key;
+    select.addEventListener('change', () => { target = documents.find(item => item.key === select.value); key = null; scope = 'whole'; draw(); });
     form.querySelectorAll('[name="link-scope"]').forEach(radio => radio.addEventListener('change', () => { scope = radio.value; update(); }));
     topic.addEventListener('change', () => { key = topic.value || null; update(); });
-    const choose = (event) => {
+    cell.addEventListener('input', () => { key = cell.value.trim().toUpperCase(); update(); });
+    const choose = event => {
       const item = event.target.closest('[data-link-target]');
-      if (!item || (event.type === 'keydown' && !['Enter', ' '].includes(event.key))) return;
-      event.preventDefault();
-      key = item.dataset.linkTarget; scope = 'node'; update();
+      if (!item || (event.type === 'keydown' && !['Enter',' '].includes(event.key))) return;
+      event.preventDefault(); key = item.dataset.linkTarget; scope = 'part'; update();
     };
-    preview.addEventListener('click', choose);
-    preview.addEventListener('keydown', choose);
+    preview.addEventListener('click', choose); preview.addEventListener('keydown', choose);
     form.querySelectorAll('[data-preview-zoom]').forEach(button => button.addEventListener('click', () => {
       const action = button.dataset.previewZoom;
-      if (action === 'fit') fit();
-      else zoom(Math.max(0.001, Math.min(2, scale * (action === 'in' ? 1.5 : 1 / 1.5))));
+      if (action === 'fit') fit(); else zoom(Math.max(0.001, Math.min(2, scale * (action === 'in' ? 1.5 : 1 / 1.5))));
     }));
-    const apply = async (link) => {
+    const apply = async link => {
       if (!valid()) { closeModal(); return; }
-      node.link = link;
-      closeModal();
-      home.selectedKey = node.id;
-      home.name = node.text;
-      home.selected = true;
-      home.drawStage();
-      await home.save();
+      node.link = link; closeModal(); home.selectedKey = node.id; home.name = node.text; home.selected = true; home.drawStage(); await home.save();
     };
-    form.addEventListener('submit', event => { event.preventDefault(); if (scope === 'node' && !key) return;
-      void apply({ diagram_id: target.id, node_id: scope === 'node' ? key : null }); });
+    form.addEventListener('submit', event => { event.preventDefault(); if (validTarget()) void apply(linkValue()); });
     form.querySelector('#diagram-link-remove')?.addEventListener('click', () => void apply(null));
     draw();
   }
@@ -271,6 +280,7 @@ class DiagramLinks {
     const home = this.home, generation = home.generation;
     const sourceKey = home.selectedKey;
     if (!link || this.busy || home.switching) return;
+    if (link.item_id) return this.followItem(link);
     this.busy = true;
     try {
       let diagrams;
@@ -300,6 +310,25 @@ class DiagramLinks {
       } else {
         await home.openDiagram(target.id, link.node_id);
       }
+    } catch (error) {
+      if (generation === home.generation) home.showStatus(error.message, true);
+    } finally { this.busy = false; }
+  }
+
+  async followItem(link) {
+    const home = this.home, generation = home.generation;
+    this.busy = true;
+    try {
+      let data;
+      do {
+        if (!await home.finishBeforeSwitch() || generation !== home.generation) return;
+        data = await home.makeRequest('data');
+        if (generation !== home.generation) return;
+      } while (home.saving || home.hasChanges());
+      const item = data.mindspace?.items.find(entry => entry.id === link.item_id);
+      if (!MindSpaceLinkTargets.valid(item, link.target, data.habits || [])) throw new Error(t('error_diagram_link_missing'));
+      S.data.mindspace = data.mindspace; S.data.diagrams = data.diagrams; S.data.habits = data.habits;
+      await home.mindspace.go(item, item.mindspace_id, link.target);
     } catch (error) {
       if (generation === home.generation) home.showStatus(error.message, true);
     } finally { this.busy = false; }

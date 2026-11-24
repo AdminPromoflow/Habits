@@ -9,6 +9,7 @@
       <div class="mindspace-body">
         <div class="mindspace-main">
           <header class="mindspace-item-header"><nav class="mindspace-folder-path" aria-label="{{pathLabel}}">{{path}}</nav>
+            {{linkedFrom}}
             <div class="mindspace-item-title"><h2 id="mindspace-item-name">{{name}}</h2><div class="button-row">{{actions}}</div></div>
             <div id="mindspace-save-status" class="mindspace-save-status" role="status" aria-live="polite"></div>
           </header>

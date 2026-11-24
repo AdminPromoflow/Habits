@@ -132,3 +132,8 @@
   .mindspace-item-header { padding: 12px; }.mindspace-item-title { align-items: flex-start; }.mindspace-item-title .button-row { flex-wrap: wrap; }
   .mindspace-tabs [role="tab"] { max-width: 160px; }.ms-kind-grid { grid-template-columns: 1fr; }.ms-board-editor,.ms-habits { padding: 12px; }
 }
+
+.ms-linked-from { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 10px; font-size: .75rem; color: var(--muted); }
+.ms-linked-from button { padding: 4px 0; border: 0; background: transparent; color: var(--purple-dark); font: inherit; text-decoration: underline; cursor: pointer; overflow-wrap: anywhere; text-align: left; }
+.ms-linked-from button:focus-visible { outline: 2px solid var(--purple); }
+.mindspace-panel .ms-link-target { outline: 3px solid var(--purple-dark); outline-offset: -3px; background: var(--lavender-wash); scroll-margin: 40px; }

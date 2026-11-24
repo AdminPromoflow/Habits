@@ -193,11 +193,28 @@ final class DiagramsModel extends BaseModel
             if (array_key_exists('link', $item)) {
                 $link = $item['link'];
                 if ($link !== null) {
-                    if (!is_array($link) || !is_int($link['diagram_id'] ?? null) || $link['diagram_id'] < 1
-                        || !array_key_exists('node_id', $link)
-                        || ($link['node_id'] !== null && (!is_string($link['node_id'])
-                            || !preg_match('/^(root|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/D', $link['node_id'])))) fail('error_validation');
-                    $link = ['diagram_id' => $link['diagram_id'], 'node_id' => $link['node_id']];
+                    if (is_array($link) && array_key_exists('item_id', $link)) {
+                        if (array_key_exists('diagram_id', $link) || !is_int($link['item_id']) || $link['item_id'] < 1 || !array_key_exists('target', $link)) fail('error_validation');
+                        $target = $link['target'];
+                        if ($target !== null) {
+                            if (!is_array($target) || !is_string($target['id'] ?? null)) fail('error_validation');
+                            $pattern = match ($target['type'] ?? '') {
+                                'cell' => '/^[A-Z]{1,2}[1-9][0-9]{0,2}$/D',
+                                'card' => '/^[a-f0-9-]{36}$/D',
+                                'habit' => '/^[1-9][0-9]{0,17}$/D',
+                                default => null,
+                            };
+                            if (!$pattern || !preg_match($pattern, $target['id'])) fail('error_validation');
+                            $target = ['type' => $target['type'], 'id' => $target['id']];
+                        }
+                        $link = ['item_id' => $link['item_id'], 'target' => $target];
+                    } else {
+                        if (!is_array($link) || array_key_exists('target', $link) || !is_int($link['diagram_id'] ?? null) || $link['diagram_id'] < 1
+                            || !array_key_exists('node_id', $link)
+                            || ($link['node_id'] !== null && (!is_string($link['node_id'])
+                                || !preg_match('/^(root|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/D', $link['node_id'])))) fail('error_validation');
+                        $link = ['diagram_id' => $link['diagram_id'], 'node_id' => $link['node_id']];
+                    }
                 }
                 $node['link'] = $link;
             }
@@ -272,17 +289,21 @@ final class DiagramsModel extends BaseModel
             // A removed destination must not prevent unrelated edits to an
             // existing source. New/changed links must point to owned targets.
             if ($node['link'] !== null && $node['link'] !== $previousLink) {
-                $targetId = $node['link']['diagram_id'];
-                if ($targetId === $id) {
-                    $targetKeys = array_column($nodes, 'id');
+                if (isset($node['link']['item_id'])) {
+                    (new MindSpacesModel($this->db, $this->user))->validateLink($node['link']);
                 } else {
-                    if (!array_key_exists($targetId, $targets)) {
-                        $owned = $this->db->one('SELECT id FROM diagrams WHERE id=? AND owner_user_id=?', [$targetId, $this->uid()]);
-                        $targets[$targetId] = $owned ? array_column($this->db->all('SELECT node_key FROM diagram_nodes WHERE diagram_id=?', [$targetId]), 'node_key') : null;
+                    $targetId = $node['link']['diagram_id'];
+                    if ($targetId === $id) {
+                        $targetKeys = array_column($nodes, 'id');
+                    } else {
+                        if (!array_key_exists($targetId, $targets)) {
+                            $owned = $this->db->one('SELECT id FROM diagrams WHERE id=? AND owner_user_id=?', [$targetId, $this->uid()]);
+                            $targets[$targetId] = $owned ? array_column($this->db->all('SELECT node_key FROM diagram_nodes WHERE diagram_id=?', [$targetId]), 'node_key') : null;
+                        }
+                        $targetKeys = $targets[$targetId];
                     }
-                    $targetKeys = $targets[$targetId];
+                    if ($targetKeys === null || ($node['link']['node_id'] !== null && !in_array($node['link']['node_id'], $targetKeys, true))) fail('error_diagram_link_missing');
                 }
-                if ($targetKeys === null || ($node['link']['node_id'] !== null && !in_array($node['link']['node_id'], $targetKeys, true))) fail('error_diagram_link_missing');
             }
             if (!array_key_exists('width', $node)) $node['width'] = $existing['node_width'] ?? null;
             if (!array_key_exists('image', $node)) $node['image'] = $existing['image_data'] ?? null;

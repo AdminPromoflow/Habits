@@ -661,3 +661,19 @@ button.diagram-handle-arrows { cursor: ew-resize; touch-action: none; }
 .diagram-root.is-dragging,
 .diagram-root.is-dragging * { cursor: grabbing !important; user-select: none; }
 .diagram-root.is-editing .diagram-node { cursor: text; }
+
+/* Read-only destinations share the diagram link picker. */
+.diagram-link-scope [hidden], #diagram-link-zoom-tools[hidden], .diagram-link-cell-field[hidden] { display: none; }
+.diagram-link-preview.is-sheet-preview { padding: 0; }
+.ms-link-sheet { border-collapse: separate; border-spacing: 0; font: 400 .8125rem system-ui,sans-serif; }
+.ms-link-sheet th { position: sticky; background: var(--lavender-wash); color: var(--purple-dark); z-index: 1; min-width: 36px; height: 30px; text-align: center; }
+.ms-link-sheet thead th { top: 0; }.ms-link-sheet tbody th { left: 0; }.ms-link-sheet thead th:first-child { left: 0; z-index: 2; }
+.ms-link-sheet td { padding: 0; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.ms-link-sheet button { display: block; width: 112px; min-height: 32px; border: 0; background: var(--surface); color: var(--ink); font: inherit; padding: 6px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; cursor: pointer; }
+.ms-link-sheet button[aria-pressed="true"], .ms-link-sheet button:focus-visible { outline: 2px solid var(--purple-dark); outline-offset: -2px; background: var(--lavender-wash); }
+.ms-link-sheet button:hover { background: var(--lavender-wash); }
+.ms-link-choices { display: grid; gap: 10px; }
+.ms-link-choices button { padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.ms-link-choices button[aria-pressed="true"], .ms-link-choices button:focus-visible { border-color: var(--purple-dark); background: var(--lavender-wash); outline: 1px solid var(--purple-dark); }
+.ms-link-note { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .875rem; line-height: 1.6; }
+.ms-link-children p { padding: 8px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }

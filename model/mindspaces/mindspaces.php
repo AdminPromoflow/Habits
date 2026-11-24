@@ -94,6 +94,29 @@ final class MindSpacesModel extends BaseModel
         return ['id' => $space['id'], 'name' => $name];
     }
 
+    public function validateLink(array $link): void
+    {
+        if (!$this->available()) fail('error_diagram_link_missing');
+        $item = $this->db->one('SELECT i.kind,i.content_json FROM mindspace_items i JOIN mindspaces m ON m.id=i.mindspace_id WHERE i.id=? AND m.owner_user_id=?', [$link['item_id'], $this->uid()]);
+        if (!$item || $item['kind'] === 'diagram') fail('error_diagram_link_missing');
+        $target = $link['target'];
+        if ($target === null) return;
+        $content = json_decode($item['content_json'], true, 32, JSON_THROW_ON_ERROR);
+        $valid = false;
+        if ($item['kind'] === 'spreadsheet' && $target['type'] === 'cell') {
+            preg_match('/^([A-Z]+)([0-9]+)$/D', $target['id'], $parts);
+            $column = 0;
+            foreach (str_split($parts[1]) as $letter) $column = $column * 26 + ord($letter) - 64;
+            $valid = $column <= $content['columns'] && (int) $parts[2] <= $content['rows'];
+        } elseif (in_array($item['kind'], ['kanban', 'scrum'], true) && $target['type'] === 'card') {
+            $valid = in_array($target['id'], array_column($content['cards'], 'id'), true);
+        } elseif ($item['kind'] === 'habits' && $target['type'] === 'habit') {
+            $valid = in_array((int) $target['id'], $content['habit_ids'], true)
+                && $this->db->one('SELECT id FROM habits WHERE id=? AND owner_user_id=?', [(int) $target['id'], $this->uid()]);
+        }
+        if (!$valid) fail('error_diagram_link_missing');
+    }
+
     public function deleteSpace(array $data): array
     {
         $space = $this->space(true, (int) ($data['id'] ?? 0));

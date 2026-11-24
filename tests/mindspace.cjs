@@ -22,6 +22,33 @@ test('spreadsheet supports column boundaries and recalculation after a cell edit
   cells.A1='4'; assert.equal(evaluate(cells).display('B1'),'12');
 });
 
+const LinkTargets = vm.runInNewContext(fs.readFileSync('view/mindspace/link-targets.js','utf8')+'\nMindSpaceLinkTargets;', {
+  MindSpaceSheet:Sheet,S:{data:{habits:[]}},t:key=>key,esc:value=>String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;')
+});
+test('link targets validate cell boundaries, typed IDs and live card/habit membership', () => {
+  const sheet={kind:'spreadsheet',content:{rows:200,columns:52,cells:{}}};
+  for(const id of ['A1','B3','AA100','AZ200']) assert.equal(LinkTargets.valid(sheet,{type:'cell',id}),true);
+  for(const id of ['A0','A01','a1','A201','BA1','A1:B2','B3<script>']) assert.equal(LinkTargets.valid(sheet,{type:'cell',id}),false);
+  assert.equal(LinkTargets.valid(sheet,null),true);
+  assert.equal(LinkTargets.valid(sheet,undefined),false);
+  assert.equal(LinkTargets.valid({kind:'diagram'},null),false);
+  const board={kind:'kanban',content:{cards:[{id:'card-id',title:'Task'}]}};
+  assert.equal(LinkTargets.valid(board,{type:'card',id:'card-id'}),true);
+  assert.equal(LinkTargets.valid(board,{type:'card',id:'missing'}),false);
+  const habits={kind:'habits',content:{habit_ids:[7,8]}};
+  const catalog=[{id:7,name:'Read',permission:'owner'},{id:8,name:'Private',permission:'viewer'}];
+  assert.equal(LinkTargets.valid(habits,{type:'habit',id:'7'},catalog),true);
+  assert.equal(LinkTargets.valid(habits,{type:'habit',id:'8'},catalog),false);
+  assert.equal(LinkTargets.valid(habits,{type:'habit',id:'9'},catalog),false);
+});
+test('spreadsheet preview includes blank selectable cells and safely renders values', () => {
+  const html=LinkTargets.preview({kind:'spreadsheet',name:'Sheet',content:{rows:3,columns:2,cells:{A1:'3',B1:'=A1*2',A2:'<script>bad</script>'}}});
+  assert.match(html,/data-link-target="B3"/);
+  assert.match(html,/data-link-target="B1"[^>]+>6<\/button>/);
+  assert.match(html,/&lt;script>/);
+  assert.doesNotMatch(html,/<script>/);
+});
+
 function setup(url='http://localhost/?item=3') {
   const items=[{id:1,kind:'folder',name:'Parent',parent_id:null,content:{}},{id:2,kind:'folder',name:'Child',parent_id:1,content:{}},
     {id:3,kind:'notes',name:'Note',parent_id:2,version:1,content:{text:'before'}},{id:4,kind:'diagram',name:'Map',parent_id:null,diagram_id:10,content:{}}];
@@ -62,6 +89,46 @@ test('late saves from a reset account never update the next account',async()=>{
   space.draft.text='old account'; const pending=space.save(); space.reset(); state.data.mindspace.items=[];
   release({id:3,kind:'notes',version:2,content:{text:'old account'}}); await pending;
   assert.equal(state.data.mindspace.items.length,0); assert.equal(space.active,null);
+});
+
+test('document backlinks save pending edits and return to the linked source topic',async()=>{
+  const {space,home,state,location}=setup('http://localhost/?item=3&cell=B3');
+  const diagrams=[{id:10,name:'Map',nodes:[{id:'root',text:'Source topic',link:{item_id:3,target:null}}]}];
+  state.data.diagrams=diagrams;
+  assert.match(space.linkedFrom(),/Source topic/);
+  space.draft.text='Pending edit';
+  const calls=[];
+  home.makeRequest=async(action,data)=>{calls.push(action);return action==='diagrams'?diagrams:{...space.active,content:data.content,version:2};};
+  await space.returnToLink({dataset:{diagram:'10',node:'root'}});
+  assert.deepEqual(calls,['saveMindSpaceItem','diagrams']);
+  const url=new URL(location.assigned);
+  assert.equal(url.searchParams.get('diagram'),'10');
+  assert.equal(url.searchParams.get('topic'),'root');
+  assert.equal(url.searchParams.has('cell'),false);
+  assert.equal(space.dirty(),false);
+});
+test('removed backlinks and late replies after account reset cannot navigate',async()=>{
+  const {space,home,location}=setup();
+  home.makeRequest=async()=>[{id:10,nodes:[{id:'root',link:null}]}];
+  await assert.rejects(space.returnToLink({dataset:{diagram:'10',node:'root'}}),/error_diagram_link_missing/);
+  assert.equal(location.assigned,undefined);
+  let release;home.makeRequest=()=>new Promise(resolve=>release=resolve);
+  const pending=space.returnToLink({dataset:{diagram:'10',node:'root'}});
+  await new Promise(setImmediate);space.reset();release([]);await pending;
+  assert.equal(location.assigned,undefined);
+});
+test('cell deep links focus and highlight exactly their selected cell once',()=>{
+  const {space,context,state}=setup('http://localhost/?item=3&cell=B3');
+  state.data.mindspace.items.find(i=>i.id===3).kind='spreadsheet';
+  state.data.mindspace.items.find(i=>i.id===3).content={rows:3,columns:2,cells:{}};
+  space.resolve();
+  let focused=0,scrolled=0;const classes=new Set();
+  const cell={getAttribute:()=> 'B3',classList:{add:value=>classes.add(value)},scrollIntoView:()=>scrolled++,focus:()=>focused++};
+  context.document.querySelectorAll=selector=>selector.includes('data-ms-cell')?[cell]:[];
+  context.MindSpaceSheet=Sheet;
+  const Targets=vm.runInContext(fs.readFileSync('view/mindspace/link-targets.js','utf8')+'\nMindSpaceLinkTargets;',context);
+  Targets.arrive(space);Targets.arrive(space);
+  assert.equal(focused,1);assert.equal(scrolled,1);assert.equal(classes.has('ms-link-target'),true);
 });
 
 function multiple(url='http://localhost/?space=200&folder=0') {
