@@ -935,6 +935,7 @@ class HomePage extends PageController {
       this.selected = true;
       this.menuOpen = !this.menuOpen;
       this.syncNodeState();
+      if (this.menuOpen) this.viewport.reveal(this.element('menu'));
       return;
     }
     if (action !== 'create-diagram' || this.switching) return;
