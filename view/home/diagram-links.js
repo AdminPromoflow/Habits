@@ -210,10 +210,28 @@ class DiagramLinks {
       const element = home.element('node', nodeId);
       home.viewport.focusElement(element);
       element?.focus({ preventScroll: true });
+      this.refocusAfterImages(nodeId);
       return true;
     }
     home.selected = false; home.menuOpen = false; home.syncNodeState();
-    return home.viewport.focusElement(document.getElementById('diagram-scene') || home.element('node', 'root'), { overview: true });
+    const focused = home.viewport.focusElement(document.getElementById('diagram-scene') || home.element('node', 'root'), { overview: true });
+    this.refocusAfterImages(nodeId);
+    return focused;
+  }
+
+  refocusAfterImages(nodeId) {
+    const home = this.home, generation = home.generation;
+    const images = [...(document.getElementById('mindmap-stage')?.querySelectorAll?.('img') || [])].filter(image => !image.complete);
+    if (!images.length) return;
+    const camera = [home.viewport.x, home.viewport.y, home.viewport.scale];
+    const selected = home.selectedKey;
+    Promise.all(images.map(image => image.decode().catch(() => {}))).then(() => {
+      if (generation !== home.generation || selected !== home.selectedKey ||
+          camera.some((value, index) => value !== [home.viewport.x, home.viewport.y, home.viewport.scale][index])) return;
+      home.positionTree();
+      const element = nodeId === null ? document.getElementById('diagram-scene') || home.element('node', 'root') : home.element('node', nodeId);
+      home.viewport.focusElement(element, { overview: nodeId === null });
+    });
   }
 
   arrive() {

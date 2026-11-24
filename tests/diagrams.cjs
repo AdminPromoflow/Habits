@@ -61,6 +61,27 @@ test('missing link destinations and failed source saves do not navigate', async 
   }
 });
 
+test('edits made while resolving a link are saved before replacing the current tree', async () => {
+  const { home, state, navigations } = savedEditor();
+  home.active.nodes = home.snapshot();
+  let resolveLookup;
+  let lookups = 0;
+  home.makeRequest = async (action, data) => {
+    if (action === 'saveDiagram') return { ...data, version: data.version + 1 };
+    if (++lookups === 1) return new Promise(resolve => { resolveLookup = resolve; });
+    return JSON.parse(JSON.stringify(state.data.diagrams));
+  };
+  const following = home.links.follow({ diagram_id: 51, node_id: 'root' });
+  await new Promise(setImmediate);
+  home.name = 'Typed during destination lookup';
+  resolveLookup(JSON.parse(JSON.stringify(state.data.diagrams)));
+  await following;
+  assert.equal(home.nodes[0].text, 'Typed during destination lookup');
+  assert.equal(home.active.version, 2);
+  assert.equal(lookups, 2);
+  assert.equal(navigations.length, 0);
+});
+
 test('a linked arrival overrides the remembered camera once and clears its URL instruction', () => {
   const { home, location, node } = editor({ draft: false, url: 'http://localhost/?diagram=51&topic=root',
     state: { user: { name: 'Aleina' }, data: { diagrams: [{ id: 51, name: 'Target', version: 1 }] } } });
