@@ -1,5 +1,13 @@
 # Verificación realizada
 
+## Enlaces de regreso y ruta de diagramas — 24 de noviembre de 2026
+
+- Cada destino deriva sus enlaces de regreso de los enlaces privados existentes, sin reemplazar su propio destino. Los enlaces al diagrama completo muestran el regreso en el cuadro principal. Un botón con contador permite escoger entre varios orígenes.
+- Ruta navegable arriba a la izquierda, desde el padre hasta el diagrama actual. Guarda el recorrido de la sesión por cuenta e instalación, lo valida contra los enlaces vigentes y reconstruye un camino al entrar directamente. Las flechas pequeñas distinguen avance (→) y regreso (←). No requiere migración adicional.
+- `node --test tests/diagram-link-navigation.cjs tests/diagrams.cjs`: 138 pruebas aprobadas. Incluyen múltiples orígenes, enlaces internos, destinos eliminados, ciclos, enlaces recíprocos existentes, aislamiento del recorrido y guardado pendiente antes de volver. Sintaxis PHP y `git diff --check` correctos.
+- Navegador local con base aislada: «Second tree» → «Subrama», regreso automático al cuadro original, recarga conservando la ruta y navegación por el antecesor. Una segunda conexión desde «Rama uno» hizo aparecer el selector de dos regresos; elegir el origen interno lo seleccionó y centró. El salto interno posterior a «Subrama» dejó una diferencia de 0 px entre los centros del cuadro y del lienzo, sin errores de consola.
+- Captura de la ruta, las dos flechas y el contador de regresos: `tests/.runtime/diagram-return-links.jpg`. Validación realizada localmente; no se desplegó esta ampliación desde esta tarea.
+
 ## Enlaces entre diagramas y cuadros — 24 de noviembre de 2026
 
 - Selector de diagramas, opciones de diagrama completo/cuadro, miniatura seleccionable con zoom, selector accesible por teclado y edición/eliminación del enlace. El icono del cuadro abre el destino; los saltos internos no recargan y los externos llevan una instrucción de centrado que se consume al llegar.
