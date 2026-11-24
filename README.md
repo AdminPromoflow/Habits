@@ -59,6 +59,8 @@ Los constructores JavaScript registran las acciones una sola vez. Los eventos co
 
 ## Editor de diagramas
 
+El **asterisco** crea una sola idea hermana del cuadro seleccionado: comparte su padre y copia distribución, direcciones, ancho, imagen, etiquetas y estado de casilla, sin copiar descendientes ni el texto principal. El nuevo cuadro aparece vacío y con el cursor listo. Si la idea seleccionada no tiene padre, su hermana también queda sin padre dentro del mismo diagrama; cada idea principal puede tener su propio árbol. Las posiciones se calculan de nuevo para separar los cuadros. Se guarda al escribir, igual que un hijo nuevo.
+
 Cada diagrama tiene un nombre propio en el recuadro de la esquina superior izquierda del lienzo. **Doble clic** lo convierte en un campo editable con el cursor al final; **Enter** o salir del campo guarda el nombre y **Escape** cancela. Un nombre vacío conserva el anterior. El título es independiente del texto de la idea central y permanece fijo al desplazar o ampliar el lienzo.
 
 Se pueden crear múltiples diagramas, sin un límite de cantidad impuesto por la aplicación. **Mis diagramas** permite elegir cualquiera de los guardados y **Crear diagrama** permanece disponible junto al selector. Cada selección guarda los cambios pendientes y recarga la página con el diagrama elegido; su identificador queda en la URL para conservarlo al volver a recargar. Si el guardado falla, se mantiene abierto el diagrama actual para reintentar. Cada creación empieza con un lienzo independiente y conserva los diagramas anteriores.

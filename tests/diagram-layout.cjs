@@ -267,7 +267,6 @@ test('matrix auto headers expand, while a resized header retains its own width',
 test('invalid trees are rejected instead of looping or leaking partial layouts', () => {
   const bad = [
     [node('root'), node('root')],
-    [node('root'), node('other')],
     [node('root'), node('a', 'missing')],
     [node('root'), node('a', 'b'), node('b', 'a')],
     [node('a', 'a')],
@@ -277,6 +276,85 @@ test('invalid trees are rejected instead of looping or leaking partial layouts',
   for (let index = 0; index < 32; index++) deep.push(node(`n${index}`, index ? `n${index - 1}` : 'root'));
   assert.throws(() => Layout.arrange(deep), /hierarchy/);
   assert.deepEqual(plain(Layout.arrange([])), { nodes: [], edges: [], width: 0, height: 0, origin: { x: 0, y: 0 } });
+});
+
+for (const mode of Layout.modes) {
+  test(`${mode} arranges independent root trees without overlap or invented connections`, () => {
+    const nodes = [
+      ...fixture(mode),
+      node('second', null, Layout.defaults(mode), { width: 600 }),
+      node('second-child', 'second'), node('second-leaf', 'second-child'),
+      node('third', null, Layout.defaults('radial')),
+      node('third-child', 'third'), node('third-other', 'third'),
+    ];
+    const untouched = JSON.stringify(nodes);
+    const plan = Layout.arrange(nodes);
+    noOverlaps(plan);
+    assert.equal(plan.nodes.length, nodes.length);
+    assert.equal(plan.edges.length, nodes.length - 3);
+    const parents = new Map(nodes.map((item) => [item.id, item.parent_id]));
+    for (const edge of plan.edges) {
+      assert.equal(parents.get(edge.to), edge.from);
+      const endpoints = assertRoundedOrthogonal(edge.path);
+      assert.ok(onBoundary(endpoints.start, plan.nodes.find((item) => item.id === edge.from)));
+      assert.ok(onBoundary(endpoints.end, plan.nodes.find((item) => item.id === edge.to)));
+    }
+    assert.equal(JSON.stringify(nodes), untouched);
+    assert.deepEqual(plain(Layout.arrange(plain(nodes))), plain(plan));
+  });
+}
+
+test('independent roots resolve their own styles without inheriting another tree', () => {
+  const nodes = [
+    node('root', null, Layout.defaults('radial')), node('a', 'root'),
+    node('second'), node('b', 'second'),
+    node('third', null, { mode: 'vertical', direction: 'top' }), node('c', 'third'),
+  ];
+  assert.equal(Layout.effective(nodes, 'a').mode, 'radial');
+  assert.equal(Layout.effective(nodes, 'second').mode, 'horizontal');
+  assert.equal(Layout.effective(nodes, 'b').mode, 'horizontal');
+  assert.equal(Layout.effective(nodes, 'c').mode, 'vertical');
+  assert.equal(Layout.effective(nodes, 'c').direction, 'top');
+  const plan = Layout.arrange(nodes);
+  noOverlaps(plan);
+  assert.equal(plan.nodes.find((item) => item.id === 'c').layout.mode, 'vertical');
+});
+
+test('the original root remains at the graph origin regardless of input order', () => {
+  const nodes = [node('second'), node('second-child', 'second'), node('root'), node('a', 'root')];
+  const plan = Layout.arrange(nodes);
+  const root = plan.nodes.find((item) => item.id === 'root');
+  assert.equal(root.x - plan.origin.x, 0);
+  assert.equal(root.y - plan.origin.y, 0);
+  assert.equal(plan.nodes[0].id, 'root');
+  noOverlaps(plan);
+});
+
+test('dragging a root moves only its own unpositioned descendants and round-trips coordinates', () => {
+  const nodes = [
+    node('root'), node('a', 'root'),
+    node('second', null, Layout.defaults('vertical')), node('b', 'second'),
+    node('fixed', 'second', null, { x: 1700, y: 400 }),
+  ];
+  const before = Layout.arrange(nodes);
+  const oldRoot = before.nodes.find((item) => item.id === 'second');
+  const second = nodes.find((item) => item.id === 'second');
+  Object.assign(second, { x: 800, y: -300 });
+  const after = Layout.arrange(nodes);
+  const movedRoot = after.nodes.find((item) => item.id === 'second');
+  assert.equal(movedRoot.x - after.origin.x, 800);
+  assert.equal(movedRoot.y - after.origin.y, -300);
+  for (const id of ['root', 'a', 'fixed']) {
+    const old = before.nodes.find((item) => item.id === id);
+    const current = after.nodes.find((item) => item.id === id);
+    assert.equal(current.x - after.origin.x, old.x - before.origin.x);
+    assert.equal(current.y - after.origin.y, old.y - before.origin.y);
+  }
+  const oldChild = before.nodes.find((item) => item.id === 'b');
+  const child = after.nodes.find((item) => item.id === 'b');
+  assert.equal(child.x - movedRoot.x, oldChild.x - oldRoot.x);
+  assert.equal(child.y - movedRoot.y, oldChild.y - oldRoot.y);
+  assert.deepEqual(plain(Layout.arrange(plain(nodes))), plain(after));
 });
 
 test('each preview is a distinct safe standalone SVG with no external assets', () => {

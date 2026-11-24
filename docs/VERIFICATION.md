@@ -1,5 +1,13 @@
 # Verificación realizada
 
+## Asterisco para ideas hermanas — 23 de noviembre de 2026
+
+- El asterisco es un botón accesible que crea una sola idea al mismo nivel, sin copiar hijos. Copia por valor estilo/direcciones, ancho, imagen, etiquetas y casilla; genera un identificador nuevo, deja el texto vacío y recalcula la posición. El foco y el cursor quedan en el campo nuevo. Escape descarta un borrador vacío y vuelve al cuadro de origen.
+- Las ideas principales también admiten hermanos sin padre en el mismo diagrama. El motor distribuye los árboles independientes sin unir sus raíces; el guardado y la recarga conservan todas sus relaciones. El alcance «todo el diagrama» aplica el estilo a cada raíz; el alcance de rama preserva los otros árboles. Copiar/pegar y eliminar funcionan también en las raíces adicionales; eliminar una raíz con hermanos preserva los demás árboles.
+- 153 pruebas JavaScript aprobadas (90 de editor, 52 de distribución y 11 de cámara); 146 comprobaciones HTTP y 7 de esquema/fuentes en una base aislada. Cubren atributos independientes, herencia, varias raíces, límites, ciclos, privacidad, cancelación, persistencia y operaciones sobre las ramas.
+- Navegador local: asterisco en la raíz crea otra idea principal vacía, sin placeholder, con foco y cursor `[0,0]`, conservando ancho de 230 px. Asterisco en un hijo crea su hermano. Después de recargar se recuperan cuatro cuadros con dos conexiones de padre a hijo y ninguna entre las ideas principales. Sin errores de consola. Captura: `tests/.runtime/diagram-siblings.png`.
+- Cambios locales, sin subir archivos. No hace falta una migración SQL; para usar varias ideas sin padre en Hostinger se deben subir también los cambios de `model/diagrams/diagrams.php`, además de la vista y JavaScript.
+
 ## Error de base de datos y revisión en Safari — 23 de noviembre de 2026
 
 - Hostinger respondía a consultas, pero faltaban `image_data`, `labels_json` y `checkbox_state` en `diagram_nodes`, así como los registros de las migraciones 008 y 009. El guardado actual requiere esos campos; el mensaje genérico no significaba que MySQL estuviera detenido.

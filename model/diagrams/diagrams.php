@@ -84,7 +84,7 @@ final class DiagramsModel extends BaseModel
             if (!is_string($id) || ($id !== 'root' && !preg_match('/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/D', $id)) || isset($nodes[$id])) fail('error_validation');
             if (!array_key_exists('parent_id', $item)) fail('error_validation');
             $parent = $item['parent_id'];
-            if (($id === 'root' && $parent !== null) || ($id !== 'root' && !is_string($parent))) fail('error_validation');
+            if (($id === 'root' && $parent !== null) || ($parent !== null && !is_string($parent))) fail('error_validation');
             $text = self::name($item, 'text');
             $layout = $item['layout'] ?? null;
             if ($layout !== null) {
@@ -127,11 +127,13 @@ final class DiagramsModel extends BaseModel
             $nodes[$id] = $node;
         }
         if (!isset($nodes['root'])) fail('error_validation');
+        // Keep the canonical root for existing clients, while allowing additional
+        // main ideas. Every ancestry chain must end at a node with no parent.
         foreach ($nodes as $node) {
             $seen = [];
             $cursor = $node;
             $depth = 0;
-            while ($cursor['id'] !== 'root') {
+            while ($cursor['parent_id'] !== null) {
                 if (isset($seen[$cursor['id']]) || ++$depth > 30 || !isset($nodes[$cursor['parent_id']])) fail('error_validation');
                 $seen[$cursor['id']] = true;
                 $cursor = $nodes[$cursor['parent_id']];

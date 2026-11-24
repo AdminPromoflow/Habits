@@ -1877,3 +1877,291 @@ test('a failed root deletion keeps the diagram and account changes cannot reuse 
   state.user.id = 8;
   assert.equal(home.nodeTools.clipboard(), null);
 });
+
+function siblingEditor() {
+  const fixture = blankChildEditor();
+  const base = { layout: null, x: null, y: null, width: null, image: null, labels: [], checkbox: null };
+  const nodes = [
+    { ...base, id: 'root', parent_id: null, text: 'Idea guardada',
+      layout: { mode: 'horizontal', direction: 'right', vertical: 'auto', horizontal: 'auto' } },
+    { ...base, id: 'source', parent_id: 'root', text: 'Fuente', width: 310, x: 72, y: -45,
+      layout: { mode: 'radial', direction: 'auto', vertical: 'auto', horizontal: 'auto' },
+      image: 'data:image/png;base64,fixture', checkbox: true,
+      labels: [{ text: 'Etiqueta interior', position: 'inside' }, { text: 'Etiqueta exterior', position: 'outside' }] },
+    { ...base, id: 'descendant', parent_id: 'source', text: 'Hijo que no se copia', width: 185 },
+    { ...base, id: 'other', parent_id: 'root', text: 'Otro hermano', width: 260 },
+  ];
+  fixture.home.active.nodes = JSON.parse(JSON.stringify(nodes));
+  fixture.home.nodes = JSON.parse(JSON.stringify(nodes));
+  fixture.home.drawStage();
+  fixture.home.selectNode('source');
+  return fixture;
+}
+
+test('the asterisk creates exactly one empty sibling with its own copies of the selected characteristics', async () => {
+  const { home, fields, document } = siblingEditor();
+  const before = JSON.parse(JSON.stringify(home.nodes));
+  home.makeRequest = () => { throw new Error('A blank sibling must not be submitted'); };
+  await home.handleAction('add-diagram-sibling');
+  const sibling = home.nodes.find(node => node.id === home.selectedKey);
+  const source = home.nodes.find(node => node.id === 'source');
+  assert.notEqual(sibling.id, source.id);
+  assert.equal(home.nodes.length, before.length + 1);
+  assert.equal(sibling.parent_id, source.parent_id);
+  assert.equal(sibling.text, '');
+  assert.equal(sibling.x, null);
+  assert.equal(sibling.y, null);
+  assert.equal(home.nodes.filter(node => node.parent_id === sibling.id).length, 0);
+  for (const key of ['layout', 'width', 'checkbox', 'image', 'labels']) {
+    assert.deepEqual(JSON.parse(JSON.stringify(sibling[key])), JSON.parse(JSON.stringify(source[key])));
+  }
+  assert.deepEqual(JSON.parse(JSON.stringify(home.nodes.filter(node => node.id !== sibling.id))), before);
+  const field = fields.get(sibling.id).field;
+  assert.equal(document.activeElement, field);
+  assert.equal(field.readOnly, false);
+  assert.equal(field.value, '');
+  assert.equal(field.selectionStart, 0);
+  assert.equal(field.selectionEnd, 0);
+  sibling.layout.mode = 'vertical';
+  sibling.labels[0].text = 'Solo del nuevo hermano';
+  assert.equal(source.layout.mode, 'radial');
+  assert.equal(source.labels[0].text, 'Etiqueta interior');
+});
+
+test('a sibling keeps inherited layout rather than introducing a new override', async () => {
+  const { home } = siblingEditor();
+  home.nodes.find(node => node.id === 'source').layout = null;
+  await home.addSibling();
+  const sibling = home.nodes.find(node => node.id === home.selectedKey);
+  assert.equal(sibling.parent_id, 'root');
+  assert.equal(sibling.layout, null);
+  assert.equal(home.nodes.find(node => node.id === 'root').layout.direction, 'right');
+});
+
+test('typing and saving a sibling preserves its parent and characteristics after reload', async () => {
+  const { home, state, fields, typeName, handleKey } = siblingEditor();
+  const requests = [];
+  home.makeRequest = async (action, data) => {
+    requests.push(JSON.parse(JSON.stringify(data)));
+    return { ...JSON.parse(JSON.stringify(data)), version: data.version + 1 };
+  };
+  await home.addSibling();
+  const key = home.selectedKey;
+  typeName('Hermano nuevo\nDetalle', fields.get(key).field);
+  handleKey('Enter', fields.get(key).field);
+  await new Promise(setImmediate);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].nodes.length, 5);
+  assert.equal(home.childDrafts.has(key), false);
+  assert.equal(home.hasChanges(), false);
+  const restored = editor({ draft: false, state: JSON.parse(JSON.stringify(state)) });
+  restored.home.render();
+  const sibling = restored.home.nodes.find(node => node.id === key);
+  assert.equal(sibling.parent_id, 'root');
+  assert.equal(sibling.text, 'Hermano nuevo\nDetalle');
+  assert.equal(sibling.layout.mode, 'radial');
+  assert.equal(sibling.width, 310);
+  assert.equal(sibling.checkbox, true);
+  assert.equal(sibling.image, 'data:image/png;base64,fixture');
+  assert.equal(sibling.labels[1].position, 'outside');
+  assert.equal(restored.home.nodes.find(node => node.id === 'descendant').parent_id, 'source');
+  assert.equal(restored.home.nodes.some(node => node.parent_id === key), false);
+});
+
+test('an empty sibling does not create another blank sibling and Escape only discards its draft', async () => {
+  const { home, fields, handleKey } = siblingEditor();
+  const before = JSON.parse(JSON.stringify(home.nodes));
+  home.makeRequest = () => { throw new Error('Cancelling an empty sibling must not save'); };
+  await home.addSibling();
+  const key = home.selectedKey;
+  await home.addSibling();
+  assert.equal(home.selectedKey, key);
+  assert.equal(home.nodes.length, before.length + 1);
+  handleKey('Escape', fields.get(key).field);
+  await new Promise(setImmediate);
+  assert.deepEqual(JSON.parse(JSON.stringify(home.nodes)), before);
+  assert.equal(home.selectedKey, 'source');
+  assert.equal(home.hasChanges(), false);
+});
+
+test('a deepest permitted node can still receive a sibling without creating a deeper child', async () => {
+  const { home } = blankChildEditor();
+  home.nodes = Array.from({ length: 30 }, (_, index) => ({
+    id: index ? `level-${index}` : 'root',
+    parent_id: index === 0 ? null : index === 1 ? 'root' : `level-${index - 1}`,
+    text: index === 0 ? 'Idea guardada' : `Nivel ${index}`,
+    layout: null, x: null, y: null, width: null,
+  }));
+  home.active.nodes = JSON.parse(JSON.stringify(home.nodes));
+  home.drawStage();
+  home.selectNode('level-29');
+  await home.addSibling();
+  assert.equal(home.nodes.length, 31);
+  const sibling = home.nodes.find(node => node.id === home.selectedKey);
+  assert.equal(sibling.parent_id, 'level-28');
+  assert.equal(home.error, '');
+});
+
+test('adding a sibling respects the total node limit without changing the tree', async () => {
+  const { home } = blankChildEditor();
+  home.nodes = Array.from({ length: 200 }, (_, index) => ({
+    id: index ? `idea-${index}` : 'root', parent_id: index ? 'root' : null,
+    text: index ? `Idea ${index}` : 'Idea guardada', layout: null, x: null, y: null, width: null,
+  }));
+  home.active.nodes = JSON.parse(JSON.stringify(home.nodes));
+  home.drawStage();
+  home.selectNode('idea-10');
+  const before = JSON.parse(JSON.stringify(home.nodes));
+  await home.addSibling();
+  assert.equal(home.error, 'diagram_node_limit');
+  assert.equal(home.selectedKey, 'idea-10');
+  assert.deepEqual(JSON.parse(JSON.stringify(home.nodes)), before);
+});
+
+test('the central idea can create an independent sibling root that survives saving and can have its own child', async () => {
+  const { home, state, fields, typeName, handleKey } = siblingEditor();
+  home.makeRequest = async (action, data) => ({ ...JSON.parse(JSON.stringify(data)), version: data.version + 1 });
+  home.selectNode('root');
+  await home.addSibling();
+  const key = home.selectedKey;
+  const sibling = home.nodes.find(node => node.id === key);
+  assert.notEqual(key, 'root');
+  assert.equal(sibling.parent_id, null);
+  assert.equal(home.nodes.find(node => node.id === 'root').parent_id, null);
+  assert.equal(home.nodes.filter(node => node.parent_id === null).length, 2);
+  assert.equal(JSON.parse(home.nodeContent(sibling)).placeholder, '');
+  typeName('Otra idea central', fields.get(key).field);
+  handleKey('Enter', fields.get(key).field);
+  await new Promise(setImmediate);
+  const restored = editor({ draft: false, state: JSON.parse(JSON.stringify(state)) });
+  restored.home.render();
+  assert.equal(restored.home.nodes.find(node => node.id === key).text, 'Otra idea central');
+  assert.equal(restored.home.nodes.find(node => node.id === key).parent_id, null);
+  assert.equal(restored.home.nodes.filter(node => node.parent_id === null).length, 2);
+  assert.equal(restored.home.active.name, 'Idea guardada');
+  await home.addChild();
+  assert.equal(home.nodes.find(node => node.id === home.selectedKey).parent_id, key);
+});
+
+test('cancelling an empty sibling root restores the central idea without a null selection', async () => {
+  const { home, fields, handleKey } = siblingEditor();
+  home.selectNode('root');
+  home.makeRequest = () => { throw new Error('Cancelling an empty root sibling must not save'); };
+  await home.addSibling();
+  const key = home.selectedKey;
+  handleKey('Escape', fields.get(key).field);
+  await new Promise(setImmediate);
+  assert.equal(home.nodes.some(node => node.id === key), false);
+  assert.equal(home.selectedKey, 'root');
+  assert.equal(home.name, 'Idea guardada');
+  assert.equal(home.hasChanges(), false);
+});
+
+test('copying sibling characteristics respects the total image limit without changing the tree', async () => {
+  const { home } = siblingEditor();
+  for (let index = 0; index < 4; index++) {
+    home.nodes.push({ id: `extra-${index}`, parent_id: 'root', text: `Idea ${index}`, layout: null, x: null, y: null, width: null });
+  }
+  for (const node of home.nodes) node.image = 'data:image/png;base64,' + 'a'.repeat(250000);
+  const before = JSON.parse(JSON.stringify(home.nodes));
+  assert.ok(home.nodes.reduce((sum, node) => sum + node.image.length, 0) < 2097152);
+  await home.addSibling();
+  assert.equal(home.error, 'error_diagram_image_limit');
+  assert.equal(home.selectedKey, 'source');
+  assert.deepEqual(JSON.parse(JSON.stringify(home.nodes)), before);
+});
+
+function forestEditor() {
+  const fixture = siblingEditor();
+  fixture.home.nodes.push(
+    { id: 'orphan', parent_id: null, text: 'Segunda raíz', width: 345, x: 90, y: 120,
+      layout: { mode: 'vertical', direction: 'bottom', vertical: 'auto', horizontal: 'auto' },
+      checkbox: false, image: null, labels: [{ text: 'Su etiqueta', position: 'outside' }] },
+    { id: 'orphan-child', parent_id: 'orphan', text: 'Hijo de segunda raíz', width: 130, x: 50, y: 25,
+      layout: { mode: 'list', direction: 'auto', vertical: 'top', horizontal: 'ltr' } },
+  );
+  fixture.home.active.nodes = JSON.parse(JSON.stringify(fixture.home.nodes));
+  fixture.home.drawStage();
+  fixture.home.makeRequest = async (action, data) => ({ ...JSON.parse(JSON.stringify(data)), version: data.version + 1 });
+  return fixture;
+}
+
+test('whole-diagram layout updates every root while branch layout only changes its selected tree', async () => {
+  const { home } = forestEditor();
+  const primaryTree = JSON.parse(JSON.stringify(home.branchNodes('root')));
+  const branchStyle = { mode: 'topdown', direction: 'auto', vertical: 'bottom', horizontal: 'rtl' };
+  home.applyLayout('orphan', branchStyle, 'branch');
+  await new Promise(setImmediate);
+  assert.deepEqual(JSON.parse(JSON.stringify(home.branchNodes('root'))), primaryTree);
+  assert.deepEqual(JSON.parse(JSON.stringify(home.nodes.find(node => node.id === 'orphan').layout)), branchStyle);
+  assert.equal(home.nodes.find(node => node.id === 'orphan-child').layout, null);
+  const allStyle = { mode: 'linear', direction: 'auto', vertical: 'compact', horizontal: 'ltr' };
+  home.applyLayout('orphan-child', allStyle, 'diagram');
+  await new Promise(setImmediate);
+  const roots = home.nodes.filter(node => node.parent_id === null);
+  assert.equal(roots.length, 2);
+  for (const root of roots) assert.deepEqual(JSON.parse(JSON.stringify(root.layout)), allStyle);
+  assert.notEqual(roots[0].layout, roots[1].layout);
+  for (const node of home.nodes) {
+    if (node.parent_id !== null) assert.equal(node.layout, null);
+    assert.equal(node.x, null);
+    assert.equal(node.y, null);
+  }
+  assert.equal(home.nodes.find(node => node.id === 'orphan').width, 345);
+  assert.equal(home.hasChanges(), false);
+});
+
+test('paste can attach a copied branch to an independent sibling root', async () => {
+  const { home } = forestEditor();
+  home.nodeTools.setClipboard(home.branchNodes('source'), 'source');
+  home.selectNode('orphan');
+  await home.handleAction('paste-diagram-node');
+  const pasted = home.nodes.find(node => node.id === home.selectedKey);
+  assert.notEqual(pasted.id, 'orphan');
+  assert.equal(pasted.parent_id, 'orphan');
+  assert.equal(pasted.text, 'Fuente');
+  assert.equal(pasted.width, 310);
+  assert.equal(home.nodes.find(node => node.parent_id === pasted.id).text, 'Hijo que no se copia');
+  assert.equal(home.nodes.length, 8);
+  assert.equal(home.hasChanges(), false);
+});
+
+test('deleting a noncanonical root removes only its tree and returns to the canonical root', async () => {
+  const { home } = forestEditor();
+  const primaryTree = JSON.parse(JSON.stringify(home.branchNodes('root')));
+  const requests = [];
+  home.makeRequest = async (action, data) => {
+    requests.push(action);
+    return { ...JSON.parse(JSON.stringify(data)), version: data.version + 1 };
+  };
+  home.selectNode('orphan');
+  await home.handleAction('delete-diagram-node');
+  assert.deepEqual(JSON.parse(JSON.stringify(home.nodes)), primaryTree);
+  assert.equal(home.selectedKey, 'root');
+  assert.equal(home.name, 'Idea guardada');
+  assert.equal(home.active.id, 51);
+  assert.equal(requests.includes('deleteDiagram'), false);
+  assert.equal(home.hasChanges(), false);
+});
+
+test('deleting the canonical root preserves sibling trees and promotes a remaining root with its characteristics', async () => {
+  const { home } = forestEditor();
+  const remainingRoot = JSON.parse(JSON.stringify(home.nodes.find(node => node.id === 'orphan')));
+  const requests = [];
+  home.makeRequest = async (action, data) => {
+    requests.push(action);
+    return { ...JSON.parse(JSON.stringify(data)), version: data.version + 1 };
+  };
+  home.selectNode('root');
+  await home.handleAction('delete-diagram-node');
+  assert.equal(home.nodes.length, 2);
+  assert.equal(home.nodes.some(node => ['source', 'descendant', 'other', 'orphan'].includes(node.id)), false);
+  assert.deepEqual(JSON.parse(JSON.stringify(home.nodes.find(node => node.id === 'root'))), { ...remainingRoot, id: 'root' });
+  assert.equal(home.nodes.find(node => node.id === 'orphan-child').parent_id, 'root');
+  assert.equal(home.selectedKey, 'root');
+  assert.equal(home.name, 'Segunda raíz');
+  assert.equal(home.active.id, 51);
+  assert.equal(home.active.name, 'Idea guardada');
+  assert.equal(requests.includes('deleteDiagram'), false);
+  assert.equal(home.hasChanges(), false);
+});

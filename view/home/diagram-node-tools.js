@@ -52,10 +52,10 @@ class DiagramNodeTools {
     for (const node of copies) {
       let cursor = node, depth = 0;
       while (cursor?.parent_id) {
-        if (++depth > 30) { home.showStatus(t('diagram_depth_limit'), true); return; }
+        if (++depth > 29) { home.showStatus(t('diagram_depth_limit'), true); return; }
         cursor = byId.get(cursor.parent_id);
       }
-      if (!cursor || cursor.id !== 'root') { toast(t('error_validation'), true); return; }
+      if (!cursor || cursor.parent_id !== null) { toast(t('error_validation'), true); return; }
     }
     if (combined.reduce((size, node) => size + (node.image?.length || 0), 0) > 2097152) {
       home.showStatus(t('error_diagram_image_limit'), true); return;
@@ -73,8 +73,8 @@ class DiagramNodeTools {
 
   remove(cut = false) {
     const home = this.home, key = home.selectedKey, generation = home.generation;
-    // Removing the central topic removes the whole diagram, so explain its scope.
-    if (key === 'root' && !cut) {
+    // Explain whole-diagram deletion only when there is a single main idea.
+    if (key === 'root' && home.ensureTree().filter((node) => node.parent_id === null).length === 1 && !cut) {
       confirmAction('diagram_delete_confirm', async () => {
         closeModal();
         if (generation === home.generation) await this.deleteNode(key);
@@ -92,7 +92,8 @@ class DiagramNodeTools {
       if (!await home.finishBeforeSwitch()) return;
       const node = home.ensureTree().find((item) => item.id === key);
       if (!node) return;
-      if (key === 'root') {
+      const deleteDiagram = key === 'root' && home.nodes.filter((item) => item.parent_id === null).length === 1;
+      if (deleteDiagram) {
         const id = home.active.id;
         await home.makeRequest('deleteDiagram', { id, version: home.active.version });
         if (generation !== home.generation) return;
@@ -105,15 +106,22 @@ class DiagramNodeTools {
       } else {
         const removed = new Set(home.branchNodes(key).map((item) => item.id));
         home.nodes = home.nodes.filter((item) => !removed.has(item.id));
-        for (const id of removed) { home.childDrafts.delete(id); home.submittedChildren.delete(id); }
-        home.selectedKey = node.parent_id;
-        home.name = home.nodes.find((item) => item.id === node.parent_id).text;
+        for (const id of removed) { home.childDrafts.delete(id); home.submittedChildren.delete(id); home.draftOrigins.delete(id); }
+        if (key === 'root') {
+          // Keep the stable canvas anchor while preserving the other trees.
+          const nextRoot = home.nodes.find((item) => item.parent_id === null);
+          const previousKey = nextRoot.id;
+          nextRoot.id = 'root';
+          for (const item of home.nodes) if (item.parent_id === previousKey) item.parent_id = 'root';
+        }
+        home.selectedKey = node.parent_id || 'root';
+        home.name = home.nodes.find((item) => item.id === home.selectedKey).text;
         home.selected = true;
         home.editing = false;
         home.menuOpen = false;
       }
       home.drawStage();
-      if (key !== 'root') await home.save();
+      if (!deleteDiagram) await home.save();
       home.element('node')?.focus({ preventScroll: true });
     } catch (error) {
       if (generation === home.generation) home.showStatus(error.message, true);

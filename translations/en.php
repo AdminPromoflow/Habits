@@ -413,6 +413,7 @@ return [
     'diagram_saved' => 'Diagram saved',
     'diagram_retry' => 'Try again',
     'diagram_add_child' => 'Add child idea',
+    'diagram_add_sibling' => 'Add sibling idea with the same properties',
     'diagram_node_width' => 'Node width',
     'diagram_node_width_hint' => 'Press and drag to change the width. You can also use the left and right arrow keys.',
     'diagram_child_name' => 'New idea',

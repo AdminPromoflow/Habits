@@ -38,7 +38,7 @@ No registrar la migración si falla alguna consulta anterior. Con el ejecutor CL
 
 - `diagrams.id` se relaciona con `diagram_nodes.diagram_id`.
 - La clave primaria de cada nodo es `(diagram_id, node_key)`; `root` identifica la raíz y los demás nodos utilizan UUID.
-- `(diagram_id, parent_key)` referencia otro nodo del mismo diagrama. La API valida una única raíz, todos los padres, ciclos, hasta 200 nodos y 30 niveles de descendencia.
+- `(diagram_id, parent_key)` referencia otro nodo del mismo diagrama. `parent_key = NULL` identifica una idea principal sin padre; un diagrama puede contener varias. Se conserva el identificador `root` como ancla interna, y las demás ideas principales usan UUID. La API valida todos los árboles, sus padres y ciclos, hasta 200 nodos y 30 niveles de descendencia. Este cambio utiliza la columna nullable existente y no requiere migración.
 - `layout_mode` nulo significa heredar del ancestro más cercano que tenga un estilo propio. Una elección propia guarda modo y direcciones sin copiarlos en todos sus descendientes. El selector permite reemplazar estilos en toda la rama o en todo el diagrama.
 - `node_width` nulo usa el ancho predeterminado; un valor numérico guarda el ancho de ese cuadro, sin heredarlo a sus hijos. En la API se llama `width`. Omitir el campo conserva el ancho anterior del mismo nodo, mientras que enviar `null` lo restablece.
 - `diagrams.name` es el título independiente del diagrama; `diagram_nodes.text` conserva el texto de cada idea, incluida la raíz. Crear sin nodos inicializa la raíz con el nombre una sola vez. Renombrar sin enviar nodos conserva todo el árbol. Esta separación utiliza las columnas existentes y no requiere una nueva migración.

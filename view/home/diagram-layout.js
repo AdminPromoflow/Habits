@@ -46,7 +46,11 @@ const DiagramLayout = (() => {
         parent.children.push(item);
       }
     }
-    if (nodes.length && roots.length !== 1) throw new TypeError('A diagram needs one root');
+    if (nodes.length && !roots.length) throw new TypeError('A diagram needs a root');
+    // Keep the original root as the canvas anchor even when another root is
+    // encountered first in the stored node order.
+    const primary = roots.findIndex((item) => item.node.id === 'root');
+    if (primary > 0) roots.unshift(...roots.splice(primary, 1));
     const visited = new Set();
     function visit(item, depth, inherited) {
       if (depth > 30 || visited.has(item.node.id)) throw new TypeError('Invalid diagram hierarchy');
@@ -54,9 +58,9 @@ const DiagramLayout = (() => {
       item.layout = item.node.layout ? normalize(item.node.layout) : { ...inherited };
       item.children.forEach((child) => visit(child, depth + 1, item.layout));
     }
-    if (roots[0]) visit(roots[0], 0, defaults());
+    roots.forEach((root) => visit(root, 0, defaults()));
     if (visited.size !== nodes.length) throw new TypeError('Invalid diagram hierarchy');
-    return { index, root: roots[0] || null };
+    return { index, roots };
   }
 
   function effective(nodes, id) {
@@ -102,8 +106,8 @@ const DiagramLayout = (() => {
   }
 
   function arrange(nodes, sizes = {}) {
-    const { root } = indexNodes(nodes);
-    if (!root) return { nodes: [], edges: [], width: 0, height: 0, origin: { x: 0, y: 0 } };
+    const { roots } = indexNodes(nodes);
+    if (!roots.length) return { nodes: [], edges: [], width: 0, height: 0, origin: { x: 0, y: 0 } };
 
     function build(item, flow = { x: 'right', y: 'bottom' }) {
       const layout = item.layout;
@@ -232,7 +236,16 @@ const DiagramLayout = (() => {
       return { entries, ...bounds(entries) };
     }
 
-    const raw = build(root).entries;
+    // Pack complete automatic trees without creating a synthetic parent or
+    // connectors between roots. Each root keeps its own layout and inheritance.
+    const raw = [];
+    let bottom = 0;
+    roots.forEach((root, index) => {
+      const block = build(root);
+      const top = index ? bottom + GAP - block.minY : 0;
+      raw.push(...move(block, 0, top));
+      bottom = block.maxY + top;
+    });
     const byId = new Map(raw.map((entry) => [entry.id, entry]));
     function manualPositions(item, inheritedX = 0, inheritedY = 0) {
       const entry = byId.get(item.node.id);
@@ -252,7 +265,7 @@ const DiagramLayout = (() => {
       }
       item.children.forEach((child) => manualPositions(child, dx, dy));
     }
-    manualPositions(root);
+    roots.forEach((root) => manualPositions(root));
     const frame = bounds(raw);
     const origin = { x: PADDING - frame.minX, y: PADDING - frame.minY };
     raw.forEach((entry) => { entry.x += origin.x; entry.y += origin.y; });

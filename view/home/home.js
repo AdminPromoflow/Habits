@@ -2,7 +2,7 @@
 
 class HomePage extends PageController {
   constructor() {
-    super(['create-diagram', 'retry-diagram', 'toggle-diagram-menu', 'diagram-layout', 'add-diagram-child',
+    super(['create-diagram', 'retry-diagram', 'toggle-diagram-menu', 'diagram-layout', 'add-diagram-child', 'add-diagram-sibling',
       'diagram-checkbox-menu', 'diagram-checkbox-state',
       'copy-diagram-node', 'cut-diagram-node', 'paste-diagram-node', 'delete-diagram-node', 'image-diagram-node', 'labels-diagram-node']);
     this.nodeTools = new DiagramNodeTools(this);
@@ -195,6 +195,7 @@ class HomePage extends PageController {
     this.layoutOpen = false;
     this.nodes = null;
     this.childDrafts = new Set();
+    this.draftOrigins = new Map();
     this.submittedChildren = new Map();
     this.selectedKey = 'root';
     this.plan = null;
@@ -387,11 +388,12 @@ class HomePage extends PageController {
       nodeKey: esc(node.id),
       suffix: node.id === 'root' ? '' : `-${esc(node.id)}`,
       addChildLabel: esc(t('diagram_add_child')),
+      addSiblingLabel: esc(t('diagram_add_sibling')),
       widthLabel: esc(t('diagram_node_width')),
       widthHint: esc(t('diagram_node_width_hint')),
       width: this.nodeWidth(node),
       label: t('diagram_name'),
-      placeholder: node.parent_id === null ? t('diagram_name') : '',
+      placeholder: node.id === 'root' ? t('diagram_name') : '',
       hint: t('diagram_interaction_hint'),
       nodeLabel: esc(`${t('diagram_name')}: ${node.text}`),
       menuLabel: t('diagram_options'),
@@ -453,7 +455,9 @@ class HomePage extends PageController {
     clearTimeout(this.timer);
     this.childDrafts.delete(key);
     this.nodes = this.nodes.filter((item) => item.id !== key);
-    this.selectedKey = node.parent_id;
+    const origin = this.draftOrigins.get(key) || node.parent_id || 'root';
+    this.draftOrigins.delete(key);
+    this.selectedKey = this.nodes.some((item) => item.id === origin) ? origin : 'root';
     this.name = this.nodes.find((item) => item.id === this.selectedKey)?.text || '';
     this.selected = true;
     this.editing = false;
@@ -671,36 +675,61 @@ class HomePage extends PageController {
     });
   }
 
-  async addChild() {
+  addChild() {
+    return this.addNode('child');
+  }
+
+  addSibling() {
+    return this.addNode('sibling');
+  }
+
+  async addNode(relation) {
+    if (!this.active && !this.draft) return;
     this.commitName();
-    const parent = this.ensureTree().find((node) => node.id === this.selectedKey);
-    if (!parent?.text.trim()) { this.beginEditing(); return; }
+    const source = this.ensureTree().find((node) => node.id === this.selectedKey);
+    if (!source?.text.trim()) { this.beginEditing(); return; }
+    const sibling = relation === 'sibling';
+    const parentKey = sibling ? source.parent_id : source.id;
     // A parent must be persisted before it can own another local draft.
-    if (this.childDrafts.has(parent.id)) {
+    if (!sibling && this.childDrafts.has(source.id)) {
+      const generation = this.generation;
       await this.save();
-      if (this.childDrafts.has(parent.id)) return;
+      if (generation !== this.generation || this.selectedKey !== source.id || this.childDrafts.has(source.id)) return;
     }
     const nodes = this.ensureTree();
     if (nodes.length >= 200) {
       this.showStatus(t('diagram_node_limit'), true);
       return;
     }
-    let ancestor = nodes.find((node) => node.id === this.selectedKey);
-    let depth = 0;
+    let ancestor = nodes.find((node) => node.id === parentKey);
+    let depth = parentKey === null ? 0 : 1;
     while (ancestor?.parent_id) {
       depth++;
       ancestor = nodes.find((node) => node.id === ancestor.parent_id);
     }
-    if (depth >= 29) {
+    if (depth > 29) {
       this.showStatus(t('diagram_depth_limit'), true);
       return;
     }
-    const child = {
-      id: crypto.randomUUID(), parent_id: this.selectedKey,
+    const child = sibling ? {
+      ...JSON.parse(JSON.stringify(source)),
+      id: crypto.randomUUID(), parent_id: parentKey,
+      text: '', x: null, y: null,
+    } : {
+      id: crypto.randomUUID(), parent_id: parentKey,
       text: '', layout: null, x: null, y: null, width: null,
     };
-    nodes.push(child);
+    if (nodes.reduce((total, node) => total + (node.image?.length || 0), child.image?.length || 0) > 2097152) {
+      this.showStatus(t('error_diagram_image_limit'), true);
+      return;
+    }
+    if (sibling) {
+      const branch = new Set(this.branchNodes(source.id).map((node) => node.id));
+      const last = nodes.reduce((index, node, i) => branch.has(node.id) ? i : index, -1);
+      nodes.splice(last + 1, 0, child);
+    } else nodes.push(child);
     this.childDrafts.add(child.id);
+    this.draftOrigins.set(child.id, source.id);
     this.selectedKey = child.id;
     this.name = child.text;
     this.selected = true;
@@ -743,14 +772,13 @@ class HomePage extends PageController {
   applyLayout(key, layout, scope = 'branch') {
     const nodes = this.ensureTree();
     if (!nodes.some((item) => item.id === key)) return;
-    const node = scope === 'diagram'
-      ? nodes.find((item) => !item.parent_id)
-      : nodes.find((item) => item.id === key);
-    if (!node) return;
+    const targets = scope === 'diagram'
+      ? nodes.filter((item) => item.parent_id === null)
+      : nodes.filter((item) => item.id === key);
     const affected = scope === 'diagram' ? nodes : this.branchNodes(key);
     // Every node in the chosen scope uses the new layout through inheritance.
     for (const item of affected) { item.layout = null; item.x = null; item.y = null; }
-    node.layout = layout ? { ...layout } : null;
+    for (const node of targets) node.layout = layout ? { ...layout } : null;
     this.positionTree();
     void this.save();
   }
@@ -912,6 +940,7 @@ class HomePage extends PageController {
     if (action === 'labels-diagram-node') return this.nodeTools.openLabels();
     if (action === 'diagram-layout') return this.openLayout();
     if (action === 'add-diagram-child') return this.addChild();
+    if (action === 'add-diagram-sibling') return this.addSibling();
     if (action === 'diagram-checkbox-menu') {
       this.menuOpen = true;
       this.checkboxMenuOpen = true;
@@ -1037,6 +1066,7 @@ class HomePage extends PageController {
       this.active = diagram;
       for (const node of diagram.nodes) {
         this.childDrafts.delete(node.id);
+        this.draftOrigins.delete(node.id);
         this.submittedChildren.delete(node.id);
       }
       this.draft = null;
