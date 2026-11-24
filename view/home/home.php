@@ -14,6 +14,7 @@
 </template>
 
 <template id="view-diagram-toolbar">
+  {{linkNavigation}}
   <div class="diagram-picker">
     <button type="button" id="diagram-select" class="diagram-picker-trigger" data-action="toggle-diagram-picker"
       aria-label="{{triggerLabel}}" aria-haspopup="menu" aria-expanded="{{expanded}}" aria-controls="diagram-picker-options" {{disabled}}>

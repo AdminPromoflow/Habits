@@ -8,6 +8,12 @@ La migración `008_diagram_node_content.sql` añade `image_data` y `labels_json`
 
 ## Aplicación al subir la actualización
 
+La migración `012_diagram_node_links.sql` añade `diagram_nodes.link_json`. Cada cuadro puede guardar un enlace privado `{diagram_id, node_id}`; `node_id: null` abre el diagrama completo. Un `link: null` quita el enlace y omitir `link` conserva el anterior para clientes antiguos. Los destinos nuevos se validan contra los diagramas y cuadros de la misma cuenta. Un destino eliminado se detecta al abrir el enlace y no bloquea ediciones posteriores del origen. No se usa una clave foránea hacia los cuadros, porque el guardado reconstruye el árbol dentro de una transacción.
+
+El 24 de noviembre de 2026 se aplicó la 012 en localhost y Hostinger. Producción tenía el código nuevo pero carecía de `link_json`, causando `error_database` al guardar. Se añadió la columna y se registró el checksum `650ac30c23ed0928b32c54fb628b23a90d2c07da0bc6e9a8ab7f8c72a12db528`, conservando dos diagramas y quince nodos. Se reintentó el guardado pendiente en Safari sin recargar y la interfaz confirmó «Diagram saved».
+
+Los enlaces de regreso y la ruta padre/hijo se calculan a partir de `link_json` de los diagramas privados ya cargados. No añaden columnas ni escriben un enlace duplicado en el destino, por lo que no sobrescriben enlaces existentes ni dejan regresos huérfanos al quitar el origen. El recorrido elegido se guarda en `sessionStorage`, aislado por cuenta e instalación, y se valida contra los enlaces vigentes antes de reutilizarlo.
+
 La migración `009_diagram_node_checkbox.sql` añade `checkbox_state`: `NULL` sin casilla, `0` sin marcar y `1` marcada. En la API se llama `checkbox` y admite `null`, `false` o `true`. Omitirlo conserva el estado anterior; enviarlo como `null` quita la casilla. Los cuadros existentes empiezan sin casilla. Aplicar las migraciones pendientes en orden, incluida la 008 de contenido de nodos y la 009, antes de habilitar los archivos actualizados.
 
 La migración `010_empty_diagram_nodes.sql` elimina únicamente la restricción `chk_diagram_node_text` que impedía guardar ideas vacías. Conserva los datos, las relaciones y los límites de longitud. El título del diagrama sigue siendo obligatorio. La migración selecciona la sintaxis correspondiente a MySQL o MariaDB y puede reintentarse si la restricción ya se eliminó. Debe aplicarse antes de habilitar el guardado de cuadros vacíos.

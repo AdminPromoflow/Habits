@@ -6,6 +6,7 @@ function openModal(title, html, wide = false) {
   d.className = wide ? 'wide' : '';
   d.innerHTML = `<div class="modal-header"><h2>${esc(t(title))}</h2><button class="icon-btn" data-action="close-modal" aria-label="${t('close')}">${icon('close')}</button></div><div class="modal-body">${html}</div>`;
   if (!d.open) d.showModal();
+  d.scrollTop = 0;
   d.setAttribute('aria-label', t(title));
   setTimeout(() => $('input:not([type=hidden]),select,textarea', d)?.focus(), 30);
 }

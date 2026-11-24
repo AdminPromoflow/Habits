@@ -49,6 +49,25 @@ test('same-diagram links focus and select the destination without a document nav
   assert.equal(home.selected, false);
 });
 
+test('automatic return actions save pending edits and navigate to the original source topic', async () => {
+  const { home, state, navigations } = savedEditor();
+  const parent = { id: 52, name: 'Parent', version: 1,
+    nodes: [{ id: 'root', parent_id: null, text: 'Original', link: { diagram_id: 51, node_id: 'root' } }] };
+  state.data.diagrams.push(parent);
+  assert.match(home.links.badge(home.nodes[0]), /data-action="open-diagram-return"/);
+  home.name = 'Pending destination edit';
+  const calls = [];
+  home.makeRequest = async (action, data) => {
+    calls.push(action);
+    return action === 'saveDiagram' ? { ...data, version: data.version + 1 } : state.data.diagrams;
+  };
+  await home.handleAction('open-diagram-return', { dataset: { returnDiagram: '52', returnNode: 'root' } });
+  assert.deepEqual(calls, ['saveDiagram', 'diagrams']);
+  assert.equal(home.active.nodes[0].text, 'Pending destination edit');
+  assert.equal(new URL(navigations[0]).searchParams.get('diagram'), '52');
+  assert.equal(new URL(navigations[0]).searchParams.get('topic'), 'root');
+});
+
 test('missing link destinations and failed source saves do not navigate', async () => {
   for (const failSave of [false, true]) {
     const { home, navigations } = savedEditor();
@@ -152,6 +171,7 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
       matches(selector) {
         return selector.startsWith('#') ? selector.slice(1) === id
           : selector.startsWith('.') ? classes.has(selector.slice(1))
+          : selector === '[data-connection-action]' ? Object.hasOwn(this.dataset, 'connectionAction')
           : selector === '[data-action="create-diagram"]' && id === 'create-diagram';
       },
       closest(selector) {
@@ -253,6 +273,7 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
     clearTimeout: (id) => timers.delete(id),
   });
   vm.runInContext(fs.readFileSync('view/home/diagram-node-tools.js', 'utf8'), context);
+  vm.runInContext(fs.readFileSync('view/home/diagram-link-navigation.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('view/home/diagram-links.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('view/home/diagram-layout.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('view/home/diagram-routing.js', 'utf8'), context);
@@ -285,6 +306,17 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
       const hit = element(`hit-${from}-${to}`, 'diagram-connection-hit', group);
       svg.querySelectorAll = () => elements.filter(item => item.parentElement === svg);
       return { group, hit, svg };
+    },
+    addConnectionTools() {
+      const tools = element('diagram-connection-tools', 'diagram-connection-tools', stage);
+      const actions = Object.fromEntries(['menu', 'label', 'save-label', 'arrows-both', 'delete'].map(action => {
+        const button = element(`connection-action-${action}`, '', tools);
+        button.dataset.connectionAction = action;
+        return [action, button];
+      }));
+      const input = element('diagram-connection-label-input', '', tools);
+      input.value = '';
+      return { tools, actions, input };
     },
     addPicker() {
       const picker = element('diagram-picker', 'diagram-picker');
@@ -2834,6 +2866,61 @@ function routeEditor(points = [[0,0],[200,0]]) {
   fixture.click(line.hit);
   return {...fixture, ...line};
 }
+
+test('connector menu buttons retain selection across Safari pointer focus and repeated clicks', () => {
+  const {home, pointer, click, group, stage, document, outside, addConnectionTools} = routeEditor();
+  const {actions, input} = addConnectionTools();
+  const press = target => {
+    const down = pointer('pointerdown', target);
+    // Safari focuses the containing canvas when a button's pointer default is allowed.
+    if (!down.prevented) stage.focus();
+    pointer('pointerup', target);
+    click(target);
+  };
+  for (const open of [true, false, true]) {
+    press(actions.menu);
+    assert.equal(group.classList.contains('is-selected'), true);
+    assert.equal(home.connectionTool.menuOpen, open);
+    assert.equal(document.activeElement, actions.menu);
+    assert.equal(home.connectionTool.editingRoute, null);
+    assert.equal(home.drag, null);
+  }
+  press(actions.label);
+  assert.equal(home.connectionTool.labelEditing, true);
+  assert.equal(document.activeElement, input);
+  assert.equal(pointer('pointerdown', input).prevented, false, 'text selection keeps its native behavior');
+  click(input);
+  assert.equal(group.classList.contains('is-selected'), true);
+  outside.focus();
+  assert.equal(home.connectionTool.selected, null, 'keyboard focus outside still dismisses the tools');
+});
+
+test('connector menu clicks save labels and arrows and delete only the line', async () => {
+  const {home, pointer, click, group, stage, addConnectionTools} = routeEditor();
+  const {actions, input} = addConnectionTools();
+  const press = async target => {
+    const down = pointer('pointerdown', target);
+    if (!down.prevented) stage.focus();
+    pointer('pointerup', target);
+    click(target);
+    await new Promise(setImmediate);
+  };
+  const nodes = JSON.parse(JSON.stringify(home.nodes));
+  await press(actions.menu);
+  await press(actions.label);
+  input.value = 'Texto del conector';
+  await press(actions['save-label']);
+  assert.equal(home.active.connection_styles[0]?.label, 'Texto del conector');
+  await press(actions.menu);
+  await press(actions['arrows-both']);
+  assert.equal(home.active.connection_styles[0]?.arrows, 'both');
+  assert.equal(group.classList.contains('is-selected'), true);
+  await press(actions.menu);
+  await press(actions.delete);
+  assert.equal(home.connectionTool.selected, null);
+  assert.equal(home.hiddenConnections.length, 1);
+  assert.deepEqual(JSON.parse(JSON.stringify(home.nodes)), nodes);
+});
 
 test('dragging a selected connector saves its bends without moving nodes and retains them after reload', async () => {
   const {home,pointer,hit,group,state,stage} = routeEditor();

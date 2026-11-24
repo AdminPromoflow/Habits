@@ -59,6 +59,8 @@ Los enlaces duran 30 minutos y solo pueden usarse una vez. Pedir un enlace no ca
 
 ## Git y despliegues
 
+Para los enlaces entre diagramas/cuadros, aplicar `012_diagram_node_links.sql` antes de habilitar el modelo actualizado. Se aplicó en esta instalación el 24 de noviembre de 2026, conservando dos diagramas y quince nodos. El guardado pendiente del enlace en Safari pasó de `error_database` a «Diagram saved» al reintentar después de añadir `link_json`.
+
 Para la selección voluntaria de categorías, aplica `004_category_choices.sql` antes de desplegar esa versión. Conserva inscripciones de categorías globales que ya tengan hábitos/rutinas; las categorías privadas propias permanecen disponibles. El catálogo global se conserva en Hostinger, mientras que cada usuario elige en Ajustes cuáles añadir. En Mis hábitos se muestran las categorías con hábitos, y cada una abre su tablero semanal.
 
 Para el editor de diagramas, aplica todas las migraciones pendientes antes de desplegar los archivos nuevos. Actualmente llegan hasta `011_diagram_connections.sql`: la 005 crea `diagrams`, la 006 añade los nodos, la 007 sus anchos individuales, la 008 imágenes/etiquetas, la 009 casillas, la 010 permite ideas vacías y la 011 añade conexiones adicionales. Si falta una tabla o columna requerida, la consulta o el guardado devuelve `error_database`, aunque MySQL esté funcionando. El migrador registra el nombre y el SHA-256 de cada archivo en `schema_migrations`.

@@ -157,7 +157,7 @@ class DiagramConnections {
       const style = this.style(edge);
       const points = this.same(this.editingRoute, edge) && this.editingRoute.preview
         ? this.editingRoute.preview : edge.points && DiagramRouting.anchored(style.points, edge.points, this.home.plan.origin);
-      return { ...edge, points, path: points ? DiagramLayout.orthogonalPath(points) : edge.path, style };
+      return { ...edge, points, path: points ? DiagramLayout.orthogonalPath(points, edge.cornerRadius) : edge.path, style };
     });
     svg.innerHTML = `<defs><marker id="diagram-arrow-end" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto"><path class="diagram-arrow" d="M1 1 L9 5 L1 9"/></marker>
       <marker id="diagram-arrow-start" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto"><path class="diagram-arrow" d="M9 1 L1 5 L9 9"/></marker></defs>` + this.drawn.map(edge => {
@@ -345,6 +345,16 @@ class DiagramConnections {
   }
 
   start(event) {
+    if (event.target.closest?.('.diagram-connection-tools')) {
+      const button = event.target.closest?.('[data-connection-action]');
+      if (button && event.button === 0 && event.isPrimary !== false) {
+        // Safari otherwise focuses the canvas and removes these controls before click.
+        // Keep native pointer behavior for the label input, including text selection.
+        event.preventDefault();
+        button.focus({ preventScroll: true });
+      }
+      return;
+    }
     const line = event.target.closest?.('.diagram-connection');
     if (line) { this.startRoute(event, line); return; }
     const home = this.home;

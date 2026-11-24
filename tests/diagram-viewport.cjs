@@ -131,6 +131,121 @@ function worldAt(camera, surface, localX, localY) {
     (localY - surface.clientHeight / 2 - camera.y) / camera.scale];
 }
 
+function boundedHarness(bounds = [{ x: 0, y: 0, width: 220, height: 48 }], options) {
+  const fixture = harness(options);
+  fixture.camera.mount(fixture.surface, fixture.content, { anchorX: 110, anchorY: 24, bounds });
+  return fixture;
+}
+
+function assertDiagramVisible({ camera, surface }) {
+  const width = surface.clientWidth, height = surface.clientHeight;
+  const marginX = Math.min(24, width / 8), marginY = Math.min(24, height / 8);
+  assert.ok(camera.bounds.some(box => {
+    const left = width / 2 + camera.x + (box.x - camera.anchorX) * camera.scale;
+    const top = height / 2 + camera.y + (box.y - camera.anchorY) * camera.scale;
+    const boxWidth = box.width * camera.scale, boxHeight = box.height * camera.scale;
+    const visibleWidth = Math.min(left + boxWidth, width - marginX) - Math.max(left, marginX);
+    const visibleHeight = Math.min(top + boxHeight, height - marginY) - Math.max(top, marginY);
+    return visibleWidth + 0.00001 >= Math.min(64, boxWidth, width - 2 * marginX) &&
+      visibleHeight + 0.00001 >= Math.min(32, boxHeight, height - 2 * marginY);
+  }), 'at least part of one actual node must remain inside the canvas');
+}
+
+test('background drags stop before the diagram disappears in every direction', () => {
+  for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]) {
+    const fixture = boundedHarness();
+    const { camera, surface } = fixture;
+    surface.emit('pointerdown');
+    surface.emit('pointermove', { clientX: 400 + dx * 10000, clientY: 250 + dy * 10000 });
+    assertDiagramVisible(fixture);
+    const edge = { x: camera.x, y: camera.y };
+    surface.emit('pointermove', { clientX: 400 + dx * 9990, clientY: 250 + dy * 9990 });
+    almost(camera.x, edge.x - dx * 10);
+    almost(camera.y, edge.y - dy * 10);
+    assertDiagramVisible(fixture);
+    surface.emit('pointerup');
+  }
+});
+
+test('wheel pan, pointer zoom and Safari gestures retain visible content at their limits', () => {
+  const fixture = boundedHarness();
+  const { camera, surface } = fixture;
+  surface.emit('wheel', { deltaX: 20, deltaY: -30 });
+  assert.equal(camera.x, -20, 'ordinary navigation remains unchanged');
+  assert.equal(camera.y, 30);
+  for (const delta of [-10000, 10000]) {
+    surface.emit('wheel', { deltaX: delta, deltaY: -delta });
+    assertDiagramVisible(fixture);
+    surface.emit('wheel', { deltaY: delta, shiftKey: true, deltaMode: 2 });
+    assertDiagramVisible(fixture);
+    surface.emit('wheel', { deltaY: delta, ctrlKey: true, clientX: 100, clientY: 50 });
+    assertDiagramVisible(fixture);
+  }
+  surface.emit('gesturestart');
+  surface.emit('gesturechange', { scale: 3, clientX: 10000, clientY: 10000 });
+  assertDiagramVisible(fixture);
+  const edge = { x: camera.x, y: camera.y };
+  surface.emit('gesturechange', { scale: 3, clientX: 9990, clientY: 9990 });
+  almost(camera.x, edge.x - 10);
+  almost(camera.y, edge.y - 10);
+  surface.emit('gesturechange', { scale: 0.01, clientX: -10000, clientY: -10000 });
+  assertDiagramVisible(fixture);
+  surface.emit('gestureend', { scale: 0.01 });
+  assertDiagramVisible(fixture);
+});
+
+test('sparse diagrams and extreme zoom never leave only the empty space between nodes visible', () => {
+  const bounds = [{ x: 0, y: 0, width: 220, height: 48 }, { x: 3000, y: 4000, width: 300, height: 80 }];
+  const fixture = boundedHarness(bounds);
+  const { camera } = fixture;
+  const original = JSON.stringify(bounds);
+  for (const scale of [0.0001, 0.2, 1, 3]) {
+    camera.scale = scale;
+    for (const x of [-10000, -1500, 0, 10000]) {
+      for (const y of [-10000, -2000, 0, 10000]) {
+        camera.x = x; camera.y = y;
+        camera.render();
+        assertDiagramVisible(fixture);
+      }
+    }
+  }
+  assert.equal(JSON.stringify(bounds), original, 'camera constraints never alter node positions');
+});
+
+test('resize and removing distant nodes bring existing content back into view', () => {
+  const bounds = [{ x: 0, y: 0, width: 220, height: 48 }, { x: 3000, y: 2000, width: 220, height: 48 }];
+  const fixture = boundedHarness(bounds);
+  const { camera, surface, content } = fixture;
+  camera.x = -3000; camera.y = -2000;
+  camera.render();
+  assert.equal(camera.x, -3000, 'any node can be the visible part, not just the root');
+  camera.mount(surface, content, { anchorX: 110, anchorY: 24, bounds: [bounds[0]] });
+  assertDiagramVisible(fixture);
+  for (const [width, height] of [[240,120], [48,48], [1200,800]]) {
+    surface.clientWidth = width; surface.clientHeight = height;
+    camera.render();
+    assertDiagramVisible(fixture);
+  }
+});
+
+test('offscreen saved views recover on mount using the correct diagram geometry', () => {
+  const storage = new Map([
+    ['lost', JSON.stringify({ x: 100000, y: -100000, scale: 0.5 })],
+    ['other', JSON.stringify({ x: -3000, y: -2000, scale: 1 })],
+  ]);
+  const fixture = boundedHarness(undefined, { storage });
+  const { camera, surface, content } = fixture;
+  camera.setPersistenceKey('lost');
+  camera.mount(surface, content, { anchorX: 110, anchorY: 24, bounds: [{ x: 0, y: 0, width: 220, height: 48 }] });
+  assertDiagramVisible(fixture);
+  const recovered = { x: camera.x, y: camera.y, scale: camera.scale };
+  assert.deepEqual(JSON.parse(storage.get('lost')), recovered);
+  camera.setPersistenceKey('other');
+  camera.mount(surface, content, { anchorX: 110, anchorY: 24, bounds: [{ x: 3000, y: 2000, width: 220, height: 48 }] });
+  assert.deepEqual({ x: camera.x, y: camera.y, scale: camera.scale }, { x: -3000, y: -2000, scale: 1 });
+  assert.deepEqual(JSON.parse(storage.get('lost')), recovered);
+});
+
 test('background dragging pans both ways and suppresses only the drag-generated click', () => {
   const { camera, surface, starts } = harness();
   surface.emit('pointerdown');

@@ -5,11 +5,32 @@ class DiagramLinks {
     this.home = home;
     this.busy = false;
     this.arrival = null;
+    this.navigation = new DiagramLinkNavigation(home);
   }
 
   badge(node) {
-    return node.link ? `<button type="button" class="diagram-topic-link" data-action="open-diagram-link"
-      aria-label="${esc(t('diagram_link_open'))}" title="${esc(t('diagram_link_open'))}">${icon('link')}</button>` : '';
+    const returns = this.navigation.incoming(node);
+    const arrow = direction => `<span class="diagram-link-direction" aria-hidden="true">${direction === 'back' ? '←' : '→'}</span>`;
+    const forward = node.link ? `<button type="button" class="diagram-topic-link" data-action="open-diagram-link"
+      aria-label="${esc(t('diagram_link_open'))}" title="${esc(t(this.navigation.direction(node.link) === 'back' ? 'diagram_link_parent' : 'diagram_link_child'))}">${icon('link')}${arrow(this.navigation.direction(node.link))}</button>` : '';
+    const back = returns.length === 1 ? `<button type="button" class="diagram-topic-link" data-action="open-diagram-return"
+      data-return-diagram="${returns[0].diagram_id}" data-return-node="${esc(returns[0].node_id)}"
+      aria-label="${esc(this.returnLabel(returns[0]))}" title="${esc(this.returnLabel(returns[0]))}">${icon('link')}${arrow('back')}</button>`
+      : returns.length ? `<button type="button" class="diagram-topic-link" data-action="choose-diagram-return"
+      aria-label="${esc(t('diagram_link_returns'))}" title="${esc(t('diagram_link_returns'))}">${icon('link')}${arrow('back')}<span class="diagram-link-count">${returns.length}</span></button>` : '';
+    return forward || back ? `<div class="diagram-topic-links">${forward}${back}</div>` : '';
+  }
+
+  returnLabel(edge) {
+    return t('diagram_link_return_to', { name: `${edge.diagram_name} · ${edge.text || t('diagram_link_untitled')}` });
+  }
+
+  chooseReturn(node) {
+    if (!node) return;
+    const returns = this.navigation.incoming(node);
+    openModal('diagram_link_returns', `<div class="diagram-return-list">${returns.map(edge =>
+      `<button type="button" class="btn secondary" data-action="open-diagram-return" data-return-diagram="${edge.diagram_id}"
+        data-return-node="${esc(edge.node_id)}"><span aria-hidden="true">←</span>${esc(this.returnLabel(edge))}</button>`).join('')}</div>`);
   }
 
   async open() {
@@ -156,16 +177,22 @@ class DiagramLinks {
   }
 
   lines(text, width) {
-    const length = Math.max(5, Math.floor((width - 24) / 10));
+    const length = Math.max(5, Math.floor((width - 24) / 9));
     return text.split('\n').flatMap(line => {
       const chars = Array.from(line), result = [];
-      do { result.push(chars.splice(0, length).join('')); } while (chars.length);
+      while (chars.length > length) {
+        const space = chars.slice(0, length + 1).lastIndexOf(' ');
+        result.push(chars.splice(0, space > 0 ? space : length).join(''));
+        if (chars[0] === ' ') chars.shift();
+      }
+      result.push(chars.join(''));
       return result;
     });
   }
 
-  async follow(link) {
+  async follow(link, navigation = {}) {
     const home = this.home, generation = home.generation;
+    const sourceKey = home.selectedKey;
     if (!link || this.busy || home.switching) return;
     this.busy = true;
     try {
@@ -178,6 +205,7 @@ class DiagramLinks {
       const target = diagrams.find(item => item.id === link.diagram_id);
       if (!target || (link.node_id !== null && !target.nodes.some(node => node.id === link.node_id))) throw new Error(t('error_diagram_link_missing'));
       S.data.diagrams = diagrams;
+      this.navigation.prepare(link, sourceKey, navigation);
       if (target.id === home.active.id) {
         // Refresh a clean snapshot so removed/moved targets from another tab
         // cannot direct the camera to stale coordinates.

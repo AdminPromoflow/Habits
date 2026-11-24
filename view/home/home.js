@@ -5,7 +5,7 @@ class HomePage extends PageController {
     super(['create-diagram', 'retry-diagram', 'toggle-diagram-menu', 'diagram-layout', 'add-diagram-child', 'add-diagram-sibling',
       'diagram-checkbox-menu', 'diagram-checkbox-state', 'toggle-diagram-picker', 'select-diagram',
       'copy-diagram-node', 'cut-diagram-node', 'paste-diagram-node', 'delete-diagram-node', 'image-diagram-node', 'labels-diagram-node',
-      'link-diagram-node', 'open-diagram-link']);
+      'link-diagram-node', 'open-diagram-link', 'open-diagram-return', 'choose-diagram-return', 'diagram-link-ancestor']);
     this.nodeTools = new DiagramNodeTools(this);
     this.links = new DiagramLinks(this);
     this.generation = 0;
@@ -202,6 +202,7 @@ class HomePage extends PageController {
   reset() {
     clearTimeout(this.timer);
     this.generation++;
+    this.links?.navigation.memory.clear();
     this.connectionTool?.cancel();
     this.connectionTool?.clearSelection();
     this.finishNodeDrag(false);
@@ -340,6 +341,7 @@ class HomePage extends PageController {
       `<button type="button" class="diagram-picker-option" role="menuitemradio" data-action="select-diagram" data-id="${esc(diagram.id)}" aria-checked="${diagram.id === this.active?.id}" tabindex="-1">${esc(diagram.name.replace(/\s+/g, ' ').trim())}</button>`).join('');
     const selectedName = this.draft ? t('diagram_default_name') : this.active?.name || t('my_diagrams');
     return renderTemplate('diagram-toolbar', {
+      linkNavigation: this.links.navigation.html(),
       label: t('my_diagrams'),
       selectedName: esc(selectedName.replace(/\s+/g, ' ').trim()),
       triggerLabel: esc(`${t('my_diagrams')}: ${selectedName}`),
@@ -746,6 +748,7 @@ class HomePage extends PageController {
       this.viewport.mount(stage, enabled ? root : null, {
         anchorX: (root?.offsetWidth || 220) / 2 - (node?.x || 0),
         anchorY: (root?.offsetHeight || 48) / 2 - (node?.y || 0),
+        bounds: [{ x: 0, y: 0, width: root?.offsetWidth || 220, height: root?.offsetHeight || 48 }],
       });
       return;
     }
@@ -773,6 +776,7 @@ class HomePage extends PageController {
     this.viewport.mount(stage, scene, {
       anchorX: this.plan.origin.x + rootPosition.width / 2,
       anchorY: this.plan.origin.y + rootPosition.height / 2,
+      bounds: this.plan.nodes,
     });
   }
 
@@ -1039,6 +1043,7 @@ class HomePage extends PageController {
   }
 
   async handleAction(action, button) {
+    if (action === 'diagram-link-ancestor') return this.links.navigation.visit(Number(button.dataset.trailIndex));
     if (action === 'toggle-diagram-picker') return this.pickerOpen ? this.closeDiagramPicker(true) : this.openDiagramPicker();
     if (action === 'select-diagram') return this.openDiagram(button.dataset.id);
     if (action === 'retry-diagram') return this.save();
@@ -1052,6 +1057,11 @@ class HomePage extends PageController {
     if (action === 'labels-diagram-node') return this.nodeTools.openLabels();
     if (action === 'link-diagram-node') return this.links.open();
     if (action === 'open-diagram-link') return this.links.follow(this.ensureTree().find(node => node.id === this.selectedKey)?.link);
+    if (action === 'choose-diagram-return') return this.links.chooseReturn(this.ensureTree().find(node => node.id === this.selectedKey));
+    if (action === 'open-diagram-return') {
+      if (button.closest?.('#modal')) closeModal();
+      return this.links.follow({ diagram_id: Number(button.dataset.returnDiagram), node_id: button.dataset.returnNode }, { returning: true });
+    }
     if (action === 'diagram-layout') return this.openLayout();
     if (action === 'add-diagram-child') return this.addChild();
     if (action === 'add-diagram-sibling') return this.addSibling();

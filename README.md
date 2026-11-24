@@ -59,6 +59,12 @@ Los constructores JavaScript registran las acciones una sola vez. Los eventos co
 
 ## Editor de diagramas
 
+En los tres puntos, **Enlace** (primera opción de la segunda fila) permite elegir un diagrama y enlazar al **diagrama completo** o a **un cuadro específico**. La miniatura muestra los cuadros seleccionables y permite acercar, alejar y ajustar; también hay un selector de cuadros accesible con teclado. El diagrama actual está incluido. Guardar añade un icono de enlace junto al cuadro de origen; pulsarlo guarda primero los cambios pendientes y abre el destino. Un destino específico queda seleccionado y centrado con zoom; el diagrama completo se ajusta al lienzo. Los enlaces dentro del mismo diagrama no recargan la página. Volver a abrir Enlace permite cambiar o quitar el destino.
+
+Los enlaces son privados, se conservan al recargar y al copiar cuadros, y no alteran las líneas padre/hijo. Si el destino desaparece, se avisa sin perder las ediciones del origen. La migración `012_diagram_node_links.sql` añade el almacenamiento: aplicarla antes de desplegar esta función. Quedó aplicada en localhost y en Hostinger el 24 de noviembre de 2026.
+
+El cuadro de destino muestra automáticamente un enlace de regreso al cuadro de origen, sin reemplazar su propio enlace. Si recibe varios enlaces, el botón de regreso permite elegir el origen. Para enlaces al diagrama completo, el regreso aparece en su cuadro principal. Los iconos llevan una flecha pequeña: → hacia el destino hijo y ← hacia el padre. La ruta de diagramas aparece arriba a la izquierda; pulsar un antecesor vuelve al cuadro desde el que se abrió el siguiente diagrama. El recorrido se conserva al recargar y también puede reconstruirse a partir de los enlaces guardados. Los regresos se actualizan al cambiar o quitar el enlace original y no requieren otra migración de base de datos.
+
 El **asterisco** crea una sola idea hermana del cuadro seleccionado: comparte su padre y copia distribución, direcciones, ancho, imagen, etiquetas y estado de casilla, sin copiar descendientes ni el texto principal. El nuevo cuadro aparece vacío y con el cursor listo. Si la idea seleccionada no tiene padre, su hermana también queda sin padre dentro del mismo diagrama; cada idea principal puede tener su propio árbol. Las posiciones se calculan de nuevo para separar los cuadros. Se guarda automáticamente aunque su texto esté vacío, igual que un hijo nuevo.
 
 Cada diagrama tiene un nombre propio en el recuadro de la esquina superior izquierda del lienzo. **Doble clic** lo convierte en un campo editable con el cursor al final; **Enter** o salir del campo guarda el nombre y **Escape** cancela. Un nombre vacío conserva el anterior. El título es independiente del texto de la idea central y permanece fijo al desplazar o ampliar el lienzo.
@@ -139,7 +145,7 @@ El importador utiliza identificadores de origen para no duplicar rutinas ni ejer
 
 ```sh
 PHP_BIN=/opt/homebrew/bin/php python3 tests/functional.py
-node --test tests/diagrams.cjs tests/diagram-layout.cjs tests/diagram-viewport.cjs tests/diagram-routing.cjs
+node --test tests/diagrams.cjs tests/diagram-layout.cjs tests/diagram-viewport.cjs tests/diagram-routing.cjs tests/diagram-link-navigation.cjs
 ```
 
 Requiere Python 3, PHP con PDO MySQL y un usuario de MySQL autorizado para crear una base aislada `mi_rutina_test_*`. Configura `RUTINA_TEST_DB_USER` y `RUTINA_TEST_DB_PASSWORD` según tu entorno; el valor predeterminado `root` sin contraseña corresponde únicamente al XAMPP local. No usa la base real de Aleina.

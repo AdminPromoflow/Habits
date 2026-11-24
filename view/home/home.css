@@ -232,8 +232,22 @@
 }
 
 .diagram-node-body { position: relative; }
-.diagram-topic-link { position: absolute; right: -16px; bottom: -16px; width: 32px; height: 32px; display: grid; place-items: center; border: 2px solid var(--lavender); border-radius: 50%; background: var(--surface); color: var(--purple-dark); cursor: pointer; z-index: 1; box-shadow: 0 2px 8px #34204720; }
+.diagram-topic-links { position: absolute; right: -16px; bottom: -16px; display: flex; gap: 6px; z-index: 1; }
+.diagram-topic-link { position: relative; width: 32px; height: 32px; display: grid; place-items: center; border: 2px solid var(--lavender); border-radius: 50%; background: var(--surface); color: var(--purple-dark); cursor: pointer; box-shadow: 0 2px 8px #34204720; }
 .diagram-topic-link svg { width: 17px; height: 17px; }
+.diagram-link-direction { position: absolute; right: -3px; bottom: -3px; width: 13px; height: 11px; display: grid; place-items: center; border-radius: 5px; background: var(--surface); color: var(--purple-dark); font: 700 10px/1 system-ui, sans-serif; pointer-events: none; }
+.diagram-link-count { position: absolute; right: -4px; top: -6px; min-width: 14px; padding: 1px 3px; border-radius: 7px; background: var(--purple); color: white; font-size: 9px; line-height: 1.2; pointer-events: none; }
+.diagram-link-trail { flex: 1 0 100%; min-width: 0; max-width: 100%; overflow-x: auto; color: var(--purple-dark); }
+.diagram-link-trail ol { list-style: none; display: flex; align-items: center; gap: 8px; margin: 0; padding: 3px 0; width: max-content; max-width: none; }
+.diagram-link-trail li { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.diagram-link-trail button, .diagram-link-trail [aria-current] { display: block; max-width: 28ch; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: .875rem; }
+.diagram-link-trail button { border: 0; background: transparent; color: inherit; padding: 6px 2px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.diagram-link-trail button:hover { color: var(--purple); }
+.diagram-link-trail button:focus-visible { outline: 2px solid var(--purple); outline-offset: 1px; border-radius: 3px; }
+.diagram-link-trail [aria-current] { color: var(--ink); font-weight: 600; }
+.diagram-trail-separator { opacity: .6; }
+.diagram-return-list { display: grid; gap: 10px; }
+.diagram-return-list button { justify-content: flex-start; text-align: left; white-space: normal; overflow-wrap: anywhere; }
 .diagram-topic-link:hover, .diagram-topic-link:focus-visible { outline: 3px solid var(--lavender); outline-offset: 2px; }
 .diagram-link-scope { display: flex; flex-wrap: wrap; gap: 12px 24px; border: 0; margin: 16px 0; padding: 0; }
 .diagram-link-scope legend { font-weight: 600; margin-bottom: 8px; }

@@ -12,6 +12,7 @@ class DiagramViewport {
     this.lastSavedView = null;
     this.stage = null;
     this.content = null;
+    this.bounds = [];
     this.anchorX = 0;
     this.anchorY = 0;
     this.pan = null;
@@ -34,7 +35,7 @@ class DiagramViewport {
     this.onBlur = () => this.cancelInteraction();
   }
 
-  mount(stage, content, { anchorX = 0, anchorY = 0 } = {}) {
+  mount(stage, content, { anchorX = 0, anchorY = 0, bounds = [] } = {}) {
     if (stage !== this.stage) {
       this.detach();
       this.stage = stage || null;
@@ -48,6 +49,8 @@ class DiagramViewport {
     this.content = content || null;
     this.anchorX = Number.isFinite(anchorX) ? anchorX : 0;
     this.anchorY = Number.isFinite(anchorY) ? anchorY : 0;
+    this.bounds = bounds.filter(box => [box.x, box.y, box.width, box.height].every(Number.isFinite) &&
+      box.width > 0 && box.height > 0);
     this.render();
   }
 
@@ -67,6 +70,7 @@ class DiagramViewport {
     }
     this.stage = null;
     this.content = null;
+    this.bounds = [];
     this.lastPoint = null;
   }
 
@@ -96,6 +100,8 @@ class DiagramViewport {
     this.persistenceKey = key;
     this.lastSavedView = null;
     if (!keepView) {
+      // The next mount supplies this diagram's geometry, which may differ from the old one.
+      this.bounds = [];
       this.x = 0;
       this.y = 0;
       this.scale = 1;
@@ -126,6 +132,7 @@ class DiagramViewport {
 
   render() {
     if (!this.stage || !this.content) return;
+    this.keepDiagramVisible();
     const left = this.stage.clientWidth / 2 + this.x - this.scale * this.anchorX;
     const top = this.stage.clientHeight / 2 + this.y - this.scale * this.anchorY;
     this.content.style.transformOrigin = '0 0';
@@ -134,6 +141,30 @@ class DiagramViewport {
     this.stage.scrollLeft = 0;
     this.stage.scrollTop = 0;
     this.saveView();
+  }
+
+  keepDiagramVisible() {
+    const width = this.stage.clientWidth, height = this.stage.clientHeight;
+    if (!width || !height || !this.bounds.length) return;
+    const marginX = Math.min(24, width / 8), marginY = Math.min(24, height / 8);
+    let nearest = null;
+    for (const box of this.bounds) {
+      const left = width / 2 + (box.x - this.anchorX) * this.scale;
+      const top = height / 2 + (box.y - this.anchorY) * this.scale;
+      const boxWidth = box.width * this.scale, boxHeight = box.height * this.scale;
+      const visibleWidth = Math.min(64, boxWidth, width - 2 * marginX);
+      const visibleHeight = Math.min(32, boxHeight, height - 2 * marginY);
+      const x = Math.max(marginX + visibleWidth - left - boxWidth,
+        Math.min(width - marginX - visibleWidth - left, this.x));
+      const y = Math.max(marginY + visibleHeight - top - boxHeight,
+        Math.min(height - marginY - visibleHeight - top, this.y));
+      const distance = (x - this.x) ** 2 + (y - this.y) ** 2;
+      if (!distance) return;
+      if (!nearest || distance < nearest.distance) nearest = { x, y, distance };
+    }
+    // Use an actual node: the overall bounding box can contain large empty gaps.
+    this.x = nearest.x;
+    this.y = nearest.y;
   }
 
   ignoredTarget(target) {
@@ -207,6 +238,11 @@ class DiagramViewport {
     this.x = pan.x + dx;
     this.y = pan.y + dy;
     this.render();
+    // Consume overshoot so reversing direction at the edge moves immediately.
+    pan.x = this.x;
+    pan.y = this.y;
+    pan.startX = event.clientX;
+    pan.startY = event.clientY;
   }
 
   pointerFinish(event) {
@@ -298,6 +334,8 @@ class DiagramViewport {
     this.y = point.y - this.stage.clientHeight / 2 - gesture.worldY * scale;
     this.scale = scale;
     this.render();
+    gesture.worldX = (point.x - this.stage.clientWidth / 2 - this.x) / scale;
+    gesture.worldY = (point.y - this.stage.clientHeight / 2 - this.y) / scale;
   }
 
   gestureEnd(event) {

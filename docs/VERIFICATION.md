@@ -1,5 +1,13 @@
 # Verificación realizada
 
+## Enlaces entre diagramas y cuadros — 24 de noviembre de 2026
+
+- Selector de diagramas, opciones de diagrama completo/cuadro, miniatura seleccionable con zoom, selector accesible por teclado y edición/eliminación del enlace. El icono del cuadro abre el destino; los saltos internos no recargan y los externos llevan una instrucción de centrado que se consume al llegar.
+- Pruebas JavaScript del editor, distribución y cámara aprobadas (212 casos en total, incluida la regresión adicional de escritura durante la búsqueda del destino). 181 comprobaciones HTTP y 7 de esquema/fuentes aprobadas en una base aislada. Cubren persistencia, clientes antiguos, destinos privados/inexistentes, validación, permisos, CSRF, versiones y eliminación del destino.
+- Navegador local: selección por clic de un cuadro de la miniatura, guardado, apertura de otro diagrama centrado en «Subrama» y salto interno a «Nieto». Las mediciones DOM situaron el centro del cuadro a menos de 0,001 px del centro del lienzo. Sin errores de consola en el recorrido.
+- La recarga conservó el enlace y su selección en el modal. «Diagrama completo» mostró todos los cuadros dentro del lienzo sin dejar ninguno seleccionado. Al volver a abrir un modal, su desplazamiento vuelve al inicio para mantener visible el selector de diagramas.
+- Migración 012 aplicada en localhost y en Hostinger. Producción tenía dos diagramas y quince cuadros antes y después. Se pulsó Try again en la pestaña de Safari con el enlace pendiente y se confirmó «Diagram saved», sin recargar ni descartar cambios.
+
 ## Cuadros vacíos rechazados y carga del diagrama — 24 de noviembre de 2026
 
 - Hostinger conservaba `chk_diagram_node_text`, que rechazaba las ideas vacías, y no tenía `diagrams.connections_json`. Sus migraciones llegaban hasta la 009. El mensaje «This item already exists or is in use» clasificaba incorrectamente cualquier SQLSTATE 23000 como duplicado.

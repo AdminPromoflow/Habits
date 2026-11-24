@@ -113,9 +113,17 @@ const DiagramLayout = (() => {
       const layout = item.layout;
       const box = measure(item, sizes);
       const self = { id: item.node.id, x: 0, y: 0, ...box, layout: { ...layout } };
+      // A linear group has one horizontal axis. Its inherited descendants form
+      // indented columns extending away from that axis, rather than more axes.
+      const linearBranch = layout.mode === 'linear' && !item.node.layout && flow.linearSide;
+      if (layout.mode === 'linear') Object.assign(self, {
+        linearRole: linearBranch ? 'branch' : 'axis',
+        linearSide: linearBranch || null,
+        linearReverse: linearBranch ? flow.linearReverse : layout.horizontal === 'rtl',
+      });
       let entries = [self];
       let childItems = [...item.children];
-      if (layout.horizontal === 'rtl' && ['list', 'topdown', 'linear', 'matrix'].includes(layout.mode)) {
+      if (layout.horizontal === 'rtl' && ['list', 'topdown', 'matrix'].includes(layout.mode)) {
         childItems.reverse();
       }
       const isRoot = item.node.parent_id == null;
@@ -175,28 +183,44 @@ const DiagramLayout = (() => {
         } else horizontalRow(childItems, flow.y);
       } else if (layout.mode === 'topdown') {
         horizontalRow(childItems, layout.vertical === 'top' ? 'top' : 'bottom');
-      } else if (layout.mode === 'list') {
-        const side = layout.vertical === 'top' ? 'top' : 'bottom';
+      } else if (layout.mode === 'list' || linearBranch) {
+        const side = linearBranch || (layout.vertical === 'top' ? 'top' : 'bottom');
+        const reverse = linearBranch ? flow.linearReverse : layout.horizontal === 'rtl';
         const indent = Math.min(48, self.width / 3);
         let next = side === 'top' ? -ROW_GAP : self.height + ROW_GAP;
         for (const child of childItems) {
           const block = build(child, flow);
-          const left = layout.horizontal === 'rtl' ? self.width - indent - blockWidth(block) : indent;
+          const left = reverse ? self.width - indent - blockWidth(block) : indent;
           const top = side === 'top' ? next - blockHeight(block) : next;
           entries.push(...move(block, left - block.minX, top - block.minY));
           next += (side === 'top' ? -1 : 1) * (blockHeight(block) + ROW_GAP);
         }
       } else if (layout.mode === 'linear') {
-        const blocks = childItems.map((child) => build(child, flow));
         const reverse = layout.horizontal === 'rtl';
-        let next = reverse ? -GAP : self.width + GAP;
-        blocks.forEach((block, index) => {
+        const compact = layout.vertical === 'compact';
+        let next = (reverse ? 0 : self.width) + GAP;
+        const sideEnds = { top: next, bottom: next };
+        let lastCenter = null, lastWidth = 0;
+        childItems.forEach((child, index) => {
           const side = layout.vertical === 'top' ? 'top' : layout.vertical === 'bottom' ? 'bottom'
             : index % 2 === 0 ? 'top' : 'bottom';
-          const left = reverse ? next - blockWidth(block) : next;
-          const top = side === 'top' ? -ROW_GAP - blockHeight(block) : self.height + ROW_GAP;
-          entries.push(...move(block, left - block.minX, top - block.minY));
-          next += (reverse ? -1 : 1) * (blockWidth(block) + (layout.vertical === 'compact' ? ROW_GAP : GAP));
+          const block = build(child, { ...flow, linearSide: side, linearReverse: reverse });
+          // Work in distance along the axis so right-to-left is a true mirror.
+          const min = reverse ? -block.maxX : block.minX;
+          const max = reverse ? -block.minX : block.maxX;
+          const childWidth = block.entries[0].width;
+          const center = (reverse ? -1 : 1) * childWidth / 2;
+          let offset = (compact ? sideEnds[side] : next) - min;
+          if (compact && lastCenter !== null) {
+            offset = Math.max(offset, lastCenter + Math.max(ROW_GAP * 2, (lastWidth + childWidth) / 4) - center);
+          }
+          const top = side === 'top' ? self.height / 2 - ROW_GAP - block.maxY
+            : self.height / 2 + ROW_GAP - block.minY;
+          entries.push(...move(block, reverse ? -offset : offset, top));
+          lastCenter = offset + center;
+          lastWidth = childWidth;
+          next = offset + max + GAP;
+          sideEnds[side] = offset + max + ROW_GAP;
         });
       } else if (layout.mode === 'matrix') {
         const blocks = childItems.map((child) => build(child, flow));
@@ -308,8 +332,9 @@ const DiagramLayout = (() => {
     const edges = nodes.filter((node) => node.parent_id != null).map((node) => {
       const from = byId.get(node.parent_id);
       const to = byId.get(node.id);
-      const points = simplifyPoints(edgePoints(from, to, raw, children.get(from.id)));
-      return { from: from.id, to: to.id, points, path: roundedOrthogonal(points) };
+      const points = simplifyPoints(edgePoints(from, to, raw, children.get(from.id), true));
+      const cornerRadius = from.linearRole ? 0 : 6;
+      return { from: from.id, to: to.id, points, cornerRadius, path: roundedOrthogonal(points, cornerRadius) };
     });
     for (const edge of connections) {
       const from = byId.get(edge.from), to = byId.get(edge.to);
@@ -342,11 +367,29 @@ const DiagramLayout = (() => {
       Math.abs(by - ay) / ((from.height + to.height) / 2);
   }
 
-  function edgePoints(from, to, nodes, siblings) {
+  function edgePoints(from, to, nodes, siblings, hierarchy = false) {
     const ax = from.x + from.width / 2;
     const ay = from.y + from.height / 2;
     const bx = to.x + to.width / 2;
     const by = to.y + to.height / 2;
+    if (hierarchy && from.linearRole === 'axis') {
+      const startX = from.linearReverse ? from.x : from.x + from.width;
+      if ((from.linearReverse ? bx <= startX : bx >= startX) && (to.y >= ay || to.y + to.height <= ay)) {
+        // Every topic shares this exact baseline, then has its own vertical stem.
+        return [[startX, ay], [bx, ay], [bx, by < ay ? to.y + to.height : to.y]];
+      }
+    }
+    if (hierarchy && from.linearRole === 'branch') {
+      const reverse = from.linearReverse;
+      const indent = Math.min(48, from.width / 3);
+      const trunkX = reverse ? from.x + from.width - indent / 2 : from.x + indent / 2;
+      const upwards = from.linearSide === 'top';
+      if ((upwards ? to.y + to.height <= from.y : to.y >= from.y + from.height) &&
+          (reverse ? to.x + to.width < trunkX : to.x > trunkX)) {
+        return [[trunkX, upwards ? from.y : from.y + from.height], [trunkX, by],
+          [reverse ? to.x + to.width : to.x, by]];
+      }
+    }
     const horizontal = horizontalConnection(from, to);
     // All siblings on one side share a junction halfway across the nearest
     // gap, even when individual widths or manual positions differ.
@@ -420,8 +463,9 @@ const DiagramLayout = (() => {
     return points;
   }
 
-  function roundedOrthogonal(waypoints) {
+  function roundedOrthogonal(waypoints, cornerRadius = 6) {
     const points = simplifyPoints(waypoints);
+    if (cornerRadius === 0) return points.map((point, index) => `${index ? 'L' : 'M'}${point[0]},${point[1]}`).join(' ');
     let path = `M${points[0][0]},${points[0][1]}`;
     for (let index = 1; index < points.length - 1; index++) {
       const previous = points[index - 1];
@@ -429,7 +473,7 @@ const DiagramLayout = (() => {
       const next = points[index + 1];
       const beforeLength = Math.hypot(corner[0] - previous[0], corner[1] - previous[1]);
       const afterLength = Math.hypot(next[0] - corner[0], next[1] - corner[1]);
-      const radius = Math.min(6, beforeLength / 2, afterLength / 2);
+      const radius = Math.min(cornerRadius, beforeLength / 2, afterLength / 2);
       const before = [corner[0] + (previous[0] - corner[0]) * radius / beforeLength,
         corner[1] + (previous[1] - corner[1]) * radius / beforeLength];
       const after = [corner[0] + (next[0] - corner[0]) * radius / afterLength,
