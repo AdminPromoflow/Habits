@@ -92,7 +92,7 @@ class DiagramViewport {
 
   setPersistenceKey(key, { keepView = false } = {}) {
     if (key === this.persistenceKey) return;
-    this.cancelInteraction();
+    if (!keepView) this.cancelInteraction();
     this.persistenceKey = key;
     this.lastSavedView = null;
     if (!keepView) {

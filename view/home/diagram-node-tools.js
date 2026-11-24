@@ -14,7 +14,10 @@ class DiagramNodeTools {
   }
 
   setClipboard(nodes, root) {
-    this.memory = { userId: S.user?.id, nodes: JSON.parse(JSON.stringify(nodes)), root };
+    const keys = new Set(nodes.map((node) => node.id));
+    const connections = this.home.connections.filter((edge) => keys.has(edge.from) && keys.has(edge.to));
+    this.memory = { userId: S.user?.id, nodes: JSON.parse(JSON.stringify(nodes)), root,
+      connections: connections.map((edge) => ({ ...edge })) };
     try { sessionStorage.setItem('diagram-clipboard', JSON.stringify(this.memory)); } catch { /* In-memory fallback. */ }
   }
 
@@ -46,6 +49,9 @@ class DiagramNodeTools {
       x: null, y: null,
     }));
     const combined = [...nodes, ...copies];
+    const connections = (clipboard.connections || []).filter((edge) => keys.has(edge.from) && keys.has(edge.to))
+      .map((edge) => ({ from: keys.get(edge.from), to: keys.get(edge.to) }));
+    if (home.connections.length + connections.length > 1000) { home.showStatus(t('diagram_connection_limit'), true); return; }
     const byId = new Map(combined.map((node) => [node.id, node]));
     for (const node of copies) {
       let cursor = node, depth = 0;
@@ -59,6 +65,7 @@ class DiagramNodeTools {
       home.showStatus(t('error_diagram_image_limit'), true); return;
     }
     home.nodes = combined;
+    home.connections.push(...connections);
     home.selectedKey = keys.get(clipboard.root);
     home.name = copies.find((node) => node.id === home.selectedKey).text;
     home.editing = false;
@@ -99,17 +106,23 @@ class DiagramNodeTools {
         home.reset();
         home.active = S.data.diagrams[0] || null;
         home.nodes = home.treeFor(home.active);
+        home.connections = home.connectionsFor(home.active);
         home.name = home.nodes[0].text;
         home.rememberDiagram();
       } else {
         const removed = new Set(home.branchNodes(key).map((item) => item.id));
         home.nodes = home.nodes.filter((item) => !removed.has(item.id));
+        home.connections = home.connections.filter((edge) => !removed.has(edge.from) && !removed.has(edge.to));
         for (const id of removed) { home.childDrafts.delete(id); home.submittedChildren.delete(id); home.draftOrigins.delete(id); }
         if (key === 'root') {
           // Keep the stable canvas anchor while preserving the other trees.
           const nextRoot = home.nodes.find((item) => item.parent_id === null);
           const previousKey = nextRoot.id;
           nextRoot.id = 'root';
+          home.connections = home.connections.map((edge) => ({
+            from: edge.from === previousKey ? 'root' : edge.from,
+            to: edge.to === previousKey ? 'root' : edge.to,
+          }));
           for (const item of home.nodes) if (item.parent_id === previousKey) item.parent_id = 'root';
         }
         home.selectedKey = node.parent_id || 'root';

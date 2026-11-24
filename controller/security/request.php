@@ -88,7 +88,11 @@ final class Request
         } catch (JsonException $error) {
             self::error('error_validation', 422);
         } catch (PDOException $error) {
-            $duplicate = $error->getCode() === '23000';
+            // SQLSTATE 23000 also covers CHECK/NOT NULL failures, including an
+            // outdated schema rejecting valid empty ideas. Only known unique
+            // and foreign-key conflicts mean an item already exists/is in use.
+            $duplicate = $error->getCode() === '23000'
+                && in_array((int) ($error->errorInfo[1] ?? 0), [1062, 1451, 1452], true);
             if (!$duplicate) {
                 error_log('MyRemarkable Mind database error: ' . $error->getMessage());
             }

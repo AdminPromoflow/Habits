@@ -12,6 +12,10 @@ La migración `009_diagram_node_checkbox.sql` añade `checkbox_state`: `NULL` si
 
 La migración `010_empty_diagram_nodes.sql` elimina únicamente la restricción `chk_diagram_node_text` que impedía guardar ideas vacías. Conserva los datos, las relaciones y los límites de longitud. El título del diagrama sigue siendo obligatorio. La migración selecciona la sintaxis correspondiente a MySQL o MariaDB y puede reintentarse si la restricción ya se eliminó. Debe aplicarse antes de habilitar el guardado de cuadros vacíos.
 
+La migración `011_diagram_connections.sql` añade `diagrams.connections_json` para las conexiones adicionales entre ideas. Aplicarla antes de habilitar el modelo que consulta este campo, incluso si todavía no se han creado conexiones. Las migraciones 010 y 011 quedaron aplicadas tanto en localhost como en Hostinger el 24 de noviembre de 2026; producción conservó su diagrama y doce nodos.
+
+La migración `011_diagram_connections.sql` añade `diagrams.connections_json`. La API expone `connections`, una lista de pares `{from, to}` de nodos existentes del mismo diagrama. Son conexiones adicionales independientes de la jerarquía; se validan con el mismo propietario, versión y transacción que los nodos. Omitir el campo conserva las conexiones válidas y retira aquellas cuyos cuadros se borraron o ahora son padre e hijo directo; `[]` elimina todas las conexiones adicionales. Los diagramas existentes empiezan sin conexiones adicionales. Debe aplicarse antes de habilitar los archivos actualizados.
+
 Antes de habilitar los archivos nuevos de `model/diagrams/` y `view/home/`, ejecutar desde la carpeta del proyecto en el servidor:
 
 ```sh

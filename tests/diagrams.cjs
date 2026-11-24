@@ -22,6 +22,7 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
   }
   const document = {
     activeElement: null,
+    elementFromPoint: () => null,
     addEventListener: (name, callback) => listen(documentListeners, name, callback),
     getElementById: (id) => elements.find((element) => element.id === id) || null,
     querySelector: (selector) => elements.find((element) => element.matches(selector)) || null,
@@ -91,6 +92,7 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
   const tool = element('diagram-tool', 'diagram-tool', controls);
   const more = element('diagram-more', 'diagram-handle diagram-handle-more', controls);
   const widthHandle = element('diagram-width', 'diagram-handle diagram-handle-arrows', controls);
+  const addHandle = element('diagram-add', 'diagram-handle diagram-handle-add', controls);
   const menu = element('diagram-menu', 'diagram-menu diagram-popover', root);
   const menuItem = element('diagram-menu-item', 'diagram-menu-item', menu);
   const checkbox = element('diagram-checkbox', 'diagram-task-checkbox', node);
@@ -151,6 +153,7 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
     clearTimeout: (id) => timers.delete(id),
   });
   vm.runInContext(fs.readFileSync('view/home/diagram-node-tools.js', 'utf8'), context);
+  vm.runInContext(fs.readFileSync('view/home/diagram-connections.js', 'utf8'), context);
   const HomePage = vm.runInContext(fs.readFileSync('view/home/home.js', 'utf8') + '\nHomePage;', context);
   const home = new HomePage();
   if (draft) {
@@ -169,7 +172,7 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
     return event;
   }
   return {
-    checkbox, checkboxTool, checkboxMenu, checkboxOptions, checkboxScopes,
+    checkbox, checkboxTool, checkboxMenu, checkboxOptions, checkboxScopes, addHandle,
     change: (target) => dispatch('change', target),
     home, state, timers, stage, field, root, node, controls, tool, more, widthHandle, menu, menuItem, outside, document, windowListeners, location, navigations, title, titleLabel, titleInput,
     addPicker() {
@@ -201,11 +204,12 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
       }));
       const controls = element(`diagram-controls-${id}`, 'diagram-controls', root);
       const widthHandle = element(`diagram-width-${id}`, 'diagram-handle diagram-handle-arrows', controls);
+      const addHandle = element(`diagram-add-${id}`, 'diagram-handle diagram-handle-add', controls);
       const field = Object.assign(element(`diagram-name-${id}`, '', node), {
         value, readOnly: true, scrollHeight: 24,
         setSelectionRange(start, end) { this.selectionStart = start; this.selectionEnd = end; },
       });
-      return { root, node, field, widthHandle, checkbox, checkboxScopes, checkboxOptions };
+      return { root, node, field, widthHandle, checkbox, checkboxScopes, checkboxOptions, addHandle };
     },
     pointer: (name, target = node, options = {}) => dispatch(name, target, {
       button: 0, buttons: 1, pointerId: 1, pointerType: 'mouse', isPrimary: true,
@@ -960,6 +964,32 @@ test('moving a branch carries its manually positioned descendants without changi
   assert.equal(byId('sibling').y, 20);
   pointer('pointerup', branch.node);
   await new Promise(setImmediate);
+  assert.equal(home.hasChanges(), false);
+});
+
+test('dragging a centered parent repeatedly translates its full branch without a position jump', async () => {
+  const { home, branch, pointer, click } = branchDragEditor();
+  const layout = vm.runInNewContext(fs.readFileSync('view/home/diagram-layout.js', 'utf8') + '\nDiagramLayout;');
+  home.positionTree = () => { home.plan = layout.arrange(home.nodes); };
+  home.positionTree();
+  home.viewport.scale = 2;
+  click(branch.node);
+  const before = JSON.parse(JSON.stringify(home.plan));
+  const parent = before.nodes.find(item => item.id === 'branch');
+  assert.notEqual(parent.y - before.origin.y, parent.baseY, 'fixture includes a recentered parent');
+  for (let drag = 1; drag <= 2; drag++) {
+    pointer('pointerdown', branch.node);
+    pointer('pointermove', branch.node, { clientX: 180, clientY: 140 });
+    for (const id of ['branch', 'leaf', 'inherited', 'sibling']) {
+      const old = before.nodes.find(item => item.id === id);
+      const current = home.plan.nodes.find(item => item.id === id);
+      const moves = id !== 'sibling';
+      assert.equal(current.x - home.plan.origin.x - (old.x - before.origin.x), moves ? 40 * drag : 0, id);
+      assert.equal(current.y - home.plan.origin.y - (old.y - before.origin.y), moves ? 20 * drag : 0, id);
+    }
+    pointer('pointerup', branch.node);
+    await new Promise(setImmediate);
+  }
   assert.equal(home.hasChanges(), false);
 });
 
@@ -2398,4 +2428,139 @@ test('Delete ignores text editing, unselected nodes, key repeats and competing g
   home.selectNode('branch');
   handleKey('Delete', branch.node);
   assert.equal(calls, 1);
+});
+
+test('viewport storage is scoped by account, diagram and application installation', () => {
+  const { home, state, location } = savedEditor();
+  state.user.id = 10;
+  home.positionTree();
+  const first = home.viewport.persistenceKey;
+  assert.ok(first.includes('"10","51"'));
+  home.mount();
+  assert.equal(home.viewport.persistenceKey, first);
+  home.active = { ...home.active, id: 52 };
+  home.positionTree();
+  const second = home.viewport.persistenceKey;
+  assert.notEqual(second, first);
+  state.user.id = 11;
+  home.positionTree();
+  const otherAccount = home.viewport.persistenceKey;
+  assert.notEqual(otherAccount, second);
+  location.href = 'http://localhost/another-installation/?diagram=52';
+  home.positionTree();
+  assert.notEqual(home.viewport.persistenceKey, otherAccount);
+  home.reset();
+  home.positionTree();
+  assert.equal(home.viewport.persistenceKey, null);
+});
+
+test('initial save binds the viewport to the new diagram while retaining draft camera movements', async () => {
+  const { home, state } = editor();
+  state.user.id = 10;
+  let resolve;
+  home.makeRequest = (action, data) => new Promise(done => { resolve = () => done({ ...data, id: 53, version: 1 }); });
+  const pending = home.save();
+  home.viewport.x = 83;
+  home.viewport.y = -45;
+  home.viewport.scale = 1.7;
+  resolve();
+  await pending;
+  assert.ok(home.viewport.persistenceKey.includes('"10","53"'));
+  assert.equal(home.viewport.persistenceOptions.keepView, true);
+  assert.equal(home.viewport.x, 83);
+  assert.equal(home.viewport.y, -45);
+  assert.equal(home.viewport.scale, 1.7);
+});
+
+test('dragging plus to an existing node creates one persisted connection without changing parents or creating a child', async () => {
+  const { home, branch, pointer, click, document, addNodeElement, state } = branchDragEditor();
+  const target = addNodeElement('sibling', 'Otra rama');
+  home.connectionTool.preview = () => {};
+  home.selectNode('branch');
+  const before = JSON.parse(JSON.stringify(home.nodes));
+  document.elementFromPoint = () => target.node;
+  pointer('pointerdown', branch.addHandle);
+  assert.ok(home.connectionTool.drag);
+  pointer('pointermove', branch.addHandle, { clientX: 230 });
+  assert.equal(home.connectionTool.drag.target, 'sibling');
+  assert.equal(target.node.classList.contains('is-connection-target'), true);
+  assert.equal(home.viewport.options.canInteract(), false, 'camera gestures pause while connecting');
+  pointer('pointerup', branch.addHandle, { clientX: 230 });
+  assert.equal(click(branch.addHandle).prevented, true, 'the post-drag click must not create a child');
+  await new Promise(setImmediate);
+  assert.deepEqual(JSON.parse(JSON.stringify(home.connections)), [{ from: 'branch', to: 'sibling' }]);
+  assert.deepEqual(JSON.parse(JSON.stringify(home.active.nodes)), before);
+  assert.equal(home.connectionTool.drag, null);
+  assert.equal(target.node.classList.contains('is-connection-target'), false);
+  assert.equal(branch.addHandle.hasPointerCapture(1), false);
+  assert.equal(home.hasChanges(), false);
+  const restored = editor({ draft: false, state: JSON.parse(JSON.stringify(state)) });
+  restored.home.render();
+  assert.deepEqual(JSON.parse(JSON.stringify(restored.home.connections)), [{ from: 'branch', to: 'sibling' }]);
+});
+
+test('plus clicks still create children and canceled or invalid drags never create connections', async () => {
+  const { home, branch, pointer, click, handleKey, document, windowListeners, node } = branchDragEditor();
+  home.connectionTool.preview = () => {};
+  home.selectNode('branch');
+  pointer('pointerdown', branch.addHandle);
+  pointer('pointerup', branch.addHandle);
+  assert.equal(click(branch.addHandle).prevented, false);
+  await home.handleAction('add-diagram-child', branch.addHandle);
+  assert.equal(home.nodes.length, 6);
+  home.editing = false;
+  home.selectNode('branch');
+  for (const ending of ['blank', 'self', 'parent', 'pointercancel', 'blur', 'Escape']) {
+    document.elementFromPoint = () => ending === 'self' ? branch.node : ending === 'parent' ? node : null;
+    pointer('pointerdown', branch.addHandle);
+    pointer('pointermove', branch.addHandle, { clientX: 250 });
+    if (ending === 'pointercancel') pointer('pointercancel', branch.addHandle);
+    else if (ending === 'blur') windowListeners.get('blur')();
+    else if (ending === 'Escape') handleKey('Escape', branch.addHandle);
+    else pointer('pointerup', branch.addHandle, { clientX: 250 });
+    assert.equal(click(branch.addHandle).prevented, true, ending);
+    assert.equal(home.connectionTool.drag, null);
+    assert.equal(home.connections.length, 0);
+    assert.equal(home.nodes.length, 6);
+  }
+});
+
+test('additional connections reject self, missing, parent-child and reversed duplicates', async () => {
+  const { home } = branchDragEditor();
+  for (const pair of [['root', 'root'], ['missing', 'branch'], ['branch', 'leaf'], ['leaf', 'branch']]) {
+    await home.connectionTool.connect(...pair);
+  }
+  assert.equal(home.connections.length, 0);
+  await home.connectionTool.connect('leaf', 'sibling');
+  const version = home.active.version;
+  await home.connectionTool.connect('sibling', 'leaf');
+  assert.equal(home.connections.length, 1);
+  assert.equal(home.active.version, version);
+});
+
+test('deleting a branch removes only its additional connections and leaves connected neighbors intact', async () => {
+  const { home } = branchDragEditor();
+  await home.connectionTool.connect('leaf', 'sibling');
+  await home.connectionTool.connect('root', 'leaf');
+  home.nodes.push({ id: 'other', parent_id: null, text: 'Other tree' });
+  await home.connectionTool.connect('sibling', 'other');
+  home.selectNode('branch');
+  await home.handleAction('delete-diagram-node');
+  assert.deepEqual(JSON.parse(JSON.stringify(home.active.connections)), [{ from: 'sibling', to: 'other' }]);
+  assert.deepEqual(home.nodes.map(n => n.id), ['root', 'sibling', 'other']);
+});
+
+test('copying a branch remaps its internal connections and omits external connections', async () => {
+  const { home } = branchDragEditor();
+  await home.connectionTool.connect('leaf', 'inherited');
+  await home.connectionTool.connect('leaf', 'sibling');
+  home.selectNode('branch');
+  await home.handleAction('copy-diagram-node');
+  home.selectNode('root');
+  await home.handleAction('paste-diagram-node');
+  const copied = new Set(home.branchNodes(home.selectedKey).map(n => n.id));
+  const internal = home.connections.filter(edge => copied.has(edge.from) && copied.has(edge.to));
+  assert.equal(internal.length, 1);
+  assert.equal(home.connections.length, 3);
+  assert.equal(home.connections.filter(edge => copied.has(edge.from) !== copied.has(edge.to)).length, 0);
 });

@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const { test } = require('node:test');
 
-function harness() {
+function harness({ storage = new Map(), storageError = false } = {}) {
   let now = 1000;
   let allowed = true;
   let starts = 0;
@@ -73,14 +73,18 @@ function harness() {
     });
   }
   const win = emitter();
-  const context = vm.createContext({ window: win, Date: { now: () => now } });
+  let writes = 0;
+  const context = vm.createContext({ window: win, Date: { now: () => now }, localStorage: {
+    getItem(key) { if (storageError) throw new Error('Storage blocked'); return storage.get(key) ?? null; },
+    setItem(key, value) { if (storageError) throw new Error('Storage blocked'); writes++; storage.set(key, value); },
+  } });
   const Viewport = vm.runInContext(fs.readFileSync('view/home/diagram-viewport.js', 'utf8') + '\nDiagramViewport;', context);
   const camera = new Viewport({ canInteract: () => allowed, onInteractionStart: () => starts++ });
   const surface = stage();
   const content = element();
   camera.mount(surface, content, { anchorX: 110, anchorY: 24 });
   return {
-    camera, surface, content, win, element, stage,
+    camera, surface, content, win, element, stage, storage, writes: () => writes,
     advance: (ms) => now += ms,
     setAllowed: (value) => allowed = value,
     starts: () => starts,
@@ -286,4 +290,109 @@ test('external editing constraints and modified browser gestures are left alone'
   assert.equal(camera.x, 0);
   assert.equal(camera.y, 0);
   assert.equal(camera.scale, 1);
+});
+
+test('pan and pinch zoom restore in a new page session with the same diagram key', () => {
+  const first = harness();
+  first.camera.setPersistenceKey('account-7:diagram-11');
+  first.surface.emit('wheel', { deltaX: 125, deltaY: -70 });
+  first.surface.emit('wheel', { ctrlKey: true, deltaY: -60, clientX: 600, clientY: 300 });
+  const expected = { x: first.camera.x, y: first.camera.y, scale: first.camera.scale };
+  const transform = first.content.style.transform;
+  const reopened = harness({ storage: first.storage });
+  reopened.camera.setPersistenceKey('account-7:diagram-11');
+  assert.deepEqual({ x: reopened.camera.x, y: reopened.camera.y, scale: reopened.camera.scale }, expected);
+  assert.equal(reopened.content.style.transform, transform);
+});
+
+test('reload during a background drag or Safari gesture keeps the latest visible frame', () => {
+  const first = harness();
+  first.camera.setPersistenceKey('diagram');
+  first.surface.emit('pointerdown');
+  first.surface.emit('pointermove', { clientX: 510, clientY: 315 });
+  const dragging = harness({ storage: first.storage });
+  dragging.camera.setPersistenceKey('diagram');
+  assert.equal(dragging.camera.x, 110);
+  assert.equal(dragging.camera.y, 65);
+  first.surface.emit('pointerup');
+  first.surface.emit('gesturestart');
+  first.surface.emit('gesturechange', { scale: 1.8, clientX: 450, clientY: 280 });
+  const gesturing = harness({ storage: first.storage });
+  gesturing.camera.setPersistenceKey('diagram');
+  assert.equal(gesturing.content.style.transform, first.content.style.transform);
+  assert.equal(gesturing.camera.scale, 1.8);
+});
+
+test('each diagram keeps its view and a fresh diagram starts centered at 100 percent', () => {
+  const { camera, surface, storage, content } = harness();
+  camera.setPersistenceKey('first');
+  surface.emit('wheel', { deltaX: 100, deltaY: 90 });
+  surface.emit('wheel', { ctrlKey: true, deltaY: -40 });
+  const firstTransform = content.style.transform;
+  camera.setPersistenceKey('second');
+  assert.equal(camera.x, 0);
+  assert.equal(camera.y, 0);
+  assert.equal(camera.scale, 1);
+  surface.emit('wheel', { deltaX: -50, deltaY: 20 });
+  camera.setPersistenceKey('first');
+  assert.equal(content.style.transform, firstTransform);
+  assert.deepEqual(JSON.parse(storage.get('second')), { x: 50, y: -20, scale: 1 });
+});
+
+test('sign-out reset forgets the current binding without clearing its saved view', () => {
+  const { camera, surface, content, storage } = harness();
+  camera.setPersistenceKey('user-a');
+  surface.emit('wheel', { deltaX: 200 });
+  const saved = storage.get('user-a');
+  camera.reset();
+  assert.equal(camera.persistenceKey, null);
+  assert.equal(storage.get('user-a'), saved);
+  camera.setPersistenceKey('user-b');
+  camera.mount(surface, content);
+  assert.equal(camera.x, 0);
+  camera.reset();
+  camera.setPersistenceKey('user-a');
+  camera.mount(surface, content);
+  assert.equal(camera.x, -200);
+});
+
+test('newly created diagram retains zoom and an active drag when its server ID arrives', () => {
+  const { camera, surface, storage } = harness();
+  surface.emit('wheel', { ctrlKey: true, deltaY: -50 });
+  surface.emit('pointerdown');
+  surface.emit('pointermove', { clientX: 510 });
+  const before = { x: camera.x, y: camera.y, scale: camera.scale };
+  camera.setPersistenceKey('new-id', { keepView: true });
+  assert.deepEqual(JSON.parse(storage.get('new-id')), before);
+  assert.equal(camera.isInteracting(), true);
+  surface.emit('pointermove', { clientX: 520 });
+  assert.equal(JSON.parse(storage.get('new-id')).x, before.x + 10);
+});
+
+test('reflow and unchanged renders do not overwrite or repeatedly save the view', () => {
+  const { camera, surface, storage, element, writes } = harness();
+  camera.setPersistenceKey('map');
+  surface.emit('wheel', { deltaY: -50 });
+  const before = storage.get('map'), count = writes();
+  camera.setPersistenceKey('map');
+  camera.render();
+  camera.mount(surface, element(), { anchorX: 500, anchorY: 300 });
+  assert.equal(storage.get('map'), before);
+  assert.equal(writes(), count);
+});
+
+test('malformed or unsupported stored views safely fall back to the default camera', () => {
+  for (const raw of ['{bad', 'null', '[]', '{}', '{"x":"0","y":0,"scale":1}', '{"x":1e400,"y":0,"scale":1}', '{"x":20,"y":10,"scale":0.1}', '{"x":20,"y":10,"scale":3.1}']) {
+    const { camera } = harness({ storage: new Map([['map', raw]]) });
+    camera.setPersistenceKey('map');
+    assert.equal(camera.x, 0);
+    assert.equal(camera.y, 0);
+    assert.equal(camera.scale, 1);
+  }
+  const { camera, surface } = harness({ storageError: true });
+  camera.setPersistenceKey('map');
+  surface.emit('wheel', { deltaX: 35 });
+  surface.emit('wheel', { ctrlKey: true, deltaY: -50 });
+  assert.notEqual(camera.x, 0);
+  assert.ok(camera.scale > 1);
 });

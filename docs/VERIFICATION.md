@@ -1,5 +1,13 @@
 # Verificación realizada
 
+## Cuadros vacíos rechazados y carga del diagrama — 24 de noviembre de 2026
+
+- Hostinger conservaba `chk_diagram_node_text`, que rechazaba las ideas vacías, y no tenía `diagrams.connections_json`. Sus migraciones llegaban hasta la 009. El mensaje «This item already exists or is in use» clasificaba incorrectamente cualquier SQLSTATE 23000 como duplicado.
+- Se aplicaron 010 y 011 mediante phpMyAdmin y se registraron los SHA-256 de los archivos locales. Antes y después se conservaron un diagrama y doce nodos; la restricción de texto vacío desapareció y la columna de conexiones quedó disponible. La 010 ya estaba aplicada en localhost; se aplicó la 011 con el migrador.
+- Safari volvió a cargar el diagrama y sus doce cuadros al pulsar Reintentar. La verificación automatizada en una base aislada pasó 147 comprobaciones HTTP y 7 de esquema/fuentes, incluido el guardado y la relectura de raíces e hijos vacíos.
+- `controller/security/request.php` distingue ahora duplicados/conflictos de claves foráneas de fallos CHECK, NOT NULL y columnas ausentes. Los fallos inesperados se registran en el servidor sin exponer detalles SQL al cliente. `php tests/request-errors.php`: ocho casos aprobados.
+- La corrección del esquema está aplicada en producción. El ajuste del controlador de errores quedó local: el administrador de archivos de Hostinger mostró «You don't have permissions to access this» al abrir `controller/`, por lo que no se subió ese archivo.
+
 ## Eliminar una rama con el teclado
 
 - Verificado el atajo Delete/Suprimir y Backspace/Retroceso sobre el cuadro seleccionado con foco. Usa la misma eliminación que la papelera: quita el cuadro y todos sus descendientes, conserva los otros árboles y guarda el resultado. Si se elimina la única idea principal se mantiene la confirmación existente del borrado completo.

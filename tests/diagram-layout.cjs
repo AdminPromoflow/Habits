@@ -100,6 +100,64 @@ test('horizontal and vertical directions position all branches on the chosen sid
   }
 });
 
+function assertParentsCentered(nodes, plan) {
+  for (const parent of plan.nodes) {
+    const axis = parent.layout.mode === 'horizontal' ? 'y'
+      : ['vertical', 'topdown'].includes(parent.layout.mode) ? 'x' : null;
+    if (!axis) continue;
+    const size = axis === 'x' ? 'width' : 'height';
+    const children = nodes.filter(item => item.parent_id === parent.id)
+      .map(item => plan.nodes.find(box => box.id === item.id));
+    if (!children.length) continue;
+    const centers = children.map(box => box[axis] + box[size] / 2);
+    assert.ok(Math.abs(parent[axis] + parent[size] / 2 -
+      (Math.min(...centers) + Math.max(...centers)) / 2) < 0.001,
+    `${parent.id} must be centered between its direct children`);
+  }
+}
+
+for (const [mode, direction] of [
+  ['horizontal', 'right'], ['horizontal', 'left'], ['horizontal', 'auto'],
+  ['vertical', 'top'], ['vertical', 'bottom'], ['vertical', 'auto'], ['topdown', 'auto'],
+]) {
+  test(`${mode}/${direction} centers every parent despite uneven sizes and descendant branches`, () => {
+    const nodes = fixture(mode);
+    nodes[0].layout.direction = direction;
+    nodes.find(item => item.id === 'c').layout = Layout.defaults('list');
+    const sizes = {
+      a: { width: 340, height: 144 }, a11: { width: 600, height: 280 },
+      b: { width: 100, height: 48 }, d: { width: 200, height: 132 },
+    };
+    const plan = Layout.arrange(nodes, sizes);
+    assertParentsCentered(nodes, plan);
+    noOverlaps(plan);
+  });
+}
+
+test('parents recenter after adding, resizing, moving and removing children, including nested ancestors', () => {
+  let nodes = fixture('horizontal');
+  nodes[0].layout.direction = 'right';
+  const sizes = {};
+  const check = () => {
+    const plan = Layout.arrange(nodes, sizes);
+    assertParentsCentered(nodes, plan);
+    assert.deepEqual(plain(Layout.arrange(plain(nodes), sizes)), plain(plan));
+    return plan;
+  };
+  check();
+  nodes.push(node('new-empty', 'a1', null, { text: '' }));
+  check();
+  sizes['new-empty'] = { width: 280, height: 240 };
+  check();
+  Object.assign(nodes.find(item => item.id === 'a11'), { x: 1200, y: 600 });
+  const moved = check();
+  const leaf = moved.nodes.find(item => item.id === 'a11');
+  assert.equal(leaf.x - moved.origin.x, 1200);
+  assert.equal(leaf.y - moved.origin.y, 600);
+  nodes = nodes.filter(item => item.id !== 'new-empty');
+  check();
+});
+
 test('topdown, list, linear and matrix honor their direction controls', () => {
   for (const mode of ['topdown', 'list', 'linear']) {
     const nodes = fixture(mode);
@@ -342,7 +400,7 @@ test('dragging a root moves only its own unpositioned descendants and round-trip
   Object.assign(second, { x: 800, y: -300 });
   const after = Layout.arrange(nodes);
   const movedRoot = after.nodes.find((item) => item.id === 'second');
-  assert.equal(movedRoot.x - after.origin.x, 800);
+  assert.equal(movedRoot.baseX, 800);
   assert.equal(movedRoot.y - after.origin.y, -300);
   for (const id of ['root', 'a', 'fixed']) {
     const old = before.nodes.find((item) => item.id === id);
@@ -352,8 +410,11 @@ test('dragging a root moves only its own unpositioned descendants and round-trip
   }
   const oldChild = before.nodes.find((item) => item.id === 'b');
   const child = after.nodes.find((item) => item.id === 'b');
-  assert.equal(child.x - movedRoot.x, oldChild.x - oldRoot.x);
+  assert.equal(child.x - after.origin.x - movedRoot.baseX, oldChild.x - before.origin.x - oldRoot.baseX);
   assert.equal(child.y - movedRoot.y, oldChild.y - oldRoot.y);
+  const fixed = after.nodes.find((item) => item.id === 'fixed');
+  assert.equal(movedRoot.x + movedRoot.width / 2,
+    (child.x + child.width / 2 + fixed.x + fixed.width / 2) / 2);
   assert.deepEqual(plain(Layout.arrange(plain(nodes))), plain(after));
 });
 
@@ -414,8 +475,8 @@ test('connectors have horizontal/vertical segments, gently rounded turns and bou
   }
 });
 
-test('aligned nodes connect with a straight segment, while offset nodes get small rounded elbows', () => {
-  const nodes = [node('root'), node('a', 'root', null, { x: 400, y: 0 })];
+test('aligned nodes connect with a straight segment, while offset free-form nodes get small rounded elbows', () => {
+  const nodes = [node('root', null, Layout.defaults('free')), node('a', 'root', null, { x: 400, y: 0 })];
   let path = Layout.arrange(nodes).edges[0].path;
   assert.deepEqual(pathCommands(path).map((part) => part.command), ['M', 'L']);
   nodes[1].x = 20;
@@ -511,5 +572,23 @@ test('manually staggered siblings keep one shared midpoint instead of separate c
   const expected = (root.x + root.width + Math.min(...plan.nodes.filter(n=>n.id!=='root').map(n=>n.x))) / 2;
   for (const edge of plan.edges) {
     for (const part of pathCommands(edge.path).filter(p=>p.command==='Q')) assert.equal(part.numbers[0], expected);
+  }
+});
+
+test('additional connections use the existing orthogonal style without moving nodes or changing their parents', () => {
+  for (const mode of Layout.modes) {
+    const nodes = fixture(mode);
+    const before = JSON.stringify(nodes);
+    const base = Layout.arrange(nodes);
+    const from = nodes[1].id, to = nodes[nodes.length - 1].id;
+    const linked = Layout.arrange(nodes, {}, [{ from, to }]);
+    assert.deepEqual(linked.nodes, base.nodes, mode);
+    assert.equal(linked.edges.length, base.edges.length + 1, mode);
+    assert.equal(JSON.stringify(nodes), before, mode);
+    const edge = linked.edges.at(-1);
+    const endpoints = assertRoundedOrthogonal(edge.path);
+    assert.ok(onBoundary(endpoints.start, linked.nodes.find(n => n.id === from)), mode);
+    assert.ok(onBoundary(endpoints.end, linked.nodes.find(n => n.id === to)), mode);
+    assert.equal(edge.path, Layout.connectionPath(linked.nodes.find(n => n.id === from), linked.nodes.find(n => n.id === to), linked.nodes));
   }
 });
