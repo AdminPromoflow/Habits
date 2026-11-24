@@ -32,14 +32,18 @@ class DiagramLinkNavigation {
   incoming(node, diagrams = this.catalog()) {
     const current = this.home.active?.id;
     return this.edges(diagrams).filter(edge => edge.target_diagram === current &&
-      (edge.target_node === node.id || (edge.target_node === null && node.id === 'root')) &&
+      edge.target_node === node.id &&
       !(edge.diagram_id === current && edge.node_id === node.id) &&
       // An explicit reciprocal link already provides this return destination.
       !(node.link?.diagram_id === edge.diagram_id && node.link?.node_id === edge.node_id));
   }
 
+  diagramEdges(diagrams = this.catalog()) {
+    return this.edges(diagrams).filter(edge => edge.target_node === null && edge.diagram_id !== edge.target_diagram);
+  }
+
   key(id) {
-    return `diagram-trail:v1:${JSON.stringify([new URL(location.href).pathname, String(S.user?.id || ''), String(id)])}`;
+    return `diagram-trail:v2:${JSON.stringify([new URL(location.href).pathname, String(S.user?.id || ''), String(id)])}`;
   }
 
   read(id) {
@@ -72,7 +76,7 @@ class DiagramLinkNavigation {
 
   trail(id = this.home.active?.id, diagrams = this.catalog()) {
     if (!diagrams.some(diagram => diagram.id === id)) return [];
-    const edges = this.edges(diagrams);
+    const edges = this.diagramEdges(diagrams);
     const saved = this.read(id);
     if (this.valid(saved, id, diagrams, edges)) return saved.map(entry => ({ ...entry }));
     const trail = [{ diagram_id: id, node_id: null }], seen = new Set([id]);
@@ -95,7 +99,7 @@ class DiagramLinkNavigation {
   }
 
   prepare(link, sourceKey, { returning = false, trail = null } = {}) {
-    if (link.diagram_id === this.home.active?.id) return;
+    if (link.node_id !== null || link.diagram_id === this.home.active?.id) return;
     let next = trail?.map(entry => ({ ...entry }));
     if (!next) {
       const current = this.trail();
@@ -111,23 +115,47 @@ class DiagramLinkNavigation {
     this.write(next);
   }
 
+  children(diagrams = this.catalog(), trail = this.trail(this.home.active?.id, diagrams)) {
+    const seen = new Set(trail.map(entry => entry.diagram_id));
+    return this.diagramEdges(diagrams).filter(edge => {
+      if (edge.diagram_id !== this.home.active?.id || seen.has(edge.target_diagram)) return false;
+      seen.add(edge.target_diagram);
+      return true;
+    });
+  }
+
   html() {
     const diagrams = this.catalog(), trail = this.trail(this.home.active?.id, diagrams);
-    if (trail.length < 2) return '';
+    const children = this.children(diagrams, trail);
+    if (trail.length < 2 && !children.length) return '';
     const items = trail.map((entry, index) => {
       const name = diagrams.find(diagram => diagram.id === entry.diagram_id).name;
       const current = index === trail.length - 1;
-      return `<li>${index ? '<span class="diagram-trail-separator" aria-hidden="true">›</span>' : ''}${current
-        ? `<span aria-current="page" title="${esc(name)}">${esc(name)}</span>`
-        : `<button type="button" data-action="diagram-link-ancestor" data-trail-index="${index}" title="${esc(name)}">${esc(name)}</button>`}</li>`;
+      return `<li>${index ? '<span class="diagram-trail-separator" aria-hidden="true">›</span>' : ''}<button type="button"
+        data-action="diagram-link-ancestor" data-trail-index="${index}" ${current ? 'aria-current="page"' : ''}
+        title="${esc(name)}">${esc(name)}</button></li>`;
     }).join('');
-    return `<nav class="diagram-link-trail" aria-label="${esc(t('diagram_link_path'))}"><ol>${items}</ol></nav>`;
+    const descendants = children.length ? `<li class="diagram-trail-children"><span class="diagram-trail-separator" aria-hidden="true">›</span>
+      <ul aria-label="${esc(t('diagram_link_children'))}">${children.map(edge => {
+        const name = diagrams.find(diagram => diagram.id === edge.target_diagram).name;
+        return `<li><button type="button" data-action="diagram-link-child" data-child-diagram="${edge.target_diagram}" title="${esc(name)}">${esc(name)}</button></li>`;
+      }).join('')}</ul></li>` : '';
+    return `<nav class="diagram-link-trail" aria-label="${esc(t('diagram_link_path'))}"><ol>${items}${descendants}</ol></nav>`;
   }
 
   async visit(index) {
     const trail = this.trail(), target = trail[index];
-    if (!target || index === trail.length - 1) return;
-    return this.home.links.follow({ diagram_id: target.diagram_id, node_id: target.node_id },
+    if (!target) return;
+    return this.home.links.follow({ diagram_id: target.diagram_id, node_id: null },
       { returning: true, trail: trail.slice(0, index + 1) });
+  }
+
+  async visitChild(id) {
+    const edge = this.children().find(item => item.target_diagram === id);
+    if (!edge) return;
+    const trail = this.trail();
+    trail[trail.length - 1].node_id = edge.node_id;
+    trail.push({ diagram_id: id, node_id: null });
+    return this.home.links.follow({ diagram_id: id, node_id: null }, { trail });
   }
 }

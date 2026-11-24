@@ -6,19 +6,81 @@ class DiagramLinks {
     this.busy = false;
     this.arrival = null;
     this.navigation = new DiagramLinkNavigation(home);
+    const show = event => {
+      const button = event.target.closest?.('[data-topic-link-details]');
+      if (button) this.showTooltip(button);
+    };
+    const leave = event => {
+      if (this.tooltip?.contains(event.relatedTarget) || this.tooltipButton?.contains(event.relatedTarget)) return;
+      this.hideTooltip();
+    };
+    document.addEventListener('pointerover', show);
+    document.addEventListener('focusin', show);
+    document.addEventListener('pointerout', leave);
+    document.addEventListener('focusout', leave);
+    document.addEventListener('pointerdown', () => this.hideTooltip());
+    document.addEventListener('click', () => this.hideTooltip());
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') this.hideTooltip(); });
+    window.addEventListener('resize', () => this.hideTooltip());
+    window.addEventListener('scroll', event => { if (!this.tooltip?.contains(event.target)) this.hideTooltip(); }, true);
   }
 
   badge(node) {
     const returns = this.navigation.incoming(node);
-    const arrow = direction => `<span class="diagram-link-direction" aria-hidden="true">${direction === 'back' ? '←' : '→'}</span>`;
-    const forward = node.link ? `<button type="button" class="diagram-topic-link" data-action="open-diagram-link"
-      aria-label="${esc(t('diagram_link_open'))}" title="${esc(t(this.navigation.direction(node.link) === 'back' ? 'diagram_link_parent' : 'diagram_link_child'))}">${icon('link')}${arrow(this.navigation.direction(node.link))}</button>` : '';
-    const back = returns.length === 1 ? `<button type="button" class="diagram-topic-link" data-action="open-diagram-return"
-      data-return-diagram="${returns[0].diagram_id}" data-return-node="${esc(returns[0].node_id)}"
-      aria-label="${esc(this.returnLabel(returns[0]))}" title="${esc(this.returnLabel(returns[0]))}">${icon('link')}${arrow('back')}</button>`
-      : returns.length ? `<button type="button" class="diagram-topic-link" data-action="choose-diagram-return"
-      aria-label="${esc(t('diagram_link_returns'))}" title="${esc(t('diagram_link_returns'))}">${icon('link')}${arrow('back')}<span class="diagram-link-count">${returns.length}</span></button>` : '';
+    const forward = node.link?.node_id ? this.arrowButton('open-diagram-link', this.navigation.direction(node.link),
+      t('diagram_link_open'), [this.targetDetails(node.link)]) : '';
+    const details = returns.map(edge => ({ diagram: edge.diagram_name, topic: edge.text || t('diagram_link_untitled') }));
+    const back = returns.length === 1 ? this.arrowButton('open-diagram-return', 'back', this.returnLabel(returns[0]), details,
+      `data-return-diagram="${returns[0].diagram_id}" data-return-node="${esc(returns[0].node_id)}"`)
+      : returns.length ? this.arrowButton('choose-diagram-return', 'back', t('diagram_link_returns'), details) : '';
     return forward || back ? `<div class="diagram-topic-links">${forward}${back}</div>` : '';
+  }
+
+  targetDetails(link) {
+    const diagram = this.navigation.catalog().find(item => item.id === link.diagram_id);
+    const node = diagram?.nodes?.find(item => item.id === link.node_id);
+    return { diagram: diagram?.name || t('diagram_link_unavailable'),
+      topic: node ? node.text || t('diagram_link_untitled') : t('diagram_link_unavailable') };
+  }
+
+  arrowButton(action, direction, label, details, attributes = '') {
+    const description = details.map(item => `${t('diagram_link_diagram')}: ${item.diagram}. ${t('diagram_link_topic_name')}: ${item.topic}`).join('\n');
+    return `<button type="button" class="diagram-topic-link" data-action="${action}" ${attributes}
+      data-topic-link-details="${esc(JSON.stringify(details))}" aria-label="${esc(label)}" aria-description="${esc(description)}">
+      <span class="diagram-link-direction" aria-hidden="true">${direction === 'back' ? '←' : '→'}</span></button>`;
+  }
+
+  detailsHtml(details) {
+    return details.map(item => `<span class="diagram-link-detail"><span class="diagram-link-detail-label">${esc(t('diagram_link_diagram'))}</span>
+      <strong>${esc(item.diagram)}</strong><span class="diagram-link-detail-label">${esc(t('diagram_link_topic_name'))}</span>
+      <span class="diagram-link-detail-topic">${esc(item.topic)}</span></span>`).join('');
+  }
+
+  showTooltip(button) {
+    if (this.tooltipButton === button) return;
+    this.hideTooltip();
+    const details = JSON.parse(button.dataset.topicLinkDetails);
+    const tooltip = document.createElement('div');
+    tooltip.id = 'diagram-topic-tooltip';
+    tooltip.className = 'diagram-link-tooltip';
+    tooltip.setAttribute('role', 'tooltip');
+    tooltip.innerHTML = this.detailsHtml(details);
+    document.body.append(tooltip);
+    button.setAttribute('aria-describedby', tooltip.id);
+    this.tooltip = tooltip;
+    this.tooltipButton = button;
+    const anchor = button.getBoundingClientRect(), box = tooltip.getBoundingClientRect();
+    const left = Math.max(8, Math.min(anchor.right - box.width, window.innerWidth - box.width - 8));
+    const top = anchor.bottom + 8 + box.height <= window.innerHeight ? anchor.bottom + 8 : Math.max(8, anchor.top - box.height - 8);
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+  }
+
+  hideTooltip() {
+    this.tooltipButton?.removeAttribute('aria-describedby');
+    this.tooltip?.remove();
+    this.tooltip = null;
+    this.tooltipButton = null;
   }
 
   returnLabel(edge) {
@@ -30,7 +92,8 @@ class DiagramLinks {
     const returns = this.navigation.incoming(node);
     openModal('diagram_link_returns', `<div class="diagram-return-list">${returns.map(edge =>
       `<button type="button" class="btn secondary" data-action="open-diagram-return" data-return-diagram="${edge.diagram_id}"
-        data-return-node="${esc(edge.node_id)}"><span aria-hidden="true">←</span>${esc(this.returnLabel(edge))}</button>`).join('')}</div>`);
+        data-return-node="${esc(edge.node_id)}" aria-label="${esc(this.returnLabel(edge))}"><span aria-hidden="true">←</span>
+        ${this.detailsHtml([{ diagram: edge.diagram_name, topic: edge.text || t('diagram_link_untitled') }])}</button>`).join('')}</div>`);
   }
 
   async open() {

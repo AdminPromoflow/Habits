@@ -5,7 +5,7 @@ class HomePage extends PageController {
     super(['create-diagram', 'retry-diagram', 'toggle-diagram-menu', 'diagram-layout', 'add-diagram-child', 'add-diagram-sibling',
       'diagram-checkbox-menu', 'diagram-checkbox-state', 'toggle-diagram-picker', 'select-diagram',
       'copy-diagram-node', 'cut-diagram-node', 'paste-diagram-node', 'delete-diagram-node', 'image-diagram-node', 'labels-diagram-node',
-      'link-diagram-node', 'open-diagram-link', 'open-diagram-return', 'choose-diagram-return', 'diagram-link-ancestor']);
+      'link-diagram-node', 'open-diagram-link', 'open-diagram-return', 'choose-diagram-return', 'diagram-link-ancestor', 'diagram-link-child']);
     this.nodeTools = new DiagramNodeTools(this);
     this.links = new DiagramLinks(this);
     this.generation = 0;
@@ -203,6 +203,7 @@ class HomePage extends PageController {
     clearTimeout(this.timer);
     this.generation++;
     this.links?.navigation.memory.clear();
+    this.links?.hideTooltip();
     this.connectionTool?.cancel();
     this.connectionTool?.clearSelection();
     this.finishNodeDrag(false);
@@ -263,6 +264,7 @@ class HomePage extends PageController {
       createDisabled: this.switching ? 'disabled' : '',
       diagramLabel: t('diagram_canvas'),
       diagramToolbar: this.toolbarContent(),
+      linkNavigation: this.links.navigation.html(),
       content: this.stageContent(),
     });
   }
@@ -341,7 +343,6 @@ class HomePage extends PageController {
       `<button type="button" class="diagram-picker-option" role="menuitemradio" data-action="select-diagram" data-id="${esc(diagram.id)}" aria-checked="${diagram.id === this.active?.id}" tabindex="-1">${esc(diagram.name.replace(/\s+/g, ' ').trim())}</button>`).join('');
     const selectedName = this.draft ? t('diagram_default_name') : this.active?.name || t('my_diagrams');
     return renderTemplate('diagram-toolbar', {
-      linkNavigation: this.links.navigation.html(),
       label: t('my_diagrams'),
       selectedName: esc(selectedName.replace(/\s+/g, ' ').trim()),
       triggerLabel: esc(`${t('my_diagrams')}: ${selectedName}`),
@@ -357,6 +358,8 @@ class HomePage extends PageController {
     if (create) create.disabled = this.switching;
     const toolbar = document.getElementById('diagram-toolbar');
     if (toolbar && !this.pickerOpen) toolbar.innerHTML = this.toolbarContent();
+    const navigation = document.getElementById('diagram-canvas-navigation');
+    if (navigation) navigation.innerHTML = this.links.navigation.html();
   }
 
   openDiagramPicker(last = false) {
@@ -720,6 +723,7 @@ class HomePage extends PageController {
   }
 
   drawStage() {
+    this.links.hideTooltip();
     const stage = document.getElementById('mindmap-stage');
     if (stage) stage.innerHTML = this.stageContent();
     this.mount();
@@ -1044,6 +1048,7 @@ class HomePage extends PageController {
 
   async handleAction(action, button) {
     if (action === 'diagram-link-ancestor') return this.links.navigation.visit(Number(button.dataset.trailIndex));
+    if (action === 'diagram-link-child') return this.links.navigation.visitChild(Number(button.dataset.childDiagram));
     if (action === 'toggle-diagram-picker') return this.pickerOpen ? this.closeDiagramPicker(true) : this.openDiagramPicker();
     if (action === 'select-diagram') return this.openDiagram(button.dataset.id);
     if (action === 'retry-diagram') return this.save();
