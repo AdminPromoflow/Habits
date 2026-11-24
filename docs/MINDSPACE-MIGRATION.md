@@ -90,3 +90,12 @@ Verificar All, Shared with me, Shared by me e Invitations; elegir un participant
 Pruebas: `node --test tests/mindspace.cjs tests/diagrams.cjs tests/sharing.cjs` y `PHP_BIN=/opt/homebrew/bin/php python3 tests/functional.py`. Esta actualización se verifica localmente; no constituye una publicación en Hostinger.
 
 Validación local del 24 de noviembre de 2026: migraciones 015 y 016 aplicadas sin reemplazar datos; 192 pruebas JavaScript, 244 comprobaciones HTTP y nueve comprobaciones de esquema/código aprobadas. Sintaxis PHP y JavaScript correcta. En el navegador se verificaron las cuatro pestañas, participantes, New/Rename/Share/Delete, las casillas independientes, guardado y recarga de notas compartidas, movimiento con permiso Move sin Edit, bloqueo de edición de diagramas, actualización de permisos y restauración del catálogo privado al salir. Evidencia: `tests/.runtime/sharing-permissions.jpg`. El correo saliente local está desactivado (`mail_transport=disabled`); las notificaciones internas están verificadas.
+
+## Corrección en Hostinger, 24 de noviembre de 2026
+
+El formulario publicado devolvía `error_mindspace_sharing_setup`: la interfaz estaba actualizada, pero `u348170507_habits` solo tenía las migraciones hasta 014 y no existía `mindspace_shares`. Se aplicaron los archivos originales 015 y 016 mediante la sesión de phpMyAdmin y se registraron sus checksums:
+
+- 015: `a9bad33c6ad0f0314a33fd4f468fff88321e4fa22b8dadce29ea72bd030b9c8b`
+- 016: `de8df8f0b112e0b146e45ea8e2d979bbfc7ce22ceb7d5c29ff841c1a63ac5d07`
+
+La comprobación posterior confirmó ambos checksums y las cuatro columnas de permisos. Antes y después se conservaron los conteos: un usuario, dos espacios, un elemento, cero diagramas y cero nodos. No se envió la invitación del formulario abierto ni se alteró su texto. El usuario puede reintentar el envío; el mensaje anterior permanece en el formulario hasta la siguiente solicitud. Evidencia: `tests/.runtime/hostinger-sharing-migrations-015-016.png`.
