@@ -123,9 +123,7 @@ class MindSpaceEditors {
 
   sheet() {
     const sheet = this.space.draft, evaluator = new MindSpaceSheet(sheet);
-    return `<div class="ms-sheet"><div class="ms-editor-toolbar"><button class="btn secondary" data-action="ms-sheet-row" ${sheet.rows >= 200 ? 'disabled' : ''}>${esc(t('ms_add_row'))}</button>
-      <button class="btn secondary" data-action="ms-sheet-column" ${sheet.columns >= 52 ? 'disabled' : ''}>${esc(t('ms_add_column'))}</button>
-      <button class="btn ghost" data-action="ms-sheet-export">${esc(t('ms_export_csv'))}</button></div>
+    return `<div class="ms-sheet">
       <div class="ms-formula-bar"><span id="ms-cell-address">${this.cell}</span><span aria-hidden="true">ƒx</span><input data-ms-formula aria-label="${esc(t('ms_formula'))}" maxlength="2000" value="${esc(sheet.cells?.[this.cell] || '')}"></div>
       <div class="ms-sheet-scroll"><table aria-label="${esc(this.space.active.name)}"><thead><tr><th></th>${Array.from({ length:sheet.columns }, (_,col) => `<th scope="col">${MindSpaceSheet.column(col)}</th>`).join('')}</tr></thead><tbody>
       ${Array.from({ length:sheet.rows }, (_,row) => `<tr><th scope="row">${row + 1}</th>${Array.from({ length:sheet.columns }, (_,col) => {
