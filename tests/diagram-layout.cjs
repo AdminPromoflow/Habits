@@ -475,6 +475,60 @@ test('connectors have horizontal/vertical segments, gently rounded turns and bou
   }
 });
 
+for (const horizontal of ['auto', 'ltr', 'rtl']) {
+  for (const vertical of ['auto', 'bottom', 'top']) {
+    test(`list ${horizontal}/${vertical} uses shared side stems and enters every child at its midline`, () => {
+      const nodes = fixture('list');
+      Object.assign(nodes[0].layout, { horizontal, vertical });
+      const sizes = Object.fromEntries(nodes.map((n, i) => [n.id, {
+        width: [100, 220, 600][i % 3], height: [40, 84, 160][i % 3],
+      }]));
+      const plan = Layout.arrange(nodes, sizes);
+      const stems = new Map();
+      for (const edge of plan.edges) {
+        const parent = plan.nodes.find(n => n.id === edge.from);
+        const child = plan.nodes.find(n => n.id === edge.to);
+        const { start, end } = assertRoundedOrthogonal(edge.path);
+        assert.deepEqual(end, [horizontal === 'rtl' ? child.x + child.width : child.x,
+          child.y + child.height / 2]);
+        assert.equal(start[1], vertical === 'top' ? parent.y : parent.y + parent.height);
+        assert.ok(horizontal === 'rtl' ? start[0] > parent.x + parent.width / 2
+          : start[0] < parent.x + parent.width / 2, 'stem starts near the leading side, not the center');
+        if (stems.has(parent.id)) assert.deepEqual(start, stems.get(parent.id));
+        stems.set(parent.id, start);
+        const points = plain(edge.points);
+        assert.equal(points.length, 3, 'one shared vertical stem and one horizontal branch');
+        assert.equal(points[0][0], points[1][0]);
+        assert.equal(points[1][1], points[2][1]);
+        assert.ok(horizontal === 'rtl' ? points[1][0] > end[0] : points[1][0] < end[0]);
+        for (const box of plan.nodes.filter(n => n.id !== parent.id && n.id !== child.id)) {
+          for (let i = 1; i < points.length; i++) {
+            const [a, b] = [points[i - 1], points[i]];
+            const crosses = a[0] === b[0]
+              ? a[0] > box.x && a[0] < box.x + box.width && Math.max(a[1], b[1]) > box.y && Math.min(a[1], b[1]) < box.y + box.height
+              : a[1] > box.y && a[1] < box.y + box.height && Math.max(a[0], b[0]) > box.x && Math.min(a[0], b[0]) < box.x + box.width;
+            assert.ok(!crosses, `${edge.from} -> ${edge.to} crosses ${box.id}`);
+          }
+        }
+      }
+      noOverlaps(plan);
+    });
+  }
+}
+
+test('list side stems apply only to list parents and leave extra connections on the general route', () => {
+  const nodes = fixture('list');
+  nodes.find(n => n.id === 'a').layout = { ...Layout.defaults('vertical'), direction: 'bottom' };
+  const plan = Layout.arrange(nodes, {}, [{ from: 'b', to: 'c' }]);
+  const a = plan.nodes.find(n => n.id === 'a');
+  for (const edge of plan.edges.filter(e => e.from === 'a')) {
+    assert.deepEqual(assertRoundedOrthogonal(edge.path).start, [a.x + a.width / 2, a.y + a.height]);
+  }
+  const extra = plan.edges.at(-1);
+  assert.equal(extra.path, Layout.connectionPath(plan.nodes.find(n => n.id === 'b'),
+    plan.nodes.find(n => n.id === 'c'), plan.nodes));
+});
+
 test('aligned nodes connect with a straight segment, while offset free-form nodes get small rounded elbows', () => {
   const nodes = [node('root', null, Layout.defaults('free')), node('a', 'root', null, { x: 400, y: 0 })];
   let path = Layout.arrange(nodes).edges[0].path;

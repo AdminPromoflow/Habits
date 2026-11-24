@@ -372,6 +372,15 @@ const DiagramLayout = (() => {
     const ay = from.y + from.height / 2;
     const bx = to.x + to.width / 2;
     const by = to.y + to.height / 2;
+    if (hierarchy && from.layout.mode === 'list') {
+      // Outline branches share a stem near the leading edge of their parent
+      // and enter each child through that same side, at the child's midline.
+      const reverse = from.layout.horizontal === 'rtl';
+      const inset = Math.min(48, from.width / 3) / 2;
+      const trunkX = reverse ? from.x + from.width - inset : from.x + inset;
+      const startY = from.layout.vertical === 'top' ? from.y : from.y + from.height;
+      return [[trunkX, startY], [trunkX, by], [reverse ? to.x + to.width : to.x, by]];
+    }
     if (hierarchy && from.linearRole === 'axis') {
       const startX = from.linearReverse ? from.x : from.x + from.width;
       if ((from.linearReverse ? bx <= startX : bx >= startX) && (to.y >= ay || to.y + to.height <= ay)) {
