@@ -79,7 +79,9 @@ trait AccessPolicy
         if (!$h) {
             fail('error_not_found', 404);
         }
-        $a = $this->access($h, null, $lock);
+        $a = ($this->workspaceHabit['id'] ?? null) === $id
+            ? ['permission' => $this->workspaceHabit['permission'], 'progress_visibility' => 'none']
+            : $this->access($h, null, $lock);
         if (self::RANK[$a['permission']] < self::RANK[$need]) {
             fail('error_forbidden', 403);
         }

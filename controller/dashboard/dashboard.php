@@ -13,6 +13,9 @@ final class DashboardController
         if ($action === 'timezones') {
             return DateTimeZone::listIdentifiers();
         }
+        if ($action === 'notifications') {
+            return (new DashboardModel($this->db, $this->user))->notifications();
+        }
         if ($action === 'readNotifications') {
             $this->db->run('UPDATE notifications SET is_read=1 WHERE user_id=?', [
                 $this->user['id'],

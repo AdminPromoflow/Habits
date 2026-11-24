@@ -49,6 +49,7 @@ return [
         'view/calendar/calendar.js',
         'view/progress/progress.js',
         'view/sharing/sharing.js',
+        'view/sharing/workspace.js',
         'view/profile/profile.js',
         'view/admin/admin.js',
         'view/layout/layout.js',

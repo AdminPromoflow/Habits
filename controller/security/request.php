@@ -4,7 +4,7 @@ declare(strict_types=1);
 /** Shared HTTP, CSRF, authentication and JSON boundary for every AJAX endpoint. */
 final class Request
 {
-    private const READ_ACTIONS = ['bootstrap', 'data', 'group', 'admin', 'timezones', 'diagrams', 'mindspace', 'sharedMindSpace'];
+    private const READ_ACTIONS = ['bootstrap', 'data', 'group', 'admin', 'timezones', 'diagrams', 'mindspace', 'sharedMindSpace', 'notifications'];
     private const PUBLIC_ACTIONS = [
         'bootstrap',
         'login',
@@ -40,7 +40,7 @@ final class Request
                 fail('error_method', 405);
             }
 
-            $data = $method === 'POST' ? self::body(in_array($action, ['saveDiagram','saveMindSpaceItem'], true) ? 3145728 : 100000) : $_GET;
+            $data = $method === 'POST' ? self::body(in_array($action, ['saveDiagram','saveMindSpaceItem','sharedMindSpaceAction'], true) ? 3145728 : 100000) : $_GET;
             $db = database();
             $auth = new Auth($db);
             $user = in_array($action, self::PUBLIC_ACTIONS, true)

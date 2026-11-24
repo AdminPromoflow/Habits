@@ -328,6 +328,7 @@ class HomePage extends PageController {
   }
 
   beginTitleEditing() {
+    if (S.sharedWorkspace && !S.sharedWorkspace.permissions.edit) return;
     if ((!this.active && !this.draft) || this.titleEditing || this.layoutOpen || this.drag || this.resizing) return;
     this.element('name')?.blur();
     this.commitName();
@@ -458,7 +459,8 @@ class HomePage extends PageController {
       url.searchParams.delete('topic');
       if (topic !== undefined) url.searchParams.set('topic', topic ?? 'overview');
       // A document navigation reloads the editor and reads the selected tree afresh.
-      location.assign(url.href);
+      if (S.sharedWorkspace) { history.replaceState(null, '', url.href); this.reset(); render(); }
+      else location.assign(url.href);
     } finally {
       if (generation === this.generation) {
         this.switching = false;
@@ -634,6 +636,7 @@ class HomePage extends PageController {
   }
 
   beginEditing() {
+    if (S.sharedWorkspace && !S.sharedWorkspace.permissions.edit) return;
     if (!this.active && !this.draft) return;
     this.selected = true;
     this.menuOpen = false;

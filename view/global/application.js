@@ -3,6 +3,7 @@ async function bootstrap() {
   if (S.user?.id !== r.user?.id) {
     if (S.user) pageControllers.home.nodeTools.clearClipboard();
     pageControllers.home.reset();
+    S.sharedWorkspace = null; S.ownedWorkspace = null; S.sharePerson = null; S.sharingTab = 'all';
   }
   Object.assign(S, {
     user: r.user,
@@ -16,6 +17,11 @@ async function bootstrap() {
   if (!S.date) S.date = today();
   if (!S.month) S.month = S.date.slice(0, 7);
   if (S.user && S.mode === 'admin') S.admin = await api('admin');
+  const sharedId = Number(new URL(location.href).searchParams.get('shared'));
+  if (S.user && sharedId && !S.sharedWorkspace) {
+    try { await openSharedWorkspace(sharedId, true); return; }
+    catch (error) { toast(error.message, true); }
+  }
   render();
 }
 
@@ -63,7 +69,8 @@ class ApplicationActions extends PageController {
         break;
       }
       case 'logout':
-        if (S.view === 'home' && pageControllers.home.mindspace.enabled() && !await pageControllers.home.mindspace.flush()) return;
+        if ((S.view === 'home' || S.sharedWorkspace) && pageControllers.home.mindspace.enabled() && !await pageControllers.home.mindspace.flush()) return;
+        if (S.sharedWorkspace) leaveSharedWorkspace();
         await this.makeRequest('logout', {});
         S.mode = 'personal';
         S.view = 'home';
@@ -72,7 +79,8 @@ class ApplicationActions extends PageController {
         await bootstrap();
         break;
       case 'switch-mode':
-        if (S.view === 'home' && pageControllers.home.mindspace.enabled() && !await pageControllers.home.mindspace.flush()) return;
+        if ((S.view === 'home' || S.sharedWorkspace) && pageControllers.home.mindspace.enabled() && !await pageControllers.home.mindspace.flush()) return;
+        if (S.sharedWorkspace) leaveSharedWorkspace();
         S.mode = S.mode === 'admin' ? 'personal' : 'admin';
         S.view = S.mode === 'admin' ? 'overview' : 'home';
         if (S.mode === 'admin') S.admin = await this.makeRequest('admin');
@@ -251,6 +259,10 @@ document.addEventListener('submit', async (event) => {
       const [target, id] = String(d.resource || '').split(':');
       d.target = target; d.id = Number(id); delete d.resource;
     }
+    if (['shareMindSpace', 'changeMindSpaceShare'].includes(action)) {
+      d.permissions = Object.fromEntries(['edit','move','delete','share'].map(right => [right, values.has(`can_${right}`)]));
+      for (const right of ['edit','move','delete','share']) delete d[`can_${right}`];
+    }
     if (['register', 'login', 'setup'].includes(action)) {
       if (action === 'register') d.language = S.language;
       if (action === 'setup') d.token = S.setupToken;
@@ -262,6 +274,7 @@ document.addEventListener('submit', async (event) => {
       await bootstrap();
     } else if (action === 'shareMindSpace') {
       await api(action, d);
+      if (S.sharedWorkspace) leaveSharedWorkspace();
       S.mode = 'personal'; S.view = 'sharing'; S.sharingTab = 'invitations'; S.sharePerson = d.email.trim().toLowerCase();
       S.shareFilter = { permission: '', category: '', owner: '', status: '', search: '' };
       await refresh(); closeModal(); toast(t('invitation_sent'));
@@ -321,11 +334,19 @@ $('#modal').addEventListener('cancel', () => {
 });
 let refreshInFlight = false;
 async function syncQuietly() {
-  if (!S.user || document.hidden || $('#modal').open || refreshInFlight || S.busy) return;
-  if (['profile', 'settings'].includes(S.view) || pageControllers.home.isEditing()) return;
+  if (!S.user || document.hidden || refreshInFlight || S.busy) return;
   refreshInFlight = true;
   try {
     const userId = S.user.id;
+    if ($('#modal').open || ['profile', 'settings'].includes(S.view) || pageControllers.home.isEditing()) {
+      const snapshot = JSON.stringify([S.data.notifications, S.data.unread_notifications]);
+      const data = await api('notifications');
+      if (S.user?.id !== userId || JSON.stringify([S.data.notifications, S.data.unread_notifications]) !== snapshot) return;
+      if (JSON.stringify([data.notifications, data.unread_notifications]) !== snapshot) {
+        Object.assign(S.data, data); updateNotificationBadge();
+      }
+      return;
+    }
     const snapshot = JSON.stringify(S.data);
     const data = await api('data');
     // A request started before typing, saving or switching accounts must not redraw stale data.
@@ -341,6 +362,7 @@ async function syncQuietly() {
   }
 }
 window.addEventListener('focus', syncQuietly);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) void syncQuietly(); });
 setInterval(syncQuietly, 15000);
 (async () => {
   const m = location.hash.match(/^#(setup|reset)=([a-f0-9]{64})$/);

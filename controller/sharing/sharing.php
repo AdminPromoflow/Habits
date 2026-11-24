@@ -16,6 +16,8 @@ final class SharingController
             'revokeMindSpaceShare' => (new MindSpaceShares($this->db, $this->user))->revoke($data),
             'leaveMindSpaceShare' => (new MindSpaceShares($this->db, $this->user))->revoke($data, true),
             'sharedMindSpace' => (new MindSpaceShares($this->db, $this->user))->preview($data),
+            'changeMindSpaceShare' => (new MindSpaceShares($this->db, $this->user))->change($data),
+            'sharedMindSpaceAction' => (new MindSpaceShares($this->db, $this->user))->action($data),
             'respond' => $model->respond($data),
             'changeShare' => $model->changeShare($data),
             'leaveShare' => $model->leaveShare($data),

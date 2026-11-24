@@ -3,6 +3,13 @@ declare(strict_types=1);
 
 final class DashboardModel extends BaseModel
 {
+    public function notifications(): array
+    {
+        return [
+            'notifications' => $this->db->all('SELECT * FROM notifications WHERE user_id=? ORDER BY id DESC LIMIT 50', [$this->uid()]),
+            'unread_notifications' => (int) $this->db->one('SELECT COUNT(*) AS total FROM notifications WHERE user_id=? AND is_read=0', [$this->uid()])['total'],
+        ];
+    }
     public function data(): array
     {
         $habits = (new Habits($this->db, $this->user))->list();
@@ -42,10 +49,7 @@ final class DashboardModel extends BaseModel
                 'SELECT t.* FROM habit_templates t JOIN user_categories uc ON uc.category_id=t.category_id AND uc.user_id=? WHERE t.active=1 ORDER BY t.id',
                 [$this->uid()],
             ),
-            'notifications' => $this->db->all(
-                'SELECT * FROM notifications WHERE user_id=? ORDER BY id DESC LIMIT 50',
-                [$this->uid()],
-            ),
+            ...$this->notifications(),
             'weights' => $this->db->all(
                 'SELECT recorded_on,weight_kg FROM wellness_entries WHERE user_id=? ORDER BY recorded_on',
                 [$this->uid()],

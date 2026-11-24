@@ -12,7 +12,16 @@
         value="{{searchValue}}"
         placeholder="{{searchPlaceholder}}"
         aria-label="{{searchLabel}}" /></label
-    >{{permissionFilter}}{{categoryFilter}}{{ownerFilter}}{{statusFilter}}
+    >
   </div>
-  <div class="share-grid">{{cards}}</div>
+  <div class="sharing-workspace">
+    <aside class="share-people" aria-label="{{peopleLabel}}">
+      <h2>{{peopleLabel}}</h2>
+      <div class="share-people-list">{{people}}</div>
+    </aside>
+    <section class="share-person-content" aria-live="polite">
+      <div class="share-person-heading">{{detailsHeading}}</div>
+      <div class="share-grid">{{cards}}</div>
+    </section>
+  </div>
 </template>

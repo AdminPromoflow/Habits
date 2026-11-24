@@ -4,7 +4,23 @@ const actionControllers = new Map();
 const requestRoutes = JSON.parse(document.getElementById('request-routes').textContent);
 
 class AjaxRequest {
-  async makeRequest(action, body = null, params = {}) {
+  async makeRequest(action, body = null, params = {}, scoped = true) {
+    const shared = S.sharedWorkspace;
+    if (scoped && shared) {
+      if (['data', 'mindspace', 'diagrams'].includes(action)) {
+        const result = await this.makeRequest('sharedMindSpace', null, {id:shared.id}, false);
+        if (S.sharedWorkspace !== shared) throw new Error(t('error_not_found'));
+        Object.assign(shared, result);
+        if (action !== 'data') return result.workspace[action];
+        const data = await this.makeRequest('data', null, params, false);
+        if (S.sharedWorkspace !== shared) throw new Error(t('error_not_found'));
+        S.ownedWorkspace = sharedOwnCatalog(data);
+        return {...data, ...result.workspace};
+      }
+      if (['saveMindSpaceItem','createMindSpaceItem','renameMindSpace','addMindSpaceHabit','moveMindSpaceItem','deleteMindSpaceItem','deleteMindSpace','saveDiagram','deleteDiagram','saveHabit','archiveHabit','complete'].includes(action)) {
+        return this.makeRequest('sharedMindSpaceAction', {share_id:shared.id, action, data:body}, {}, false);
+      }
+    }
     const module = requestRoutes[action];
     if (!module) throw new Error(t('error_not_found'));
     const query = new URLSearchParams({ ...params, action });

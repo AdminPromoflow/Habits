@@ -5,7 +5,7 @@ class MindSpaceEditors {
     this.space = space; this.cell = 'A1';
     document.addEventListener('dragstart', event => {
       const card = event.target.closest?.('[data-ms-card]');
-      if (!card) return;
+      if (!card || !this.space.can('edit')) return;
       this.dragCard = card.dataset.msCard;
       event.dataTransfer.setData('text/plain', this.dragCard);
       event.dataTransfer.effectAllowed = 'move';
@@ -31,6 +31,7 @@ class MindSpaceEditors {
     const panel = document.getElementById('mindspace-panel');
     if (panel) panel.innerHTML = this.render();
     this.space.status();
+    if (S.sharedWorkspace) mountSharedWorkspace();
   }
   columns() { return MindSpaceLinkTargets.columns({...this.space.active, content:this.space.draft}); }
   statuses() { return this.columns().map(column => column.id); }
@@ -110,7 +111,7 @@ class MindSpaceEditors {
   habits() {
     const date = S.date || today(), ids = new Set(this.space.draft.habit_ids);
     const returns = this.space.targetReturnLinks();
-    const habits = (S.data.habits || []).filter(habit => ids.has(habit.id) && habit.permission === 'owner');
+    const habits = (S.data.habits || []).filter(habit => ids.has(habit.id) && (habit.permission === 'owner' || S.sharedWorkspace));
     return `<div class="ms-habits"><div class="ms-editor-toolbar"><label>${esc(t('date'))}<input type="date" data-ms-habit-date value="${esc(date)}" max="${today()}"></label>
       <button type="button" class="btn secondary" data-action="ms-habits-select">${esc(t('ms_choose_habits'))}</button><button type="button" class="btn primary" data-action="ms-habit-new">${icon('plus')}${esc(t('new_habit'))}</button></div>
       ${habits.length ? `<div class="ms-habit-list">${habits.map(habit => {
@@ -122,7 +123,7 @@ class MindSpaceEditors {
   async chooseHabits() {
     const space = this.space;
     if (!await space.flush()) return;
-    const own = S.data.habits.filter(habit => habit.permission === 'owner');
+    const own = S.data.habits.filter(habit => habit.permission === 'owner' || S.sharedWorkspace);
     openModal('ms_choose_habits', `<form id="ms-habits-form"><div class="ms-habit-choices">${own.length ? own.map(habit => `<label><input type="checkbox" name="habits" value="${habit.id}" ${space.draft.habit_ids.includes(habit.id) ? 'checked' : ''}><span>${esc(habit.name)}</span></label>`).join('') : `<p>${esc(t('ms_habits_empty'))}</p>`}</div>${formFooter()}</form>`);
     const form = document.getElementById('ms-habits-form');
     form.addEventListener('submit', event => { event.preventDefault(); void space.submit(form, async values => {

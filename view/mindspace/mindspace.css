@@ -48,6 +48,7 @@
 .ms-context-submenu { z-index: 1003; overflow-y: auto; }
 .ms-context-submenu[hidden] { display: none; }
 .ms-context-new { margin: 0 -7px; padding: 0 7px; }
+.ms-context-new[hidden] { display: none; }
 .ms-context-chevron { margin-left: auto; font-size: 20px; line-height: 1; }
 .ms-context-menu button[aria-expanded="true"] { background: var(--lavender-wash); }
 .ms-context-title { margin: 0; padding: 8px 10px; color: var(--muted); font-size: .75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

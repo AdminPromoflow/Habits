@@ -174,15 +174,20 @@
 .notification-btn {
   position: relative;
 }
-.unread-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+.notification-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
   position: absolute;
-  top: 5px;
-  right: 7px;
-  background: #bc8dac;
-  border: 1px solid var(--canvas);
+  top: -3px;
+  right: -5px;
+  background: #cf3048;
+  color: #fff;
+  font: 700 10px/1 system-ui, sans-serif;
+  border: 2px solid var(--canvas);
 }
 .mobile-menu {
   display: none;

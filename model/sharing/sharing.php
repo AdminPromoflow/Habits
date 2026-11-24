@@ -83,6 +83,7 @@ final class SharingModel extends BaseModel
                     $message,
                 ],
             );
+            $this->notify($this->uid(), 'notification_invitation_sent', $email);
         }
     }
 

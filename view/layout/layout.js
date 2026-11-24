@@ -13,18 +13,30 @@ function langSwitch() {
   return `<div class="lang-switch" role="group" aria-label="${esc(t('language'))}"><button data-action="language" data-lang="en" aria-pressed="${S.language === 'en'}" class="${S.language === 'en' ? 'selected' : ''}">English</button><span>|</span><button data-action="language" data-lang="es" aria-pressed="${S.language === 'es'}" class="${S.language === 'es' ? 'selected' : ''}">Español</button></div>`;
 }
 
+function notificationCount() { return S.data.unread_notifications ?? S.data.notifications.filter(n => !Number(n.is_read)).length; }
+function notificationLabel() { const count = notificationCount(); return count ? t('notifications_unread', {count}) : t('notifications'); }
+function notificationBadge() { const count = notificationCount(); return count ? `<span class="notification-badge" aria-hidden="true">${count > 99 ? '99+' : count}</span>` : ''; }
+function updateNotificationBadge() {
+  const bell = document.querySelector('[data-action="notifications"]');
+  if (!bell) return;
+  bell.setAttribute('aria-label', notificationLabel());
+  bell.innerHTML = icon('bell') + notificationBadge();
+}
+
 function render() {
   document.documentElement.lang = S.language;
   document.body.dataset.theme = S.user?.theme || 'light';
   document.title = `MyRemarkable Mind · ${t(S.mode === 'admin' ? 'admin_dashboard' : S.view === 'categoryWeek' ? 'weekly_plan' : S.view === 'routine' ? 'routine' : S.view)}`;
   $('#app').innerHTML = S.user && !S.setupToken && !S.resetToken ? shell() : authPage();
-  if (S.user && S.mode === 'personal' && S.view === 'home') pageControllers.home.mount();
+  if (S.user && S.mode === 'personal' && (S.view === 'home' || S.sharedWorkspace)) {
+    pageControllers.home.mount();
+    if (S.sharedWorkspace) mountSharedWorkspace();
+  }
 }
 
 function shell() {
   const admin = S.mode === 'admin';
   const nav = admin ? adminNav : personalNav;
-  const unread = S.data.notifications.filter((n) => !Number(n.is_read)).length;
   const pending = [...S.data.incoming, ...(S.data.mindspace_shares?.incoming || [])].filter((n) => n.status === 'pending').length;
   // Resolve the selected document before highlighting its MindSpace in navigation.
   const content = admin ? adminPage() : personalPage();
@@ -57,9 +69,9 @@ function shell() {
       S.view === 'categoryWeek' ? 'weekly_plan' : S.view === 'routine' ? 'routine' : S.view
     ),
     languageSwitch: langSwitch(),
-    notificationsLabel: t('notifications'),
+    notificationsLabel: esc(notificationLabel()),
     bellIcon: icon('bell'),
-    unreadDot: unread ? '<span class="unread-dot"></span>' : '',
+    unreadDot: notificationBadge(),
     profileLabel: t('profile'),
     profileAvatar: esc(S.user.name.slice(0, 1)),
     content,
@@ -86,6 +98,10 @@ function personalPage() {
 }
 
 async function navigate(view) {
+  if (S.sharedWorkspace) {
+    if (!await pageControllers.home.mindspace.flush()) return;
+    leaveSharedWorkspace();
+  }
   if (S.view === 'home' && view !== 'home' && pageControllers.home.mindspace.enabled() && !await pageControllers.home.mindspace.flush()) return;
   if (S.mode === 'personal' && view === 'categories') view = 'settings';
   if (view === 'sharing') {

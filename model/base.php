@@ -4,6 +4,10 @@ declare(strict_types=1);
 abstract class BaseModel
 {
     use AccessPolicy;
+    protected ?array $workspaceHabit = null;
+
+    // Internal capability: only the sharing gateway calls this after checking scope and permissions.
+    public function authorizeWorkspaceHabit(int $id, string $permission, ?string $joined = null): void { $this->workspaceHabit = ['id' => $id, 'permission' => $permission, 'joined' => $joined]; }
 
     public function __construct(public DB $db, public array $user) {}
 

@@ -1,152 +1,64 @@
-function sharingPage() {
-  const tabs = [
-    'with_me',
-    'by_me',
-    'collaborative',
-    'invitations',
-    'shared_categories',
-    'group_progress',
-  ];
-  const f = S.shareFilter;
-  let content = '';
-  if (S.sharingTab === 'by_me' || S.sharingTab === 'shared_categories') {
-    let rows = S.data.outgoing;
-    if (S.sharingTab === 'shared_categories') rows = rows.filter((r) => r.category_id);
-    rows = rows.filter(
-      (r) =>
-        (!f.category ||
-          String(
-            r.category_id ||
-              S.data.habits.find((h) => Number(h.id) === Number(r.habit_id))?.category_id
-          ) === f.category) &&
-        (!f.owner || f.owner === String(S.user.id)) &&
-        (!f.permission || r.permission === f.permission) &&
-        (!f.status || r.status === f.status) &&
-        (!f.search ||
-          (r.resource_name + ' ' + r.recipient_email)
-            .toLowerCase()
-            .includes(f.search.toLowerCase()))
-    );
-    content = rows
-      .map(
-        (r) =>
-          `<article class="card share-card"><div class="share-card-top"><span class="share-symbol">${icon(r.category_id ? 'categories' : 'sharing')}</span>${badge(r.status)}</div><h3>${esc(r.category_key ? t(r.category_key) : r.resource_name)}</h3><p>${esc(r.recipient_email)}</p><div class="share-meta">${badge(r.permission)}<span>${t(r.progress_visibility)}</span></div>${r.category_id ? `<p class="field-help">${t(r.include_future == 1 ? 'future_habits' : 'future_default')}</p>` : ''}${['pending', 'accepted'].includes(r.status) ? `<div class="share-card-actions"><button class="btn secondary" data-action="manage-share" data-id="${r.id}">${t('manage_permissions')}</button><button class="text-btn danger" data-action="revoke" data-id="${r.id}">${t('revoke')}</button></div>` : ''}</article>`
-      )
-      .join('');
-    if (S.sharingTab === 'shared_categories') {
-      content += S.data.incoming
-        .filter((r) => r.category_id && r.status === 'accepted')
-        .map(invitationCard)
-        .join('');
+function sharingEntries(tab = S.sharingTab) {
+  const entries = [];
+  for (const [type, catalog] of [['habit', S.data], ['mindspace', S.data.mindspace_shares || {}]]) {
+    for (const direction of ['incoming', 'outgoing']) {
+      for (const row of catalog[direction] || []) {
+        if (tab !== 'invitations' && row.status !== 'accepted') continue;
+        if (tab === 'with_me' && direction !== 'incoming') continue;
+        if (tab === 'by_me' && direction !== 'outgoing') continue;
+        const mine = direction === 'outgoing';
+        const email = mine ? row.recipient_email : row.owner_email;
+        const key = email?.toLowerCase() || `user:${row.owner_user_id}`;
+        const name = (mine ? row.recipient_name : row.owner_name) || email || t('participants');
+        entries.push({type, row, mine, key, name, email:email || ''});
+      }
     }
-  } else if (S.sharingTab === 'invitations') {
-    content = S.data.incoming
-      .filter(
-        (r) =>
-          (!f.status || r.status === f.status) &&
-          (!f.permission || r.permission === f.permission) &&
-          (!f.owner || String(r.owner_user_id) === f.owner) &&
-          (!f.category ||
-            String(
-              r.category_id ||
-                S.data.habits.find((h) => Number(h.id) === Number(r.habit_id))?.category_id
-            ) === f.category) &&
-          (!f.search ||
-            (r.owner_name + ' ' + r.resource_name).toLowerCase().includes(f.search.toLowerCase()))
-      )
-      .map(invitationCard)
-      .join('');
-  } else {
-    let rows = S.data.habits.filter((h) => h.permission !== 'owner');
-    if (S.sharingTab === 'collaborative' || S.sharingTab === 'group_progress') {
-      const acceptedIds = new Set(
-        S.data.outgoing
-          .filter((r) => r.status === 'accepted')
-          .flatMap((r) =>
-            r.habit_id
-              ? [Number(r.habit_id)]
-              : S.data.habits
-                  .filter(
-                    (h) =>
-                      Number(h.category_id) === Number(r.category_id) && h.permission === 'owner'
-                  )
-                  .map((h) => Number(h.id))
-          )
-      );
-      rows = S.data.habits.filter(
-        (h) =>
-          (h.permission !== 'owner' && h.permission !== 'viewer') || acceptedIds.has(Number(h.id))
-      );
-    }
-    rows = rows.filter(
-      (h) =>
-        (!f.permission || h.permission === f.permission) &&
-        (!f.category || String(h.category_id) === f.category) &&
-        (!f.owner || String(h.owner_user_id) === f.owner) &&
-        (!f.status || h.status === f.status) &&
-        (!f.search ||
-          (
-            h.owner_name +
-            ' ' +
-            h.name +
-            ' ' +
-            (h.group?.members || []).map((m) => m.name).join(' ')
-          )
-            .toLowerCase()
-            .includes(f.search.toLowerCase()))
-    );
-    content = rows
-      .map(
-        (h) =>
-          `<article class="card share-card" style="--category-color:${esc(h.color)}"><div class="share-card-top"><span class="share-symbol" style="background:${esc(h.color)}">${icon(h.icon)}</span>${badge(h.permission)}</div><h3>${esc(h.name)}</h3><p>${esc(habitCategory(h))} · ${esc(h.owner_name)}</p><div class="share-details"><span>${icon('calendar')}${esc(scheduleLabel(h))}</span><span>${icon('sparkles')}${t('goal')}: ${goalLabel(h)}</span></div><div class="share-participants"><span>${t('participants')}: ${esc((h.group?.members || []).map((m) => m.name).join(', '))}</span>${badge('accepted')}<span>${t('group_progress')}: ${h.group?.average === null || h.group?.average === undefined ? '—' : h.group.average + '%'}</span></div><div class="share-card-actions"><button class="btn secondary" data-action="habit-detail" data-id="${h.id}">${t('view_all')}</button><button class="text-btn" data-action="group" data-id="${h.id}">${t('group_progress')}</button></div></article>`
-      )
-      .join('');
   }
-  content += mindSpaceShareCards(S.sharingTab);
-  const owners = [
-    ...new Map(
-      [...S.data.habits, ...(S.data.mindspace_shares?.incoming || []), ...(S.data.mindspace_shares?.outgoing || [])]
-        .map((h) => [h.owner_user_id, [h.owner_user_id, h.owner_name]])
-    ).values(),
-  ];
-  const cats = [
-    ...new Map(
-      S.data.habits.map((h) => [h.category_id, [h.category_id, habitCategory(h)]])
-    ).values(),
-  ];
+  return entries;
+}
+
+function sharingPeople(entries) {
+  const people = new Map();
+  for (const entry of entries) {
+    const person = people.get(entry.key) || {key:entry.key, name:entry.name, email:entry.email, entries:[]};
+    if (entry.name !== entry.email) person.name = entry.name;
+    person.entries.push(entry); people.set(entry.key, person);
+  }
+  return [...people.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function sharingHabitCard({row:r, mine}) {
+  if (!mine && r.status !== 'accepted') return invitationCard(r);
+  const open = r.habit_id
+    ? `<button class="btn secondary" data-action="habit-detail" data-id="${r.habit_id}">${esc(t('view_all'))}</button>`
+    : `<button class="btn secondary" data-action="share-category-view" data-id="${r.id}" data-direction="${mine ? 'outgoing' : 'incoming'}">${esc(t('view_all'))}</button>`;
+  const controls = mine && ['pending','accepted'].includes(r.status)
+    ? `<button class="btn secondary" data-action="manage-share" data-id="${r.id}">${esc(t('manage_permissions'))}</button><button class="text-btn danger" data-action="revoke" data-id="${r.id}">${esc(t('revoke'))}</button>`
+    : !mine && r.status === 'accepted' ? `<button class="text-btn" data-action="leave" data-id="${r.id}">${esc(t('leave'))}</button>` : '';
+  return `<article class="card share-card"><div class="share-card-top"><span class="share-symbol">${icon(r.category_id ? 'categories' : 'habits')}</span>${badge(r.status)}</div>
+    <h3>${esc(r.category_key ? t(r.category_key) : r.resource_name || t('revoked'))}</h3><div class="share-meta">${badge(r.permission)}<span>${esc(t(r.progress_visibility))}</span></div>
+    ${r.invitation_message ? `<p class="invitation-message">${esc(r.invitation_message)}</p>` : ''}
+    <div class="share-card-actions">${mine || r.status === 'accepted' ? open : ''}${controls}</div></article>`;
+}
+
+function sharingPage() {
+  if (S.sharedWorkspace) return sharedWorkspacePage();
+  const tabs = ['all', 'with_me', 'by_me', 'invitations'];
+  if (!tabs.includes(S.sharingTab)) S.sharingTab = 'all';
+  const search = S.shareFilter.search.toLowerCase();
+  const entries = sharingEntries().filter(entry => !search || `${entry.name} ${entry.email} ${entry.row.resource_name || ''}`.toLowerCase().includes(search));
+  const people = sharingPeople(entries), selected = people.find(person => person.key === S.sharePerson);
+  const pending = [...(S.data.incoming || []), ...(S.data.mindspace_shares?.incoming || [])].some(row => row.status === 'pending');
   return renderTemplate('sharing', {
-    heading: heading(
-      t('sharing'),
-      t('sharing_subtitle'),
-      `<button class="btn primary" data-action="new-share">${icon('plus')}${t('new_invitation')}</button>`
-    ),
-    tabs: tabs
-      .map(
-        (v) =>
-          `<button role="tab" aria-selected="${S.sharingTab === v}" data-action="sharing-tab" data-tab="${v}" class="${S.sharingTab === v ? 'active' : ''}">${t(v)}${v === 'invitations' && [...S.data.incoming, ...(S.data.mindspace_shares?.incoming || [])].some((r) => r.status === 'pending') ? '<span class="tab-dot"></span>' : ''}</button>`
-      )
-      .join(''),
-    searchIcon: icon('search'),
-    searchValue: esc(f.search),
-    searchPlaceholder: t('search_people'),
-    searchLabel: t('search_people'),
-    permissionFilter: selectControl(
-      'share-permission',
-      ['viewer', 'participant', 'editor'].map((x) => [x, t(x)]),
-      f.permission,
-      t('all_permissions')
-    ),
-    categoryFilter: selectControl('share-category-filter', cats, f.category, t('all_categories')),
-    ownerFilter: selectControl('share-owner-filter', owners, f.owner, t('all_owners')),
-    statusFilter: selectControl(
-      'share-status-filter',
-      ['active', 'archived', 'pending', 'accepted', 'declined', 'revoked'].map((x) => [x, t(x)]),
-      f.status,
-      t('all_statuses')
-    ),
-    cards:
-      content ||
-      `<div class="card empty-wide">${empty(S.sharingTab === 'invitations' ? 'no_invitations' : 'no_shared', 'no_shared_hint', button('new_invitation', 'new-share', 'secondary'))}</div>`,
+    heading:heading(t('sharing'), t('sharing_subtitle'), `<button class="btn primary" data-action="new-share">${icon('plus')}${esc(t('new_invitation'))}</button>`),
+    tabs:tabs.map(tab => `<button role="tab" aria-selected="${S.sharingTab === tab}" data-action="sharing-tab" data-tab="${tab}" class="${S.sharingTab === tab ? 'active' : ''}">${esc(t(tab))}${tab === 'invitations' && pending ? '<span class="tab-dot"></span>' : ''}</button>`).join(''),
+    searchIcon:icon('search'), searchValue:esc(S.shareFilter.search), searchPlaceholder:esc(t('sharing_search')), searchLabel:esc(t('sharing_search')),
+    peopleLabel:esc(t('participants')),
+    people:people.map(person => `<button type="button" class="share-person ${person === selected ? 'is-selected' : ''}" data-action="sharing-person" data-person="${esc(person.key)}" aria-pressed="${person === selected}">
+      <span class="avatar" aria-hidden="true">${esc(person.name.slice(0, 1).toUpperCase())}</span><span class="share-person-label"><strong>${esc(person.name)}</strong>${person.name !== person.email ? `<small>${esc(person.email)}</small>` : ''}<small>${esc(t(S.sharingTab === 'invitations' ? 'sharing_invitation_count' : 'sharing_item_count', {count:person.entries.length}))}</small></span>${icon('chevron')}</button>`).join('') || `<p class="muted share-no-people">${esc(t(search ? 'no_results' : S.sharingTab === 'invitations' ? 'no_invitations' : 'sharing_no_people'))}</p>`,
+    detailsHeading:selected ? `<h2>${esc(selected.name)}</h2>${selected.name !== selected.email ? `<p class="muted">${esc(selected.email)}</p>` : ''}` : '',
+    cards:selected ? selected.entries.map(entry => `<div class="share-resource"><span class="share-direction">${esc(t(S.sharingTab === 'invitations' ? entry.mine ? 'sharing_sent' : 'sharing_received' : entry.mine ? 'by_me' : 'with_me'))}</span>${entry.type === 'mindspace' ? mindSpaceShareCards(entry.mine ? 'by_me' : 'invitations', [entry.row]) : sharingHabitCard(entry)}</div>`).join('')
+      : `<div class="card empty-wide">${empty('sharing_choose_person', people.length ? 'sharing_choose_person_hint' : 'no_shared_hint')}</div>`,
   });
 }
 
@@ -210,10 +122,21 @@ async function groupModal(id) {
   );
 }
 
+function sharingPermissionsText(permissions = {}) {
+  return esc(['edit','move','delete','share'].filter(right => permissions[right]).map(right => t(`ms_permission_${right}`)).join(' · ') || t('ms_share_readonly_short'));
+}
+function mindSpacePermissionFields(permissions = {edit:true}, maximum = {edit:true,move:true,delete:true,share:true}) {
+  return `<fieldset class="ms-share-permissions"><legend>${esc(t('permission'))}</legend>${['edit','move','delete','share'].map(right => `<label><input type="checkbox" name="can_${right}" value="1" ${permissions[right] && maximum[right] ? 'checked' : ''} ${maximum[right] ? '' : 'disabled'}><span>${esc(t(`ms_permission_${right}`))}</span></label>`).join('')}</fieldset><p class="field-help">${esc(t('ms_permissions_hint'))}</p>`;
+}
+function manageMindSpaceShare(id) {
+  const row = S.data.mindspace_shares.outgoing.find(row => row.id === id);
+  if (!row) return;
+  openModal('manage_permissions', `<form data-form="changeMindSpaceShare"><input type="hidden" name="id" value="${id}"><h3>${esc(row.resource_name)}</h3><p>${esc(row.recipient_email)}</p>${mindSpacePermissionFields(row.permissions, row.allowed_permissions)}${formFooter()}</form>`);
+}
 function mindSpaceShareForm(target = 'space', id = null) {
   const space = pageControllers.home.mindspace;
   const choices = space.spaces().flatMap(root => [
-    [`space:${root.id}`, root.name],
+    ...(!S.sharedWorkspace || root.permissions?.share ? [[`space:${root.id}`, root.name]] : []),
     ...space.items(root.id).map(item => [`item:${item.id}`, `${root.name} / ${[...space.pathTo(item.parent_id, root.id).map(folder => folder.name), item.name].join(' / ')}`]),
   ]);
   openModal('ms_share_item', `<form data-form="shareMindSpace">
@@ -221,66 +144,32 @@ function mindSpaceShareForm(target = 'space', id = null) {
     <p class="field-help">${esc(t('ms_share_scope_hint'))}</p>
     ${field('email', 'recipient_email', 'email', '', {required:true, maxlength:190, autocomplete:'off'})}
     <p class="field-help">${esc(t('email_privacy'))}</p>
-    <p class="ms-share-readonly">${icon('lock')}${esc(t('ms_share_readonly'))}</p>
+    ${S.sharedWorkspace ? `<input type="hidden" name="source_share_id" value="${S.sharedWorkspace.delegation_share_id || S.sharedWorkspace.id}">` : ''}
+    ${mindSpacePermissionFields({edit:true}, S.sharedWorkspace?.permissions)}
     ${textarea('invitation_message', 'message')}${formFooter('send_invitation')}
   </form>`);
 }
 
-function mindSpaceShareCards(tab) {
+function mindSpaceShareCards(tab, selection = null) {
   if (!['by_me','with_me','invitations'].includes(tab)) return '';
   const mine = tab === 'by_me', f = S.shareFilter;
-  const rows = S.data.mindspace_shares?.[mine ? 'outgoing' : 'incoming'] || [];
+  const rows = selection || S.data.mindspace_shares?.[mine ? 'outgoing' : 'incoming'] || [];
   return rows.filter(row => (tab !== 'with_me' || row.status === 'accepted') && !f.category
-    && (!f.permission || f.permission === 'viewer') && (!f.status || f.status === row.status)
+    && (!f.permission || f.permission === row.permission) && (!f.status || f.status === row.status)
     && (!f.owner || f.owner === String(row.owner_user_id))
     && (!f.search || `${row.resource_name || ''} ${row.owner_name} ${row.recipient_email}`.toLowerCase().includes(f.search.toLowerCase())))
     .map(row => {
       const actions = mine ? `<button class="btn secondary" data-action="ms-share-preview" data-id="${row.id}">${esc(t('view_all'))}</button>
-        ${['pending','accepted'].includes(row.status) ? `<button class="text-btn danger" data-action="ms-share-revoke" data-id="${row.id}">${esc(t('revoke'))}</button>` : ''}`
+        ${['pending','accepted'].includes(row.status) ? `<button class="btn secondary" data-action="ms-share-manage" data-id="${row.id}">${esc(t('manage_permissions'))}</button><button class="text-btn danger" data-action="ms-share-revoke" data-id="${row.id}">${esc(t('revoke'))}</button>` : ''}`
         : row.status === 'pending' ? `<button class="btn primary" data-action="ms-share-accept" data-id="${row.id}">${esc(t('accept'))}</button><button class="btn secondary" data-action="ms-share-decline" data-id="${row.id}">${esc(t('decline'))}</button>`
         : row.status === 'accepted' ? `<button class="btn secondary" data-action="ms-share-preview" data-id="${row.id}">${esc(t('view_all'))}</button><button class="text-btn" data-action="ms-share-leave" data-id="${row.id}">${esc(t('leave'))}</button>` : '';
       const kind = row.kind === 'space' ? 'MindSpace' : t(`ms_kind_${row.kind}`);
       return `<article class="card share-card ms-share-card"><div class="share-card-top"><span class="share-symbol">${pageControllers.home.mindspace.kindIcon(row.kind === 'space' ? 'folder' : row.kind)}</span>${badge(row.status)}</div>
         <span class="eyebrow">${esc(kind)}</span><h3>${esc(row.resource_name || t('revoked'))}</h3><p>${esc(mine ? row.recipient_email : t('invited_by', {name:row.owner_name}))}</p>
-        <div class="share-meta">${badge('viewer')}<span>${esc(t('ms_share_readonly_short'))}</span></div>
+        <div class="share-meta"><span>${sharingPermissionsText(row.permissions)}</span></div>
         ${row.invitation_message ? `<p class="invitation-message">${esc(row.invitation_message)}</p>` : ''}
         ${actions ? `<div class="share-card-actions">${actions}</div>` : ''}</article>`;
     }).join('');
-}
-
-async function mindSpaceSharePreview(id, itemId = null) {
-  const userId = S.user?.id;
-  const result = await api('sharedMindSpace', null, {id, ...(itemId ? {item_id:itemId} : {})});
-  if (S.user?.id !== userId) return;
-  const item = result.selected;
-  let content = '';
-  if (!item || item.kind === 'folder') {
-    const children = result.items.filter(child => child.parent_id === (item?.id || null));
-    content = `<div class="ms-shared-files">${children.map(child => `<button type="button" class="btn secondary" data-action="ms-share-preview" data-id="${id}" data-item="${child.id}">${pageControllers.home.mindspace.kindIcon(child.kind)}<span>${esc(child.name)}</span></button>`).join('') || `<p>${esc(t('ms_folder_empty'))}</p>`}</div>`;
-  } else if (item.kind === 'diagram') {
-    const {html, plan} = pageControllers.home.links.preview(item.diagram);
-    content = `<div class="diagram-link-preview ms-shared-diagram">${html.replace('<svg ', `<svg width="${plan.width}" height="${plan.height}" `).replace(/ tabindex="0"| role="button"| aria-pressed="false"| data-link-target="[^"]*"/g, '')}</div>`;
-  } else if (item.kind === 'habits') {
-    content = `<div class="ms-shared-habits">${item.habits.map(habit => `<article><h3>${esc(habit.name)}</h3>${habit.description ? `<p>${esc(habit.description)}</p>` : ''}<p>${esc(t('goal'))}: ${esc(habit.goal)} ${esc(habit.unit)}</p></article>`).join('') || `<p>${esc(t('ms_link_empty'))}</p>`}</div><p class="field-help">${esc(t('ms_share_habits_privacy'))}</p>`;
-  } else {
-    content = `<div class="diagram-link-preview ms-shared-content">${MindSpaceLinkTargets.preview(item)}</div>`;
-  }
-  const path = [], seen = new Set();
-  let parent = item?.parent_id;
-  while (parent && !seen.has(parent)) {
-    seen.add(parent);
-    const folder = result.items.find(entry => entry.id === parent);
-    if (!folder) break;
-    if (folder.id !== result.root_id) path.unshift(folder);
-    parent = folder.parent_id;
-  }
-  openModal('ms_share_preview', `<nav class="mindspace-folder-path" aria-label="${esc(t('ms_folder_path'))}"><button type="button" data-action="ms-share-preview" data-id="${id}">${esc(result.name)}</button>
-    ${path.map(folder => `<span aria-hidden="true">/</span><button type="button" data-action="ms-share-preview" data-id="${id}" data-item="${folder.id}">${esc(folder.name)}</button>`).join('')}</nav>
-    <h3>${esc(item?.name || result.name)}</h3><p class="field-help">${esc(t('ms_share_readonly'))}</p>${content}`, true);
-  // Preview controls expose text and values without acting as editor inputs.
-  document.querySelectorAll('.ms-shared-content [data-link-target]').forEach(control => {
-    control.removeAttribute('aria-pressed'); control.setAttribute('tabindex', '-1'); control.setAttribute('aria-disabled', 'true');
-  });
 }
 
 class SharingPage extends PageController {
@@ -290,6 +179,8 @@ class SharingPage extends PageController {
       'share-habit',
       'share-category',
       'sharing-tab',
+      'sharing-person',
+      'share-category-view',
       'accept',
       'decline',
       'manage-share',
@@ -298,6 +189,8 @@ class SharingPage extends PageController {
       'group',
       'ms-share-picker',
       'ms-share-preview',
+      'ms-share-manage',
+      'shared-workspace-back',
       'ms-share-accept',
       'ms-share-decline',
       'ms-share-revoke',
@@ -307,11 +200,30 @@ class SharingPage extends PageController {
 
   async handleAction(action, el, id) {
     switch (action) {
+      case 'shared-workspace-back':
+        if (!await pageControllers.home.mindspace.flush()) return;
+        leaveSharedWorkspace(); await refresh();
+        break;
+      case 'ms-share-manage':
+        manageMindSpaceShare(id);
+        break;
+      case 'sharing-person':
+        S.sharePerson = el.dataset.person;
+        render();
+        break;
+      case 'share-category-view': {
+        const mine = el.dataset.direction === 'outgoing';
+        const row = S.data[mine ? 'outgoing' : 'incoming'].find(row => Number(row.id) === id);
+        if (!row) return;
+        const habits = S.data.habits.filter(habit => Number(habit.category_id) === Number(row.category_id) && Number(habit.owner_user_id) === Number(mine ? S.user.id : row.owner_user_id));
+        openModal('shared_categories', `<h3>${esc(row.category_key ? t(row.category_key) : row.resource_name)}</h3><div class="ms-shared-files">${habits.map(habit => `<button class="btn secondary" data-action="habit-detail" data-id="${habit.id}">${esc(habit.name)}</button>`).join('') || `<p>${esc(t('no_results'))}</p>`}</div>`);
+        break;
+      }
       case 'ms-share-picker':
         mindSpaceShareForm();
         break;
       case 'ms-share-preview':
-        await mindSpaceSharePreview(id, el.dataset.item ? Number(el.dataset.item) : null);
+        await openSharedWorkspace(id);
         break;
       case 'ms-share-accept':
       case 'ms-share-decline':
@@ -334,6 +246,7 @@ class SharingPage extends PageController {
         break;
       case 'sharing-tab':
         S.sharingTab = el.dataset.tab;
+        S.sharePerson = null;
         S.shareFilter = { permission: '', category: '', owner: '', status: '', search: '' };
         render();
         break;

@@ -181,6 +181,7 @@ final class Habits extends BaseModel
                     ->setTimezone(new DateTimeZone($this->user['timezone']))
                     ->format('Y-m-d')
                 : null;
+            if (($this->workspaceHabit['id'] ?? null) === (int) $h['id']) $joinedDate = $this->workspaceHabit['joined'] ?? $this->today();
             if (!$joinedDate || $date < $joinedDate) {
                 fail('error_date');
             }

@@ -111,6 +111,15 @@ class DiagramNodeTools {
         const id = home.active.id;
         await home.makeRequest('deleteDiagram', { id, version: home.active.version });
         if (generation !== home.generation) return;
+        if (S.sharedWorkspace) {
+          const deleted = S.data.mindspace.items.find(item => item.diagram_id === id);
+          if (deleted?.id === S.sharedWorkspace.root_id) { leaveSharedWorkspace(); await refresh(); return; }
+          S.data.diagrams = S.data.diagrams.filter(item => item.id !== id);
+          S.data.mindspace.items = S.data.mindspace.items.filter(item => item.diagram_id !== id);
+          home.reset();
+          await home.mindspace.go(S.data.mindspace.items.find(item => item.id === S.sharedWorkspace.root_id) || null, S.sharedWorkspace.space_id);
+          return;
+        }
         S.data.diagrams = S.data.diagrams.filter((item) => item.id !== id);
         if (S.data.mindspace) S.data.mindspace.items = S.data.mindspace.items.filter(item => item.diagram_id !== id);
         home.reset();

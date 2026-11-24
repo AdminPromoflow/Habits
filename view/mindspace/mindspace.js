@@ -9,7 +9,7 @@ class MindSpace extends PageController {
     this.editor = new MindSpaceEditors(this);
     this.reset();
     for (const type of ['input','change','focusin','focusout','keydown','paste']) document.addEventListener(type, event => {
-      if (this.enabled() && event.target.closest?.('#mindspace-panel')) this.editor.event(type, event);
+      if (this.enabled() && this.can('edit') && event.target.closest?.('#mindspace-panel')) this.editor.event(type, event);
       if (type === 'keydown' && event.target.closest?.('[role="tablist"]') && ['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) {
         const tabs = [...document.querySelectorAll('#mindspace-tabs [role="tab"]')];
         const index = tabs.indexOf(event.target);
@@ -65,6 +65,7 @@ class MindSpace extends PageController {
     this.sidebarExpanded = undefined; this.treeExpanded = undefined; this.linkArrival = null;
   }
   enabled() { return !!S.data?.mindspace; }
+  can(right, item = this.active) { return !S.sharedWorkspace || !!(item?.permissions || S.sharedWorkspace.permissions)[right]; }
   allItems() { return S.data?.mindspace?.items || []; }
   spaces() { return S.data?.mindspace?.spaces || (this.enabled() ? [{ id:S.data.mindspace.id, name:S.data.mindspace.name || 'MindSpace' }] : []); }
   spaceId() {
@@ -142,12 +143,16 @@ class MindSpace extends PageController {
     try { localStorage.setItem(`${this.sidebarKey()}:tree`, JSON.stringify(this.treeExpanded)); } catch {}
   }
   addButton(spaceId, parent = null) {
+    if (S.sharedWorkspace && !this.can('edit', parent ? this.allItems().find(item => item.id === parent) : this.spaces().find(space => space.id === spaceId))) return '';
     return `<button type="button" class="ms-sidebar-add" data-action="ms-sidebar-add" data-space="${spaceId}" data-parent="${parent || 0}" title="${esc(t('ms_add_in', {name:this.allItems().find(item => item.id === parent)?.name || this.spaceName(spaceId)}))}">${icon('plus')}<span>${esc(t('ms_sidebar_add'))}</span></button>`;
   }
   moreButton(target, id, name) {
+    const entry = (target === 'space' ? this.spaces() : this.allItems()).find(item => item.id === id);
+    if (S.sharedWorkspace && !['edit','delete','share'].some(right => this.can(right, entry))) return '';
     return `<button type="button" class="ms-entry-more" data-action="ms-entry-menu" data-target="${target}" data-id="${id}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(t('ms_options_for', {name}))}" title="${esc(t('more'))}"><span aria-hidden="true">⋯</span></button>`;
   }
   sidebar() {
+    if (S.sharedWorkspace) return '';
     if (!this.enabled()) return '';
     return `<section class="mindspace-sidebar"><button type="button" id="mindspace-sidebar-toggle" class="nav-item ms-sidebar-toggle"
       data-action="ms-sidebar-toggle" aria-expanded="${this.sidebarOpen()}" aria-controls="mindspace-sidebar-list">${icon('overview')}<span>All MindSpace</span><span class="ms-sidebar-chevron" aria-hidden="true">›</span></button>
@@ -192,19 +197,20 @@ class MindSpace extends PageController {
     const spaceId = isSpace ? id : target.mindspace_id || this.spaceId();
     const parent = isSpace ? 0 : target.kind === 'folder' ? id : target.parent_id || 0;
     const context = `data-space="${spaceId}" data-parent="${parent}"`;
+    const canNew = this.can('edit', target) && (!S.sharedWorkspace || parent || this.spaces().find(space => space.id === spaceId)?.permissions?.edit);
     const option = (action, label, attrs = '', symbol = '', extra = '') => `<button type="button" role="menuitem" tabindex="-1" data-action="${action}" ${attrs} class="${extra}">${symbol}<span>${esc(label)}</span></button>`;
     const menu = document.createElement('div');
     menu.id = 'ms-context-menu'; menu.className = 'ms-context-menu'; menu.setAttribute('role', 'menu');
     menu.setAttribute('aria-label', t('ms_options_for', {name:target.name}));
-    menu.innerHTML = `<p class="ms-context-title">${esc(target.name)}</p><div class="ms-context-new" role="none">
+    menu.innerHTML = `<p class="ms-context-title">${esc(target.name)}</p><div class="ms-context-new" role="none" ${canNew ? '' : 'hidden'}>
       <button type="button" role="menuitem" tabindex="-1" id="ms-context-new" aria-haspopup="menu" aria-expanded="false" aria-controls="ms-context-submenu">${icon('plus')}<span>${esc(t('ms_menu_new'))}</span><span class="ms-context-chevron" aria-hidden="true">›</span></button>
       <div id="ms-context-submenu" class="ms-context-submenu" role="menu" aria-labelledby="ms-context-new" hidden>`
       + this.kinds().map(kind => option('ms-new-kind', t('ms_create_kind', {kind:this.kindLabel(kind)}), `${context} data-kind="${kind}"`, this.kindIcon(kind))).join('')
-      + (isSpace ? '<hr role="separator">' + option('ms-space-new', t('ms_new_space'), '', icon('plus')) : '')
+      + (isSpace && !S.sharedWorkspace ? '<hr role="separator">' + option('ms-space-new', t('ms_new_space'), '', icon('plus')) : '')
       + '</div></div><hr role="separator">'
-      + option(isSpace ? 'ms-space-rename' : 'ms-rename', t('ms_rename'), `data-id="${id}"`)
-      + option('ms-share', t('ms_share'), `data-target="${isSpace ? 'space' : 'item'}" data-id="${id}"`)
-      + option(isSpace ? 'ms-space-delete' : 'ms-delete', t('delete'), `data-id="${id}"`, '', 'is-danger');
+      + (this.can('edit', target) ? option(isSpace ? 'ms-space-rename' : 'ms-rename', t('ms_rename'), `data-id="${id}"`) : '')
+      + (this.can('share', target) ? option('ms-share', t('ms_share'), `data-target="${isSpace ? 'space' : 'item'}" data-id="${id}"`) : '')
+      + (this.can('delete', target) ? option(isSpace ? 'ms-space-delete' : 'ms-delete', t('delete'), `data-id="${id}"`, '', 'is-danger') : '');
     document.body.append(menu); this.menuTrigger = button;
     button.setAttribute('aria-expanded', 'true'); button.setAttribute('aria-controls', menu.id);
     const branch = menu.querySelector('.ms-context-new'), newButton = menu.querySelector('#ms-context-new');
@@ -215,7 +221,7 @@ class MindSpace extends PageController {
       if (!branch.contains(event.target)) this.newSubmenu(false);
     });
     this.positionMenu();
-    newButton.focus();
+    (canNew ? newButton : menu.querySelector('[data-action="ms-rename"],[data-action="ms-space-rename"],[data-action="ms-share"],[data-action="ms-delete"],[data-action="ms-space-delete"]'))?.focus();
   }
   positionMenu() {
     const menu = document.getElementById('ms-context-menu');
@@ -258,7 +264,7 @@ class MindSpace extends PageController {
     if (!menu.contains(event.target) || !['ArrowDown','ArrowUp','Home','End'].includes(event.key)) return;
     event.preventDefault();
     const currentMenu = event.target.closest('[role="menu"]');
-    const options = [...currentMenu.querySelectorAll('[role="menuitem"]')].filter(option => option.closest('[role="menu"]') === currentMenu), index = options.indexOf(event.target);
+    const options = [...currentMenu.querySelectorAll('[role="menuitem"]')].filter(option => option.closest('[role="menu"]') === currentMenu && !option.closest('[hidden]')), index = options.indexOf(event.target);
     options[event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1 : (index + (event.key === 'ArrowUp' ? -1 : 1) + options.length) % options.length]?.focus();
   }
 
@@ -278,7 +284,7 @@ class MindSpace extends PageController {
       spaceName:esc(this.spaceName()), intro:t('ms_intro'), tabsLabel:t('ms_tabs'), tabs:this.tabs(), plus:icon('plus'), addLabel:t('ms_add'),
       pathLabel:t('ms_folder_path'), path, linkedFrom:this.linkedFrom(),
       name:esc(this.active?.name || t('ms_files')),
-      actions:this.active ? `<button type="button" class="text-btn" data-action="ms-rename">${esc(t('ms_rename'))}</button><button type="button" class="text-btn" data-action="ms-move">${esc(t('ms_move'))}</button>` : '', content,
+      actions:this.active ? `${this.can('edit') ? `<button type="button" class="text-btn" data-action="ms-rename">${esc(t('ms_rename'))}</button>` : ''}${this.can('move') ? `<button type="button" class="text-btn" data-action="ms-move">${esc(t('ms_move'))}</button>` : ''}` : '', content,
     });
   }
 
@@ -404,6 +410,10 @@ class MindSpace extends PageController {
     if (target && ['cell','card','column','habit','topic'].includes(target.type)) url.searchParams.set(target.type, target.id);
     // The creation request has finished; do not trigger beforeunload for its form.
     this.busy = false;
+    if (S.sharedWorkspace) {
+      history.replaceState(null, '', url.href);
+      this.home.reset(); render(); return;
+    }
     location.assign(url.href);
   }
 
@@ -411,7 +421,7 @@ class MindSpace extends PageController {
     return this.items(spaceId).filter(item => item.kind === 'folder' && item.id !== exclude && !this.pathTo(item.parent_id, spaceId).some(folder => folder.id === exclude));
   }
   folderOptions(selected, exclude = null, spaceId = this.spaceId()) {
-    return `<option value="0">${esc(this.spaceName(spaceId))}</option>` + this.folders(exclude, spaceId).map(folder => `<option value="${folder.id}" ${folder.id === selected ? 'selected' : ''}>${esc(this.spaceName(spaceId))} / ${esc(this.pathTo(folder.id, spaceId).map(item => item.name).join(' / '))}</option>`).join('');
+    return (S.sharedWorkspace?.root_id ? '' : `<option value="0">${esc(this.spaceName(spaceId))}</option>`) + this.folders(exclude, spaceId).map(folder => `<option value="${folder.id}" ${folder.id === selected ? 'selected' : ''}>${esc(this.spaceName(spaceId))} / ${esc(this.pathTo(folder.id, spaceId).map(item => item.name).join(' / '))}</option>`).join('');
   }
   async submit(form, task) {
     const button = form.querySelector('[type="submit"]');
@@ -508,6 +518,9 @@ class MindSpace extends PageController {
         const next = this.spaces()[0]; S.data.mindspace.id = next?.id || null; S.data.mindspace.name = next?.name || 'MindSpace';
       }
       closeModal();
+      if (S.sharedWorkspace && (isSpace || deleted.has(S.sharedWorkspace.root_id))) {
+        leaveSharedWorkspace(); await refresh(); return;
+      }
       if (removedActive || (isSpace && currentSpace === id)) {
         const nextSpace = isSpace ? this.spaces()[0]?.id : item.mindspace_id || this.spaceId();
         await this.go(isSpace ? null : this.allItems().find(entry => entry.id === item.parent_id) || null, nextSpace);
@@ -515,6 +528,7 @@ class MindSpace extends PageController {
     }); });
   }
   async move(id, parent) {
+    if (!this.can('move')) throw new Error(t('error_forbidden'));
     if (!await this.flush()) return;
     const item = this.allItems().find(entry => entry.id === id);
     if (!item || item.parent_id === parent) return;
@@ -532,6 +546,7 @@ class MindSpace extends PageController {
     form.addEventListener('submit', event => { event.preventDefault(); void this.submit(form, async values => { await this.move(item.id, Number(values.get('parent')) || null); closeModal(); }); });
   }
   canDrop(id, target) {
+    if (!this.can('move')) return false;
     const item = this.allItems().find(entry => entry.id === id);
     const parent = this.allItems().find(entry => entry.id === Number(target.dataset.msDrop));
     const spaceId = Number(target.dataset.msSpace) || (parent ? parent.mindspace_id || S.data.mindspace.id : this.spaceId());
@@ -542,6 +557,9 @@ class MindSpace extends PageController {
     document.querySelectorAll('.ms-drop-target').forEach(el => el.classList.remove('ms-drop-target'));
   }
   async handleAction(action, button) {
+    const right = ['ms-delete','ms-space-delete'].includes(action) ? 'delete' : action === 'ms-share' ? 'share' : action === 'ms-move' ? 'move'
+      : ['ms-new','ms-new-kind','ms-rename','ms-space-rename','ms-card-new','ms-card-edit','ms-column-new','ms-sprint','ms-habits-select','ms-habit-new','ms-sheet-row','ms-sheet-column'].includes(action) ? 'edit' : null;
+    if (right && !this.can(right)) throw new Error(t('error_forbidden'));
     if (action === 'ms-share') {
       if (!await this.flush()) return;
       this.closeMenu();
