@@ -240,7 +240,7 @@
 }
 
 .diagram-node-body { position: relative; }
-.diagram-topic-links { position: absolute; right: -40px; bottom: -22px; display: flex; gap: 3px; z-index: 1; }
+.diagram-topic-links { position: absolute; right: -20px; bottom: -16px; display: flex; gap: 3px; z-index: 1; }
 .diagram-topic-link { position: relative; width: 26px; height: 26px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 5px; background: transparent; color: var(--purple-dark); cursor: pointer; }
 .diagram-link-direction { font: 600 14px/1 system-ui, sans-serif; pointer-events: none; }
 .diagram-canvas-navigation { position: absolute; top: 12px; left: 16px; right: 16px; z-index: 6; pointer-events: none; }
