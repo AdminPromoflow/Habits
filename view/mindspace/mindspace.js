@@ -3,7 +3,7 @@
 class MindSpace extends PageController {
   constructor(home) {
     super(['ms-new','ms-new-kind','ms-open','ms-folder','ms-rename','ms-move','ms-retry',
-      'ms-link-return','ms-sidebar-toggle','ms-sidebar-add','ms-space-open','ms-space-new','ms-entry-menu','ms-space-rename','ms-delete','ms-space-delete',
+      'ms-link-return','ms-link-returns','ms-sidebar-toggle','ms-sidebar-add','ms-space-open','ms-space-new','ms-entry-menu','ms-space-rename','ms-delete','ms-space-delete',
       'ms-card-new','ms-card-edit','ms-sprint','ms-habits-select','ms-habit-new','ms-sheet-row','ms-sheet-column','ms-sheet-export']);
     this.home = home;
     this.editor = new MindSpaceEditors(this);
@@ -238,11 +238,40 @@ class MindSpace extends PageController {
     });
   }
 
+  linkSources() {
+    if (!this.active || this.isDiagram()) return [];
+    return (S.data.diagrams || []).flatMap(diagram => (diagram.nodes || []).filter(node => node.link?.item_id === this.active.id).map(node => ({diagram, node})));
+  }
   linkedFrom() {
-    if (!this.active || this.isDiagram()) return '';
-    const sources = (S.data.diagrams || []).flatMap(diagram => (diagram.nodes || []).filter(node => node.link?.item_id === this.active.id).map(node => ({diagram, node})));
+    const sources = this.linkSources().filter(({node}) => node.link.target === null);
     if (!sources.length) return '';
     return `<nav class="ms-linked-from" aria-label="${esc(t('ms_link_sources'))}"><span>${esc(t('ms_link_sources'))}</span>${sources.map(({diagram, node}) => `<button type="button" data-action="ms-link-return" data-diagram="${diagram.id}" data-node="${esc(node.id)}">← ${esc(diagram.name)} · ${esc(node.text || t('diagram_link_untitled'))}</button>`).join('')}</nav>`;
+  }
+  targetReturnLinks() {
+    const grouped = new Map(), type = MindSpaceLinkTargets.type(this.active);
+    for (const source of this.linkSources()) {
+      const target = source.node.link.target;
+      if (!target || target.type !== type || !MindSpaceLinkTargets.valid({...this.active, content:this.draft}, target)) continue;
+      if (!grouped.has(target.id)) grouped.set(target.id, []);
+      grouped.get(target.id).push(source);
+    }
+    return new Map([...grouped].map(([id, sources]) => {
+      const details = sources.map(({diagram, node}) => ({diagram:diagram.name, topic:node.text || t('diagram_link_untitled')}));
+      const attributes = `data-target-type="${type}" data-target-id="${esc(id)}"`;
+      const single = sources.length === 1, {diagram, node} = sources[0];
+      const label = single ? t('diagram_link_return_to', {name:`${diagram.name} · ${node.text || t('diagram_link_untitled')}`}) : t('diagram_link_returns');
+      const button = this.home.links.arrowButton(single ? 'ms-link-return' : 'ms-link-returns', 'back', label, details,
+        `${attributes}${single ? ` data-diagram="${diagram.id}" data-node="${esc(node.id)}"` : ' aria-haspopup="dialog"'}`);
+      return [id, `<span class="ms-target-return">${button}</span>`];
+    }));
+  }
+  chooseLinkReturn(button) {
+    const type = button.dataset.targetType, id = button.dataset.targetId;
+    const sources = this.linkSources().filter(({node}) => node.link.target?.type === type && node.link.target.id === id);
+    if (!sources.length) throw new Error(t('error_diagram_link_missing'));
+    openModal('diagram_link_returns', `<div class="diagram-return-list">${sources.map(({diagram, node}) =>
+      `<button type="button" class="btn secondary" data-action="ms-link-return" data-diagram="${diagram.id}" data-node="${esc(node.id)}" data-target-type="${esc(type)}" data-target-id="${esc(id)}">
+        <span aria-hidden="true">←</span>${this.home.links.detailsHtml([{diagram:diagram.name, topic:node.text || t('diagram_link_untitled')}])}</button>`).join('')}</div>`);
   }
   async returnToLink(button) {
     const generation = this.generation, id = this.active?.id;
@@ -250,10 +279,12 @@ class MindSpace extends PageController {
     const diagrams = await this.home.makeRequest('diagrams');
     if (generation !== this.generation) return;
     const diagram = diagrams.find(entry => entry.id === Number(button.dataset.diagram));
-    if (!diagram?.nodes.some(node => node.id === button.dataset.node && node.link?.item_id === id)) throw new Error(t('error_diagram_link_missing'));
+    const source = diagram?.nodes.find(node => node.id === button.dataset.node && node.link?.item_id === id);
+    if (!source || (button.dataset.targetType && (source.link.target?.type !== button.dataset.targetType || source.link.target.id !== button.dataset.targetId))) throw new Error(t('error_diagram_link_missing'));
     const item = this.allItems().find(entry => entry.diagram_id === diagram.id);
     if (!item) throw new Error(t('error_diagram_link_missing'));
     S.data.diagrams = diagrams;
+    if (button.closest?.('#modal')) closeModal();
     await this.go(item, item.mindspace_id, {type:'topic', id:button.dataset.node});
   }
   render() { return this.frame(!this.active || this.active.kind === 'folder' ? this.folderContent() : this.editor.render()); }
@@ -468,6 +499,7 @@ class MindSpace extends PageController {
   }
   async handleAction(action, button) {
     if (action === 'ms-link-return') return this.returnToLink(button);
+    if (action === 'ms-link-returns') return this.chooseLinkReturn(button);
     if (action === 'ms-sidebar-toggle') return this.toggleSidebar();
     if (action === 'ms-entry-menu') return this.entryMenu(button);
     if (action === 'ms-sidebar-add') {

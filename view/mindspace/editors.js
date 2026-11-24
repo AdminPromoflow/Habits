@@ -35,6 +35,7 @@ class MindSpaceEditors {
   statuses() { return this.space.active.kind === 'scrum' ? ['backlog','todo','doing','done'] : ['todo','doing','done']; }
   board() {
     const draft = this.space.draft, scrum = this.space.active.kind === 'scrum', sprint = draft.sprint || {};
+    const returns = this.space.targetReturnLinks();
     return `<div class="ms-board-editor">${scrum ? `<div class="ms-sprint"><div><h3>${esc(sprint.name || t('ms_sprint'))}</h3><p>${esc(sprint.goal || t('ms_sprint_hint'))}</p>
       ${sprint.start || sprint.end ? `<small>${esc(sprint.start || '')} — ${esc(sprint.end || '')}</small>` : ''}</div><button class="btn secondary" data-action="ms-sprint">${esc(t('ms_edit_sprint'))}</button></div>` : ''}
       <div class="ms-board">${this.statuses().map(status => {
@@ -42,7 +43,7 @@ class MindSpaceEditors {
         return `<section class="ms-column" data-ms-column="${status}" aria-label="${esc(t(`ms_status_${status}`))}"><header><h3>${esc(t(`ms_status_${status}`))}</h3><span>${cards.length}</span></header>
           ${cards.map(card => `<article class="ms-card" draggable="true" data-ms-card="${card.id}"><button type="button" class="ms-card-title" data-action="ms-card-edit" data-id="${card.id}">${esc(card.title)}</button>
             ${card.description ? `<p>${esc(card.description)}</p>` : ''}${scrum ? `<small>${esc(t('ms_points'))}: ${card.points}</small>` : ''}
-            <label class="sr-only" for="ms-card-${card.id}">${esc(t('ms_card_status'))}: ${esc(card.title)}</label><select id="ms-card-${card.id}" data-ms-card-status="${card.id}">${this.statuses().map(value => `<option value="${value}" ${value === status ? 'selected' : ''}>${esc(t(`ms_status_${value}`))}</option>`).join('')}</select></article>`).join('')}
+            <label class="sr-only" for="ms-card-${card.id}">${esc(t('ms_card_status'))}: ${esc(card.title)}</label><select id="ms-card-${card.id}" data-ms-card-status="${card.id}">${this.statuses().map(value => `<option value="${value}" ${value === status ? 'selected' : ''}>${esc(t(`ms_status_${value}`))}</option>`).join('')}</select>${returns.get(card.id) || ''}</article>`).join('')}
           <button type="button" class="ms-add-card" data-action="ms-card-new" data-status="${status}">${icon('plus')}${esc(t('ms_add_card'))}</button></section>`;
       }).join('')}</div></div>`;
   }
@@ -86,13 +87,14 @@ class MindSpaceEditors {
 
   habits() {
     const date = S.date || today(), ids = new Set(this.space.draft.habit_ids);
+    const returns = this.space.targetReturnLinks();
     const habits = (S.data.habits || []).filter(habit => ids.has(habit.id) && habit.permission === 'owner');
     return `<div class="ms-habits"><div class="ms-editor-toolbar"><label>${esc(t('date'))}<input type="date" data-ms-habit-date value="${esc(date)}" max="${today()}"></label>
       <button type="button" class="btn secondary" data-action="ms-habits-select">${esc(t('ms_choose_habits'))}</button><button type="button" class="btn primary" data-action="ms-habit-new">${icon('plus')}${esc(t('new_habit'))}</button></div>
       ${habits.length ? `<div class="ms-habit-list">${habits.map(habit => {
         const complete = done(habit, date), enabled = habit.status === 'active' && date <= today() && scheduled(habit, date);
         return `<article class="ms-habit" data-ms-habit="${habit.id}"><button type="button" role="checkbox" aria-checked="${complete}" aria-label="${esc(t('diagram_checkbox_task', { name:habit.name }))}" data-action="toggle-habit" data-id="${habit.id}" data-date="${date}" ${enabled ? '' : 'disabled'}>${complete ? icon('check') : ''}</button>
-          <div><button type="button" class="ms-habit-name" data-action="habit-detail" data-id="${habit.id}" data-date="${date}">${esc(habit.name)}</button><small>${esc(goalLabel(habit))} · ${esc(habitCategory(habit))}</small></div></article>`;
+          <div><button type="button" class="ms-habit-name" data-action="habit-detail" data-id="${habit.id}" data-date="${date}">${esc(habit.name)}</button><small>${esc(goalLabel(habit))} · ${esc(habitCategory(habit))}</small></div>${returns.get(String(habit.id)) || ''}</article>`;
       }).join('')}</div>` : `<div class="ms-empty">${icon('habits')}<p>${esc(t('ms_habits_empty'))}</p></div>`}</div>`;
   }
   async chooseHabits() {
@@ -123,12 +125,14 @@ class MindSpaceEditors {
 
   sheet() {
     const sheet = this.space.draft, evaluator = new MindSpaceSheet(sheet);
+    const returns = this.space.targetReturnLinks();
     return `<div class="ms-sheet">
       <div class="ms-formula-bar"><span id="ms-cell-address">${this.cell}</span><span aria-hidden="true">ƒx</span><input data-ms-formula aria-label="${esc(t('ms_formula'))}" maxlength="2000" value="${esc(sheet.cells?.[this.cell] || '')}"></div>
       <div class="ms-sheet-scroll"><table aria-label="${esc(this.space.active.name)}"><thead><tr><th></th>${Array.from({ length:sheet.columns }, (_,col) => `<th scope="col">${MindSpaceSheet.column(col)}</th>`).join('')}</tr></thead><tbody>
       ${Array.from({ length:sheet.rows }, (_,row) => `<tr><th scope="row">${row + 1}</th>${Array.from({ length:sheet.columns }, (_,col) => {
         const key = `${MindSpaceSheet.column(col)}${row + 1}`;
-        return `<td><input data-ms-cell="${key}" aria-label="${key}" autocomplete="off" spellcheck="false" maxlength="2000" value="${esc(evaluator.display(key))}"></td>`;
+        const back = returns.get(key) || '';
+        return `<td><div class="ms-sheet-cell${back ? ' has-return' : ''}"><input data-ms-cell="${key}" aria-label="${key}" autocomplete="off" spellcheck="false" maxlength="2000" value="${esc(evaluator.display(key))}">${back}</div></td>`;
       }).join('')}</tr>`).join('')}</tbody></table></div><p class="ms-sheet-hint">${esc(t('ms_sheet_hint'))}</p></div>`;
   }
   recalculate() {

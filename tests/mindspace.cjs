@@ -131,6 +131,76 @@ test('cell deep links focus and highlight exactly their selected cell once',()=>
   assert.equal(focused,1);assert.equal(scrolled,1);assert.equal(classes.has('ms-link-target'),true);
 });
 
+function cellReturnFixture() {
+  const fixture=setup('http://localhost/?item=3&cell=B3'),{space,state,context,home}=fixture;
+  context.MindSpaceSheet=Sheet;
+  vm.runInContext(fs.readFileSync('view/mindspace/link-targets.js','utf8'),context);
+  home.links=vm.runInContext(fs.readFileSync('view/home/diagram-links.js','utf8')+'\nObject.create(DiagramLinks.prototype);',context);
+  const Editors=vm.runInContext(fs.readFileSync('view/mindspace/editors.js','utf8')+'\nMindSpaceEditors;',context);
+  space.editor=new Editors(space);
+  const sheet=state.data.mindspace.items.find(item=>item.id===3);
+  sheet.kind='spreadsheet';sheet.content={rows:3,columns:2,cells:{B3:'42'}};space.resolve();
+  state.data.diagrams=[{id:10,name:'Source map',nodes:[{id:'root',text:'Budget topic',link:{item_id:3,target:{type:'cell',id:'B3'}}}]}];
+  return fixture;
+}
+test('only the linked cell receives a return arrow, with the source tooltip and no duplicate header link',()=>{
+  const {space,state}=cellReturnFixture();
+  const html=space.editor.sheet();
+  assert.match(html,/<div class="ms-sheet-cell has-return"><input data-ms-cell="B3"[^>]*value="42">.*data-action="ms-link-return"/s);
+  assert.equal((html.match(/data-action="ms-link-return"/g)||[]).length,1);
+  assert.match(html,/data-target-id="B3"/);assert.match(html,/Budget topic/);assert.match(html,/Source map/);
+  assert.equal(space.linkedFrom(),'');
+  state.data.diagrams[0].nodes[0].link.target=null;
+  assert.doesNotMatch(space.editor.sheet(),/data-action="ms-link-return"/);
+  assert.match(space.linkedFrom(),/Budget topic/);
+  state.data.diagrams[0].nodes[0].link=null;
+  assert.equal(space.linkedFrom(),'');assert.equal(space.targetReturnLinks().size,0);
+});
+test('multiple sources on one cell open a chooser limited to that exact cell',()=>{
+  const {space,state,context}=cellReturnFixture();
+  state.data.diagrams[0].nodes.push({id:'second',text:'Second source',link:{item_id:3,target:{type:'cell',id:'B3'}}},
+    {id:'other',text:'Different cell',link:{item_id:3,target:{type:'cell',id:'A1'}}});
+  const arrow=space.targetReturnLinks().get('B3');
+  assert.match(arrow,/data-action="ms-link-returns"/);assert.match(arrow,/aria-haspopup="dialog"/);
+  let modal;context.openModal=(title,html)=>{modal={title,html};};
+  space.chooseLinkReturn({dataset:{targetType:'cell',targetId:'B3'}});
+  assert.equal(modal.title,'diagram_link_returns');
+  assert.match(modal.html,/Budget topic/);assert.match(modal.html,/Second source/);assert.doesNotMatch(modal.html,/Different cell/);
+  assert.equal((modal.html.match(/data-action="ms-link-return"/g)||[]).length,2);
+});
+test('cell return arrows save edits and reject sources that moved to another cell',async()=>{
+  const {space,state,home,location}=cellReturnFixture();const calls=[];
+  space.draft.cells.B3='99';
+  home.makeRequest=async(action,data)=>{calls.push(action);return action==='diagrams'?state.data.diagrams:{...space.active,content:data.content,version:2};};
+  const button={dataset:{diagram:'10',node:'root',targetType:'cell',targetId:'B3'}};
+  await space.returnToLink(button);
+  assert.deepEqual(calls,['saveMindSpaceItem','diagrams']);
+  assert.equal(space.active.content.cells.B3,'99');
+  assert.equal(new URL(location.assigned).searchParams.get('topic'),'root');
+  delete location.assigned;
+  state.data.diagrams[0].nodes[0].link.target.id='A1';
+  await assert.rejects(space.returnToLink(button),/error_diagram_link_missing/);
+  assert.equal(location.assigned,undefined);
+});
+test('cell return failures preserve edits and do not navigate',async()=>{
+  const {space,home,location}=cellReturnFixture();space.draft.cells.B3='Keep me';
+  home.makeRequest=async()=>{throw new Error('Offline');};
+  await space.returnToLink({dataset:{diagram:'10',node:'root',targetType:'cell',targetId:'B3'}});
+  assert.equal(space.draft.cells.B3,'Keep me');assert.equal(location.assigned,undefined);assert.equal(space.error,'Offline');
+});
+test('card and habit return arrows stay attached to the exact linked target',()=>{
+  const {space,state}=cellReturnFixture();
+  for(const kind of ['kanban','scrum']) {
+    space.active.kind=kind;space.draft={cards:[{id:'card',title:'Linked card',status:'todo',points:0}],sprint:{}};
+    state.data.diagrams[0].nodes[0].link.target={type:'card',id:'card'};
+    assert.match(space.editor.board(),/data-ms-card="card"[^]*data-target-id="card"/);
+  }
+  space.active.kind='habits';space.draft={habit_ids:[7]};state.data.habits=[{id:7,name:'Read',permission:'owner'}];
+  state.data.diagrams[0].nodes[0].link.target={type:'habit',id:'7'};
+  assert.match(space.targetReturnLinks().get('7'),/data-target-type="habit"/);
+  space.draft.habit_ids=[];assert.equal(space.targetReturnLinks().size,0);
+});
+
 function multiple(url='http://localhost/?space=200&folder=0') {
   const fixture = setup(url), data = fixture.state.data.mindspace;
   data.id = 100; data.name = 'MindSpace';
