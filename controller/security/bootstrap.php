@@ -20,6 +20,8 @@ spl_autoload_register(static function (string $class): void {
         'AppError' => 'controller/security/error.php',
         'Mailer' => 'controller/emails/mailer.php',
         'DiagramsModel' => 'model/diagrams/diagrams.php',
+        'MindSpacesModel' => 'model/mindspaces/mindspaces.php',
+        'MindSpacesController' => 'controller/mindspaces/mindspaces.php',
         'Request' => 'controller/security/request.php',
         'DashboardController' => 'controller/dashboard/dashboard.php',
         'AuthController' => 'controller/users/users.php',

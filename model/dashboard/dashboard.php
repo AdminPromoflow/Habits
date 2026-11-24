@@ -16,6 +16,7 @@ final class DashboardModel extends BaseModel
             )
             : [];
         return [
+            'mindspace' => (new MindSpacesModel($this->db, $this->user))->available() ? (new MindSpacesModel($this->db, $this->user))->get() : null,
             'diagrams' => (new DiagramsModel($this->db, $this->user))->list(),
             'today' => $this->today(),
             'habits' => $habits,

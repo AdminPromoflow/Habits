@@ -10,6 +10,7 @@ class HomePage extends PageController {
     this.nodeTools = new DiagramNodeTools(this);
     this.links = new DiagramLinks(this);
     this.history = new DiagramHistory(this);
+    this.mindspace = new MindSpace(this);
     this.generation = 0;
     this.viewport = new DiagramViewport({
       canInteract: () => !this.drag && !this.resizing && !this.connectionTool?.drag && !this.connectionTool?.editingRoute && !this.layoutOpen && !this.titleEditing,
@@ -195,7 +196,7 @@ class HomePage extends PageController {
     this.bindDragging();
     this.bindResizing();
     window.addEventListener('beforeunload', (event) => {
-      if (this.saving || this.hasChanges()) {
+      if (this.saving || this.hasChanges() || this.mindspace.isEditing()) {
         event.preventDefault();
         event.returnValue = '';
       }
@@ -204,6 +205,7 @@ class HomePage extends PageController {
 
   reset() {
     clearTimeout(this.timer);
+    this.mindspace?.reset();
     this.generation++;
     this.links?.navigation.memory.clear();
     this.links?.navigation.closeMenu();
@@ -248,7 +250,16 @@ class HomePage extends PageController {
   }
 
   render() {
-    if (!this.isEditing()) {
+    let changedDiagram = false;
+    if (this.mindspace.enabled()) {
+      this.mindspace.resolve();
+      if (!this.mindspace.isDiagram()) return this.mindspace.render();
+      if (this.active?.id !== this.mindspace.active.diagram_id) {
+        changedDiagram = true;
+        this.active = S.data.diagrams?.find(item => item.id === this.mindspace.active.diagram_id) || null;
+      }
+    }
+    if (changedDiagram || !this.isEditing()) {
       this.active =
         S.data.diagrams?.find((item) => item.id === this.active?.id) ||
         S.data.diagrams?.find((item) => String(item.id) === new URL(location.href).searchParams.get('diagram')) ||
@@ -264,7 +275,7 @@ class HomePage extends PageController {
       this.rememberDiagram();
       this.history.reconcile();
     }
-    return renderTemplate('home', {
+    const values = {
       greeting: t('greeting', { name: esc(S.user.name.split(' ')[0]) }),
       plus: icon('plus'),
       createLabel: t('create_diagram'),
@@ -273,7 +284,8 @@ class HomePage extends PageController {
       diagramToolbar: this.toolbarContent(),
       linkNavigation: this.links.navigation.html(),
       content: this.stageContent(),
-    });
+    };
+    return this.mindspace.enabled() ? this.mindspace.renderDiagram(values) : renderTemplate('home', values);
   }
 
   stageContent() {
@@ -361,6 +373,7 @@ class HomePage extends PageController {
   }
 
   syncToolbar() {
+    this.mindspace.syncTabs();
     this.links.navigation.closeMenu();
     const create = document.getElementById('create-diagram');
     if (create) create.disabled = this.switching;
@@ -437,6 +450,8 @@ class HomePage extends PageController {
     try {
       if (!await this.finishBeforeSwitch()) return;
       const url = new URL(location.href);
+      url.searchParams.delete('item');
+      url.searchParams.delete('folder');
       url.searchParams.set('diagram', id);
       url.searchParams.delete('topic');
       if (topic !== undefined) url.searchParams.set('topic', topic ?? 'overview');
@@ -488,6 +503,7 @@ class HomePage extends PageController {
   }
 
   mount() {
+    if (this.mindspace.enabled() && !this.mindspace.isDiagram()) { this.mindspace.mount(); return; }
     this.history.ensure();
     this.syncToolbar();
     this.syncTitleState();
@@ -496,6 +512,7 @@ class HomePage extends PageController {
     this.positionTree();
     this.links.arrive();
     if (this.error) this.showStatus(this.error, true);
+    if (this.mindspace.enabled()) this.mindspace.mount();
   }
 
   keyFor(target) {
@@ -1214,7 +1231,9 @@ class HomePage extends PageController {
   }
 
   isEditing() {
+    if (this.mindspace?.enabled() && !this.mindspace.isDiagram()) return this.mindspace.isEditing();
     return !!(
+      this.mindspace?.isEditing() ||
       this.draft ||
       this.selected ||
       this.editing ||
@@ -1300,6 +1319,7 @@ class HomePage extends PageController {
         diagram,
         ...(S.data.diagrams || []).filter((item) => item.id !== diagram.id),
       ];
+      this.mindspace.adoptDiagram(diagram);
       this.rememberDiagram();
       this.syncToolbar();
       this.showStatus(t('diagram_saved'));

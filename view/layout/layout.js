@@ -84,6 +84,7 @@ function personalPage() {
 }
 
 async function navigate(view) {
+  if (S.view === 'home' && view !== 'home' && pageControllers.home.mindspace.enabled() && !await pageControllers.home.mindspace.flush()) return;
   if (S.mode === 'personal' && view === 'categories') view = 'settings';
   if (view === 'habits') {
     S.filter = { category: '', routine: '', status: 'active', search: '' };

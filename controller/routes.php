@@ -38,6 +38,11 @@ return [
     'saveTemplate' => 'admin',
     'platform' => 'admin',
     'diagrams' => 'diagrams',
+    'mindspace' => 'mindspaces',
+    'createMindSpaceItem' => 'mindspaces',
+    'saveMindSpaceItem' => 'mindspaces',
+    'addMindSpaceHabit' => 'mindspaces',
+    'moveMindSpaceItem' => 'mindspaces',
     'saveDiagram' => 'diagrams',
     'deleteDiagram' => 'diagrams',
 ];

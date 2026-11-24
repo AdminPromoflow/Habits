@@ -48,6 +48,8 @@ const ICONS = {
   lock: 'M6 10h12v11H6zM8 10V7a4 4 0 0 1 8 0v3',
   bell: 'M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4',
   logout: 'M9 3H4v18h5M14 8l5 4-5 4M8 12h11',
+  folder: 'M3 7V5h6l2 2h10v13H3V7Z',
+  table: 'M3 4h18v16H3V4ZM3 9h18M3 14h18M9 4v16M15 4v16',
   search: 'M21 21l-5-5M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16',
   sun: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1 1M18 18l1 1M5 19l1-1M18 6l1-1',
   moon: 'M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10',

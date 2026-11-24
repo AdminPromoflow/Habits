@@ -297,6 +297,7 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
   vm.runInContext(fs.readFileSync('view/home/diagram-routing.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('view/home/diagram-connections.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('view/home/diagram-history.js', 'utf8'), context);
+  for (const file of ['sheet', 'editors', 'mindspace']) vm.runInContext(fs.readFileSync(`view/mindspace/${file}.js`, 'utf8'), context);
   const HomePage = vm.runInContext(fs.readFileSync('view/home/home.js', 'utf8') + '\nHomePage;', context);
   const home = new HomePage();
   if (draft) {

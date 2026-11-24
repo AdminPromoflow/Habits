@@ -63,6 +63,7 @@ class ApplicationActions extends PageController {
         break;
       }
       case 'logout':
+        if (S.view === 'home' && pageControllers.home.mindspace.enabled() && !await pageControllers.home.mindspace.flush()) return;
         await this.makeRequest('logout', {});
         S.mode = 'personal';
         S.view = 'home';
@@ -71,6 +72,7 @@ class ApplicationActions extends PageController {
         await bootstrap();
         break;
       case 'switch-mode':
+        if (S.view === 'home' && pageControllers.home.mindspace.enabled() && !await pageControllers.home.mindspace.flush()) return;
         S.mode = S.mode === 'admin' ? 'personal' : 'admin';
         S.view = S.mode === 'admin' ? 'overview' : 'home';
         if (S.mode === 'admin') S.admin = await this.makeRequest('admin');

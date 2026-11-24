@@ -5,8 +5,11 @@ final class DiagramsModel extends BaseModel
 {
     public function list(): array
     {
+        $mindspace = (new MindSpacesModel($this->db, $this->user))->available();
         $diagrams = $this->db->all(
-            'SELECT id,name,version,created_at,updated_at,connections_json FROM diagrams WHERE owner_user_id=? ORDER BY updated_at DESC,id DESC',
+            'SELECT d.id,d.name,d.version,d.created_at,d.updated_at,d.connections_json,' . ($mindspace ? 'i.id' : 'NULL') . ' AS mindspace_item_id FROM diagrams d ' .
+            ($mindspace ? 'LEFT JOIN mindspace_items i ON i.diagram_id=d.id ' : '') .
+            'WHERE d.owner_user_id=? ORDER BY d.updated_at DESC,d.id DESC',
             [$this->uid()],
         );
         $nodes = $this->db->all(
@@ -53,6 +56,7 @@ final class DiagramsModel extends BaseModel
         if ($writeNodes && ($nodes !== null || array_key_exists('connections', $data) || array_key_exists('hidden_connections', $data) || array_key_exists('connection_styles', $data))) $this->saveConnections($id, $data);
         $diagram = $this->db->one('SELECT id,name,version,created_at,updated_at,connections_json FROM diagrams WHERE id=? AND owner_user_id=?', [$id, $this->uid()]);
         $diagram['nodes'] = array_map(self::nodeResponse(...), $this->db->all('SELECT * FROM diagram_nodes WHERE diagram_id=? ORDER BY sort_order', [$id]));
+        $diagram['mindspace_item_id'] = (new MindSpacesModel($this->db, $this->user))->attachDiagram($id);
         return self::diagramResponse($diagram);
     }
 

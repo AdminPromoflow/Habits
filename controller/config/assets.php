@@ -19,6 +19,7 @@ return [
         'view/category_week/category_week.css',
         'view/habits/category_tiles.css',
         'view/home/home.css',
+        'view/mindspace/mindspace.css',
         'view/home/diagram-layout-panel.css',
     ],
     'scripts' => [
@@ -36,6 +37,9 @@ return [
         'view/home/diagram-links.js',
         'view/home/diagram-connections.js',
         'view/home/diagram-history.js',
+        'view/mindspace/sheet.js',
+        'view/mindspace/editors.js',
+        'view/mindspace/mindspace.js',
         'view/home/home.js',
         'view/habits/habits.js',
         'view/categories/categories.js',
@@ -52,6 +56,7 @@ return [
     'templates' => [
         'view/auth/auth.php',
         'view/home/home.php',
+        'view/mindspace/mindspace.php',
         'view/habits/habits.php',
         'view/categories/categories.php',
         'view/category_week/category_week.php',

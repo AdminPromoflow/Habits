@@ -264,6 +264,10 @@ try:
  for path in ['config/local.php','storage/initial-access.txt','database/routine-nov-dec-2026.json','.git/config','app/Habits.php','model/diagrams/diagrams.php','controller/security/bootstrap.php','controller/config/database.php','controller/diagrams/diagrams.php','view/home/home.php','tests/provision.php','tests/.runtime/mail/']:
   try:urllib.request.urlopen(BASE+'/'+path);raise AssertionError('Private path exposed: '+path)
   except urllib.error.HTTPError as e:check(e.code==404,'HTTP denies '+path)
+ from mindspace_acceptance import run as test_mindspace
+ ms_owner=Client();ms_owner.register('mindspace@example.test','MindSpace tester')
+ ms_other=Client();ms_other.register('mindspace-other@example.test','Other MindSpace tester')
+ test_mindspace(ms_owner, ms_other, guest, check)
  subprocess.run([PHP,'tests/constraints.php'],cwd=ROOT,env=env,check=True)
  (ROOT/'tests/.runtime/environment.json').write_text(json.dumps({'database':DB,'base_url':BASE,'env':{k:v for k,v in env.items() if k.startswith('RUTINA_')}},indent=2))
  check(True,'All tests ran against a dedicated MySQL database, without touching Aleina’s real data')
