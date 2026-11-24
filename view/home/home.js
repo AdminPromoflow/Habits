@@ -83,10 +83,6 @@ class HomePage extends PageController {
       if (!this.isNameField(event.target) || !this.editing || this.keyFor(event.target) !== this.selectedKey) return;
       this.commitName();
       this.editing = false;
-      if (!this.name.trim() && this.discardChildDraft()) {
-        void this.save();
-        return;
-      }
       this.syncNodeState();
       void this.save();
     });
@@ -146,11 +142,8 @@ class HomePage extends PageController {
       if (!this.isNameField(event.target) || event.target.readOnly) return;
       if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
-        if (!this.name.trim()) this.showStatus(t('diagram_name_required'), true);
-        else {
-          event.target.blur();
-          this.element('node')?.focus({ preventScroll: true });
-        }
+        event.target.blur();
+        this.element('node')?.focus({ preventScroll: true });
       } else if (event.key === 'Escape') {
         event.preventDefault();
         clearTimeout(this.timer);
@@ -160,7 +153,7 @@ class HomePage extends PageController {
           return;
         }
         if (this.saving) return;
-        this.name = this.savedNode()?.text || this.submittedChildren.get(this.selectedKey) || this.active?.name || '';
+        this.name = this.savedNode()?.text ?? this.submittedChildren.get(this.selectedKey) ?? this.active?.name ?? '';
         this.commitName();
         this.draft = null;
         this.selected = !!this.active;
@@ -311,7 +304,7 @@ class HomePage extends PageController {
     const diagrams = S.data.diagrams || [];
     if (!diagrams.length && !this.draft) return '';
     const options = diagrams.map((diagram) =>
-      `<option value="${esc(diagram.id)}" ${diagram.id === this.active?.id ? 'selected' : ''}>${esc(diagram.name.replace(/\s+/g, ' ').trim())} · #${esc(diagram.id)}</option>`).join('');
+      `<option value="${esc(diagram.id)}" ${diagram.id === this.active?.id ? 'selected' : ''}>${esc(diagram.name.replace(/\s+/g, ' ').trim())}</option>`).join('');
     return renderTemplate('diagram-toolbar', {
       label: t('my_diagrams'),
       disabled: this.switching ? 'disabled' : '',
@@ -343,10 +336,6 @@ class HomePage extends PageController {
       await this.save();
       if (generation !== this.generation || this.error) return false;
     } while (this.hasChanges());
-    if (this.snapshot().some((node) => !node.text.trim())) {
-      this.showStatus(t('diagram_name_required'), true);
-      return false;
-    }
     return true;
   }
 
@@ -444,8 +433,7 @@ class HomePage extends PageController {
 
   snapshot() {
     this.commitName();
-    return this.ensureTree().filter((node) => !this.childDrafts.has(node.id) ||
-      this.submittedChildren.has(node.id) || node.text.trim()).map((node) => ({ ...node, text: this.normalizedName(node.text) }));
+    return this.ensureTree().map((node) => ({ ...node, text: this.normalizedName(node.text) }));
   }
 
   discardChildDraft(key = this.selectedKey) {
@@ -470,7 +458,6 @@ class HomePage extends PageController {
   hasChanges() {
     if (!this.active && !this.draft) return false;
     const nodes = this.snapshot();
-    if (nodes.some((node) => !node.text.trim())) return false;
     return !!this.draft || this.titleName() !== this.active.name ||
       this.fingerprint(nodes) !== this.fingerprint(this.treeFor(this.active));
   }
@@ -687,7 +674,7 @@ class HomePage extends PageController {
     if (!this.active && !this.draft) return;
     this.commitName();
     const source = this.ensureTree().find((node) => node.id === this.selectedKey);
-    if (!source?.text.trim()) { this.beginEditing(); return; }
+    if (!source) return;
     const sibling = relation === 'sibling';
     const parentKey = sibling ? source.parent_id : source.id;
     // A parent must be persisted before it can own another local draft.
@@ -738,6 +725,7 @@ class HomePage extends PageController {
     this.drawStage();
     this.viewport.reveal(this.element('root'));
     this.beginEditing();
+    this.scheduleSave();
   }
 
   openLayout() {
@@ -1039,11 +1027,7 @@ class HomePage extends PageController {
     const nodes = this.snapshot();
     const name = this.titleName();
     this.diagramTitle = name;
-    const invalid = nodes.some((node) => !node.text.trim());
-    if (invalid || this.saving || (!this.active && !this.draft)) {
-      if (invalid && this.active) this.showStatus(t('diagram_name_required'), true);
-      return;
-    }
+    if (this.saving || (!this.active && !this.draft)) return;
     if (!this.hasChanges()) {
       if (!this.childDrafts.has(this.selectedKey)) this.showStatus(t('diagram_saved'));
       return;
@@ -1095,7 +1079,7 @@ class HomePage extends PageController {
     if (!status) return;
     status.className = error ? 'diagram-status is-error' : 'diagram-status sr-only';
     status.textContent = message;
-    if (error && this.name.trim()) {
+    if (error) {
       const retry = document.createElement('button');
       retry.type = 'button';
       retry.className = 'text-btn';

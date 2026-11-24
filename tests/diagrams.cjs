@@ -516,14 +516,15 @@ test('text area grows and shrinks on mount, input and viewport resizing', () => 
   assert.equal(field.style.height, '120px');
 });
 
-test('names containing only whitespace and line breaks are never submitted', async () => {
-  const { home } = editor({ draft: false });
-  home.active = { id: 34, name: 'Nombre válido', version: 1 };
+test('blank node text and intentional line breaks are saved without changing the diagram title', async () => {
+  const { home } = savedEditor();
   home.name = ' \n\t\n ';
-  home.makeRequest = () => { throw new Error('No request expected'); };
+  home.makeRequest = async (action, data) => ({ ...JSON.parse(JSON.stringify(data)), version: data.version + 1 });
   await home.save();
-  assert.equal(home.error, 'diagram_name_required');
-  assert.equal(home.active.name, 'Nombre válido');
+  assert.equal(home.error, '');
+  assert.equal(home.active.name, 'Idea guardada');
+  assert.equal(home.active.nodes[0].text, '\n\t\n');
+  assert.equal(home.hasChanges(), false);
 });
 
 test('creating a diagram saves immediately without typing and restores after reload', async () => {
@@ -702,20 +703,21 @@ test('a late response from a signed-out account cannot enter another account sta
   assert.equal(timers.size, 0);
 });
 
-test('empty edits keep the saved name and restoring it clears validation errors', async () => {
-  const { home } = editor();
-  home.active = { id: 1, name: 'Saved', version: 2 };
-  home.diagramTitle = 'Saved';
-  home.draft = null;
-  home.makeRequest = () => { throw new Error('No request expected'); };
+test('clearing a saved idea persists an empty string and Escape restores that empty text', async () => {
+  const { home, doubleClick, typeName, pressKey } = savedEditor();
+  home.makeRequest = async (action, data) => ({ ...JSON.parse(JSON.stringify(data)), version: data.version + 1 });
   home.name = '  ';
   await home.save();
-  assert.equal(home.active.name, 'Saved');
-  assert.equal(home.error, 'diagram_name_required');
-  home.name = ' Saved ';
-  await home.save();
+  assert.equal(home.active.name, 'Idea guardada');
+  assert.equal(home.active.nodes[0].text, '');
   assert.equal(home.error, '');
-  assert.equal(home.isEditing(), false);
+  home.drawStage();
+  doubleClick();
+  typeName('No guardar');
+  pressKey('Escape');
+  assert.equal(home.name, '');
+  assert.equal(home.nodes[0].text, '');
+  assert.equal(home.hasChanges(), false);
 });
 
 test('children persist their parent and inherit layout without changing the root name', async () => {
@@ -1263,40 +1265,45 @@ test('a new child is empty, focused and editable, then Enter saves only its type
   assert.equal(home.hasChanges(), false);
 });
 
-test('leaving an empty new child removes only the draft and saves other node changes', async () => {
-  const { home, fields } = blankChildEditor();
+test('leaving an empty new child preserves it, saves other changes and restores both after reload', async () => {
+  const { home, state, fields } = blankChildEditor();
   const requests = [];
   home.makeRequest = async (action, data) => {
     requests.push(JSON.parse(JSON.stringify(data)));
-    return { id: data.id, name: data.name, nodes: data.nodes, version: data.version + 1 };
+    return { ...JSON.parse(JSON.stringify(data)), version: data.version + 1 };
   };
   await home.addChild();
   const key = home.selectedKey;
   home.nodes[0].width = 270;
   fields.get(key).field.blur();
   await new Promise(setImmediate);
-  assert.equal(home.nodes.length, 1);
+  assert.equal(home.nodes.length, 2);
   assert.equal(home.nodes[0].width, 270);
   assert.equal(requests.length, 1);
-  assert.equal(requests[0].nodes.length, 1);
-  assert.equal(home.selectedKey, 'root');
+  assert.equal(requests[0].nodes.find(node => node.id === key).text, '');
+  assert.equal(home.selectedKey, key);
   assert.equal(home.error, '');
+  assert.equal(home.hasChanges(), false);
+  const restored = editor({ draft: false, state: JSON.parse(JSON.stringify(state)) });
+  restored.home.render();
+  assert.equal(restored.home.nodes.find(node => node.id === key).text, '');
+  assert.equal(restored.home.nodes[0].width, 270);
 });
 
-test('Escape cancels an unsent named child and an empty draft cannot own another child', async () => {
-  const { home, fields, typeName, handleKey } = blankChildEditor();
-  home.makeRequest = () => { throw new Error('Unsent drafts must not save'); };
+test('an empty idea can own another empty child and Enter persists both', async () => {
+  const { home, fields, handleKey } = blankChildEditor();
+  home.makeRequest = async (action, data) => ({ ...JSON.parse(JSON.stringify(data)), version: data.version + 1 });
   await home.addChild();
-  const key = home.selectedKey;
+  const parent = home.selectedKey;
   await home.addChild();
-  assert.equal(home.nodes.length, 2);
-  assert.equal(home.selectedKey, key);
-  typeName('Todavía sin guardar', fields.get(key).field);
-  handleKey('Escape', fields.get(key).field);
+  const child = home.selectedKey;
+  assert.notEqual(child, parent);
+  handleKey('Enter', fields.get(child).field);
   await new Promise(setImmediate);
-  assert.equal(home.nodes.length, 1);
-  assert.equal(home.selectedKey, 'root');
-  assert.equal(home.nodes[0].text, 'Idea guardada');
+  assert.equal(home.active.nodes.length, 3);
+  assert.equal(home.active.nodes.find(node => node.id === parent).text, '');
+  assert.equal(home.active.nodes.find(node => node.id === child).parent_id, parent);
+  assert.equal(home.active.nodes.find(node => node.id === child).text, '');
   assert.equal(home.hasChanges(), false);
 });
 
@@ -1322,7 +1329,8 @@ test('a blank child does not block an unrelated pending save or later queued cha
     return { id: data.id, name: data.name, nodes: data.nodes, version: data.version + 1 };
   };
   await home.save();
-  assert.equal(sent.nodes.length, 1);
+  assert.equal(sent.nodes.length, 2);
+  assert.equal(sent.nodes.find(node => node.id === key).text, '');
   assert.equal(sent.nodes[0].width, 310);
   assert.equal(home.nodes.length, 2);
   assert.equal(home.error, '');
@@ -1444,15 +1452,15 @@ test('a failed save prevents both switching and creating until it can be saved',
   assert.equal(navigations.length, 1);
 });
 
-test('empty text in a saved node blocks navigation without losing the current edit', async () => {
+test('empty text is saved before navigating to another diagram', async () => {
   const { home, state, navigations } = savedEditor();
   state.data.diagrams.push({ id: 52, name: 'Otro', version: 1 });
-  home.name = '   ';
-  home.makeRequest = () => { throw new Error('Invalid edits must not be submitted'); };
+  home.name = '';
+  home.makeRequest = async (action, data) => ({ ...JSON.parse(JSON.stringify(data)), version: data.version + 1 });
   await home.openDiagram('52');
-  assert.equal(navigations.length, 0);
-  assert.equal(home.active.id, 51);
-  assert.equal(home.error, 'diagram_name_required');
+  assert.equal(navigations.length, 1);
+  assert.equal(home.active.nodes[0].text, '');
+  assert.equal(home.error, '');
 });
 
 test('switching cannot navigate after the account is reset during a save', async () => {
@@ -1968,19 +1976,24 @@ test('typing and saving a sibling preserves its parent and characteristics after
   assert.equal(restored.home.nodes.some(node => node.parent_id === key), false);
 });
 
-test('an empty sibling does not create another blank sibling and Escape only discards its draft', async () => {
-  const { home, fields, handleKey } = siblingEditor();
-  const before = JSON.parse(JSON.stringify(home.nodes));
-  home.makeRequest = () => { throw new Error('Cancelling an empty sibling must not save'); };
+test('consecutive empty siblings keep their characteristics and persist when focus leaves', async () => {
+  const { home, fields } = siblingEditor();
+  home.makeRequest = async (action, data) => ({ ...JSON.parse(JSON.stringify(data)), version: data.version + 1 });
   await home.addSibling();
-  const key = home.selectedKey;
+  const first = home.selectedKey;
   await home.addSibling();
-  assert.equal(home.selectedKey, key);
-  assert.equal(home.nodes.length, before.length + 1);
-  handleKey('Escape', fields.get(key).field);
+  const second = home.selectedKey;
+  assert.notEqual(second, first);
+  fields.get(second).field.blur();
   await new Promise(setImmediate);
-  assert.deepEqual(JSON.parse(JSON.stringify(home.nodes)), before);
-  assert.equal(home.selectedKey, 'source');
+  await home.save();
+  for (const key of [first, second]) {
+    const node = home.active.nodes.find(item => item.id === key);
+    assert.equal(node.text, '');
+    assert.equal(node.parent_id, 'root');
+    assert.equal(node.width, 310);
+    assert.equal(node.checkbox, true);
+  }
   assert.equal(home.hasChanges(), false);
 });
 
@@ -2164,4 +2177,20 @@ test('deleting the canonical root preserves sibling trees and promotes a remaini
   assert.equal(home.active.name, 'Idea guardada');
   assert.equal(requests.includes('deleteDiagram'), false);
   assert.equal(home.hasChanges(), false);
+});
+
+
+test('an untouched empty child is autosaved and remains available for copying and pasting', async () => {
+  const { home, timers } = blankChildEditor();
+  home.makeRequest = async (action, data) => ({ ...JSON.parse(JSON.stringify(data)), version: data.version + 1 });
+  await home.addChild();
+  const key = home.selectedKey;
+  assert.equal(timers.size, 1);
+  [...timers.values()][0]();
+  await home.save();
+  assert.equal(home.active.nodes.find(node => node.id === key).text, '');
+  await home.nodeTools.copy();
+  await home.nodeTools.paste();
+  assert.equal(home.active.nodes.length, 3);
+  assert.equal(home.active.nodes.filter(node => node.text === '').length, 2);
 });

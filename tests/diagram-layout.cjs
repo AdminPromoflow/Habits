@@ -450,3 +450,66 @@ test('matrix connections route around earlier rows instead of crossing their nod
     }
   }
 });
+
+for (const [mode, direction] of [['horizontal', 'right'], ['horizontal', 'left'], ['vertical', 'bottom'], ['vertical', 'top']]) {
+  test(`${mode}/${direction} connects every child through one centered junction`, () => {
+    const horizontal = mode === 'horizontal';
+    const sign = ['right', 'bottom'].includes(direction) ? 1 : -1;
+    const nodes = [node('root', null, { ...Layout.defaults(mode), direction })];
+    for (let i = 0; i < 6; i++) nodes.push(node(`child-${i}`, 'root'));
+    const sizes = Object.fromEntries(nodes.map(n => [n.id, { width: 220, height: n.id === 'root' ? 120 : 60 }]));
+    const plan = Layout.arrange(nodes, sizes);
+    const root = plan.nodes.find(n => n.id === 'root');
+    const children = plan.nodes.filter(n => n.id !== 'root');
+    const port = horizontal ? [root.x + (sign > 0 ? root.width : 0), root.y + root.height / 2]
+      : [root.x + root.width / 2, root.y + (sign > 0 ? root.height : 0)];
+    const childPorts = children.map(n => horizontal ? n.x + (sign < 0 ? n.width : 0) : n.y + (sign < 0 ? n.height : 0));
+    const junction = (port[horizontal ? 0 : 1] + childPorts[0]) / 2;
+    for (const edge of plan.edges) {
+      const child = children.find(n => n.id === edge.to);
+      const endpoints = assertRoundedOrthogonal(edge.path);
+      assert.deepEqual(endpoints.start, port);
+      assert.deepEqual(endpoints.end, horizontal
+        ? [child.x + (sign < 0 ? child.width : 0), child.y + child.height / 2]
+        : [child.x + child.width / 2, child.y + (sign < 0 ? child.height : 0)]);
+      const commands = pathCommands(edge.path);
+      for (const command of commands.filter(c => c.command === 'Q')) {
+        assert.equal(command.numbers[horizontal ? 0 : 1], junction, 'every rounded corner uses the shared midpoint');
+      }
+    }
+    const centers = children.map(n => horizontal ? n.y + n.height / 2 : n.x + n.width / 2).sort((a,b) => a-b);
+    const parentCenter = horizontal ? port[1] : port[0];
+    assert.equal((centers[0] + centers.at(-1)) / 2, parentCenter);
+    for (let i = 2; i < centers.length; i++) assert.equal(centers[i] - centers[i-1], centers[1] - centers[0]);
+  });
+}
+
+test('lower children in the screenshot geometry share the horizontal trunk without an exterior detour', () => {
+  const nodes = [node('root', null, { ...Layout.defaults(), direction: 'right' }, { x:176, y:56 }),
+    ...[47,183,319,455].map((y,i) => node(`child-${i}`, 'root', null, { x:660, y }))];
+  const sizes = Object.fromEntries(nodes.map(n => [n.id, { width:n.id==='root'?373:343, height:n.id==='root'?197:79 }]));
+  const plan = Layout.arrange(nodes,sizes);
+  const root = plan.nodes.find(n => n.id === 'root');
+  const port = [root.x + root.width, root.y + root.height / 2];
+  const childX = plan.nodes.find(n => n.id === 'child-0').x;
+  for (const edge of plan.edges) {
+    const child = plan.nodes.find(n => n.id === edge.to);
+    const endpoints = assertRoundedOrthogonal(edge.path);
+    assert.deepEqual(endpoints.start, port);
+    assert.deepEqual(endpoints.end, [childX, child.y + child.height/2]);
+    for (const part of pathCommands(edge.path)) {
+      for (let i=0; i<part.numbers.length; i+=2) assert.ok(part.numbers[i] >= port[0] && part.numbers[i] <= childX);
+    }
+  }
+});
+
+test('manually staggered siblings keep one shared midpoint instead of separate connector spines', () => {
+  const nodes = [node('root', null, { ...Layout.defaults(), direction:'right' }),
+    node('a', 'root', null, {x:400,y:-120}), node('b', 'root', null, {x:560,y:240}), node('c', 'root', null, {x:470,y:400})];
+  const plan = Layout.arrange(nodes);
+  const root = plan.nodes.find(n => n.id === 'root');
+  const expected = (root.x + root.width + Math.min(...plan.nodes.filter(n=>n.id!=='root').map(n=>n.x))) / 2;
+  for (const edge of plan.edges) {
+    for (const part of pathCommands(edge.path).filter(p=>p.command==='Q')) assert.equal(part.numbers[0], expected);
+  }
+});

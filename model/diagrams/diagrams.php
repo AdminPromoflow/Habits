@@ -63,10 +63,10 @@ final class DiagramsModel extends BaseModel
         return ['id' => $id];
     }
 
-    private static function name(array $data, string $key): string
+    private static function name(array $data, string $key, bool $required = true): string
     {
         // Keep deliberate newlines, including blank first and last lines.
-        return preg_replace('/^[^\S\r\n]+|[^\S\r\n]+$/u', '', Validate::text($data, $key, 120));
+        return preg_replace('/^[^\S\r\n]+|[^\S\r\n]+$/u', '', Validate::text($data, $key, 120, $required));
     }
 
     private static function rootNode(string $name): array
@@ -85,7 +85,8 @@ final class DiagramsModel extends BaseModel
             if (!array_key_exists('parent_id', $item)) fail('error_validation');
             $parent = $item['parent_id'];
             if (($id === 'root' && $parent !== null) || ($parent !== null && !is_string($parent))) fail('error_validation');
-            $text = self::name($item, 'text');
+            if (!array_key_exists('text', $item) || !is_string($item['text'])) fail('error_validation');
+            $text = self::name($item, 'text', false);
             $layout = $item['layout'] ?? null;
             if ($layout !== null) {
                 if (!is_array($layout)) fail('error_validation');

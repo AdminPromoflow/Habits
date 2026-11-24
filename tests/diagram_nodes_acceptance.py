@@ -93,6 +93,16 @@ def run(owner, other, guest, diagram_id, check):
     nodes[1]['checkbox'] = None
     removed = persist(nodes)
     check(removed['nodes'][1]['checkbox'] is None and removed['nodes'][0]['checkbox'] is False, 'Removing one checkbox leaves other task states intact')
+    original_texts = copy.deepcopy(saved()['nodes'])
+    empty_nodes = copy.deepcopy(original_texts)
+    empty_nodes[0]['text'] = ''
+    empty_nodes[1]['text'] = ''
+    empty_nodes[2]['text'] = '\n\n'
+    blank = persist(empty_nodes)
+    check(blank['nodes'] == empty_nodes and saved()['nodes'] == empty_nodes,
+          'Empty roots, children and whitespace-only ideas persist with their styles, widths and relationships')
+    other.request('saveDiagram', dict(id=diagram_id, version=blank['version'], name=blank['name'], nodes=empty_nodes), 404, module='diagrams')
+    persist(original_texts)
     before = saved()
 
     def reject(mutator):
@@ -112,12 +122,13 @@ def run(owner, other, guest, diagram_id, check):
     reject(lambda n: n.pop(0))
     reject(lambda n: n[0].update(parent_id=a))
     check(True, 'Duplicate IDs, cycles, missing parents, invalid parent types and absent canonical roots are rejected atomically')
-    reject(lambda n: n[1].update(text='   \n '))
     reject(lambda n: n[1].update(text='x' * 121))
     reject(lambda n: n[1].update(id='unsafe-id'))
-    reject(lambda n: n[0].update(text='   \n '))
     reject(lambda n: n[0].update(text='x' * 121))
-    check(True, 'Root and child names remain non-empty and bounded independently of the title')
+    reject(lambda n: n[1].update(text=None))
+    reject(lambda n: n[1].update(text=42))
+    reject(lambda n: n[1].pop('text'))
+    check(True, 'Node text remains a required string bounded to 120 characters independently of the title')
     for field in ['mode', 'direction', 'vertical', 'horizontal']:
         reject(lambda n, field=field: n[0]['layout'].update({field: 'bad-value'}))
     reject(lambda n: n[1].update(x='10'))

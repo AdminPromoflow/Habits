@@ -269,10 +269,16 @@ const DiagramLayout = (() => {
     const frame = bounds(raw);
     const origin = { x: PADDING - frame.minX, y: PADDING - frame.minY };
     raw.forEach((entry) => { entry.x += origin.x; entry.y += origin.y; });
+    const children = new Map();
+    for (const node of nodes) {
+      if (node.parent_id == null) continue;
+      if (!children.has(node.parent_id)) children.set(node.parent_id, []);
+      children.get(node.parent_id).push(byId.get(node.id));
+    }
     const edges = nodes.filter((node) => node.parent_id != null).map((node) => {
       const from = byId.get(node.parent_id);
       const to = byId.get(node.id);
-      return { from: from.id, to: to.id, path: edgePath(from, to, raw) };
+      return { from: from.id, to: to.id, path: edgePath(from, to, raw, children.get(from.id)) };
     });
     return {
       nodes: raw,
@@ -283,21 +289,42 @@ const DiagramLayout = (() => {
     };
   }
 
-  function edgePath(from, to, nodes) {
+  function horizontalConnection(from, to) {
     const ax = from.x + from.width / 2;
     const ay = from.y + from.height / 2;
     const bx = to.x + to.width / 2;
     const by = to.y + to.height / 2;
     const separatedX = Math.abs(bx - ax) >= (from.width + to.width) / 2;
     const separatedY = Math.abs(by - ay) >= (from.height + to.height) / 2;
-    const horizontal = separatedX && !separatedY || separatedX === separatedY &&
+    // A tall stack of horizontal children must not switch its lower branches
+    // to the parent's bottom edge just because they are farther away vertically.
+    if (from.layout.mode === 'horizontal' && separatedX) return true;
+    if (['vertical', 'topdown'].includes(from.layout.mode) && separatedY) return false;
+    return separatedX && !separatedY || separatedX === separatedY &&
       Math.abs(bx - ax) / ((from.width + to.width) / 2) >=
       Math.abs(by - ay) / ((from.height + to.height) / 2);
+  }
+
+  function edgePath(from, to, nodes, siblings) {
+    const ax = from.x + from.width / 2;
+    const ay = from.y + from.height / 2;
+    const bx = to.x + to.width / 2;
+    const by = to.y + to.height / 2;
+    const horizontal = horizontalConnection(from, to);
+    // All siblings on one side share a junction halfway across the nearest
+    // gap, even when individual widths or manual positions differ.
+    const side = Math.sign(horizontal ? bx - ax : by - ay);
+    const sameSide = siblings.filter((node) => horizontalConnection(from, node) === horizontal &&
+      Math.sign(horizontal ? node.x + node.width / 2 - ax : node.y + node.height / 2 - ay) === side);
+    const facing = sameSide.map((node) => horizontal
+      ? side > 0 ? node.x : node.x + node.width
+      : side > 0 ? node.y : node.y + node.height);
+    const nearest = side > 0 ? Math.min(...facing) : Math.max(...facing);
     if (horizontal) {
       const sign = bx >= ax ? 1 : -1;
       const startX = ax + sign * from.width / 2;
       const endX = bx - sign * to.width / 2;
-      const middle = (startX + endX) / 2;
+      const middle = (startX + (sign * (nearest - startX) > 0 ? nearest : endX)) / 2;
       const direct = [[startX, ay], [middle, ay], [middle, by], [endX, by]];
       const frame = bounds(nodes);
       const lanes = [frame.minY - 16, frame.maxY + 16].map((lane) => [
@@ -309,7 +336,7 @@ const DiagramLayout = (() => {
     const sign = by >= ay ? 1 : -1;
     const startY = ay + sign * from.height / 2;
     const endY = by - sign * to.height / 2;
-    const middle = (startY + endY) / 2;
+    const middle = (startY + (sign * (nearest - startY) > 0 ? nearest : endY)) / 2;
     const direct = [[ax, startY], [ax, middle], [bx, middle], [bx, endY]];
     const frame = bounds(nodes);
     const lanes = [frame.minX - 16, frame.maxX + 16].map((lane) => [

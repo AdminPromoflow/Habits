@@ -27,7 +27,6 @@ class DiagramNodeTools {
     const home = this.home;
     home.commitName();
     const branch = home.branchNodes(home.selectedKey);
-    if (branch.some((node) => !node.text.trim())) { home.beginEditing(); return; }
     this.setClipboard(branch, home.selectedKey);
     if (cut) return this.remove(true);
     home.syncNodeState();
@@ -38,7 +37,6 @@ class DiagramNodeTools {
     const home = this.home, clipboard = this.clipboard();
     if (!clipboard) { toast(t('diagram_clipboard_empty')); return; }
     home.commitName();
-    if (!home.name.trim()) { home.beginEditing(); return; }
     const nodes = home.ensureTree();
     if (nodes.length + clipboard.nodes.length > 200) { home.showStatus(t('diagram_node_limit'), true); return; }
     const keys = new Map(clipboard.nodes.map((node) => [node.id, crypto.randomUUID()]));
