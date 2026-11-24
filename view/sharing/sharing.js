@@ -3,7 +3,7 @@ function sharingEntries(tab = S.sharingTab) {
   for (const [type, catalog] of [['habit', S.data], ['mindspace', S.data.mindspace_shares || {}]]) {
     for (const direction of ['incoming', 'outgoing']) {
       for (const row of catalog[direction] || []) {
-        if (tab !== 'invitations' && row.status !== 'accepted') continue;
+        if (tab !== 'invitations' && row.status !== 'accepted' && !(direction === 'outgoing' && row.status === 'pending')) continue;
         if (tab === 'with_me' && direction !== 'incoming') continue;
         if (tab === 'by_me' && direction !== 'outgoing') continue;
         const mine = direction === 'outgoing';
@@ -25,6 +25,58 @@ function sharingPeople(entries) {
     person.entries.push(entry); people.set(entry.key, person);
   }
   return [...people.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function sharingSidebarOpen() {
+  if (S.sharingSidebarExpanded === undefined) {
+    try { S.sharingSidebarExpanded = localStorage.getItem(`mrm-sharing-sidebar:${S.user.id}`) === 'open'; }
+    catch { S.sharingSidebarExpanded = false; }
+  }
+  return S.sharingSidebarExpanded;
+}
+function setSharingSidebarOpen(open) {
+  S.sharingSidebarExpanded = open;
+  try { localStorage.setItem(`mrm-sharing-sidebar:${S.user.id}`, open ? 'open' : 'closed'); } catch {}
+}
+function sharingSidebar(pending = 0) {
+  const people = sharingPeople(sharingEntries('invitations').filter(entry => ['pending','accepted'].includes(entry.row.status)));
+  return `<section class="sharing-sidebar"><button type="button" id="sharing-sidebar-toggle" class="nav-item sharing-sidebar-toggle ${S.view === 'sharing' ? 'active' : ''}" data-action="sharing-sidebar-toggle" aria-expanded="${sharingSidebarOpen()}" aria-controls="sharing-sidebar-people">${icon('sharing')}<span>${esc(t('sharing'))}</span>${pending ? `<span class="nav-count">${pending}</span>` : ''}<span class="sharing-sidebar-chevron" aria-hidden="true">›</span></button>
+    <div id="sharing-sidebar-people" ${sharingSidebarOpen() ? '' : 'hidden'}>${people.map(person => {
+      const selected = S.view === 'sharing' && S.sharePerson === person.key;
+      return `<div class="sharing-sidebar-person"><button type="button" class="sharing-person-link ${selected ? 'is-selected' : ''}" data-action="sharing-sidebar-person" data-person="${esc(person.key)}" aria-pressed="${selected}" title="${esc(person.email)}">${icon('profile')}<span>${esc(person.name)}</span></button>
+        ${selected ? `<div class="sharing-sidebar-resources">${person.entries.map(entry => {
+          if (entry.type === 'mindspace' && S.sharedWorkspace?.id === entry.row.id) return `<div class="mindspace-explorer sharing-sidebar-workspace">${pageControllers.home.mindspace.explorer()}</div>`;
+          return sharingResourceLink(entry, true);
+        }).join('')}</div>` : ''}</div>`;
+    }).join('') || `<p class="share-no-people muted">${esc(t('sharing_no_people'))}</p>`}</div></section>`;
+}
+function sharingResourceLink(entry, sidebar = false) {
+  const {row, mine, type} = entry;
+  const canOpen = mine || row.status === 'accepted';
+  const action = !canOpen ? 'sharing-sidebar-person' : type === 'mindspace' ? 'ms-share-preview' : row.habit_id ? 'habit-detail' : 'share-category-view';
+  const id = type === 'habit' && row.habit_id ? row.habit_id : row.id;
+  const name = row.category_key ? t(row.category_key) : row.resource_name || t('revoked');
+  const symbol = type === 'mindspace' ? pageControllers.home.mindspace.kindIcon(row.kind === 'space' ? 'folder' : row.kind) : icon(row.category_id ? 'categories' : 'habits');
+  return `<button type="button" class="sharing-resource-link ${sidebar ? 'is-sidebar' : ''}" data-action="${action}" data-id="${id}" data-person="${esc(entry.key)}" data-direction="${mine ? 'outgoing' : 'incoming'}" ${!canOpen ? 'data-invitations="true"' : ''} title="${esc(name)}">${symbol}<span>${esc(name)}${row.status === 'pending' ? `<small>${esc(t('pending'))}</small>` : ''}</span></button>`;
+}
+function sharingResourceRow(entry) {
+  const {row, mine, type} = entry;
+  return `<article class="sharing-resource-row">${sharingResourceLink(entry)}<div class="sharing-resource-meta"><span>${esc(t(mine ? 'by_me' : 'with_me'))}</span>${type === 'mindspace' ? `<span>${sharingPermissionsText(row.permissions)}</span>` : ''}</div>
+    ${mine ? `<button type="button" class="text-btn" data-action="${type === 'mindspace' ? 'ms-share-manage' : 'manage-share'}" data-id="${row.id}">${esc(t('manage_permissions'))}</button>` : ''}</article>`;
+}
+async function selectSharingPerson(key, {sidebar = false, invitations = false} = {}) {
+  if (!await pageControllers.home.mindspace.flush()) return;
+  if (S.sharedWorkspace) leaveSharedWorkspace();
+  if (sidebar) S.sharingTab = 'all';
+  if (invitations || !sharingEntries().some(entry => entry.key === key)) S.sharingTab = 'invitations';
+  S.sharePerson = key; S.view = 'sharing'; S.mode = 'personal';
+  S.shareFilter = {permission:'', category:'', owner:'', status:'', search:''};
+  setSharingSidebarOpen(true);
+  document.body.classList.remove('menu-open');
+  const entries = sharingEntries().filter(entry => entry.key === key);
+  // A single shared workspace opens directly; several resources remain listed.
+  if (S.sharingTab !== 'invitations' && entries.length === 1 && entries[0].type === 'mindspace') return openSharedWorkspace(entries[0].row.id);
+  render(); window.scrollTo(0, 0);
 }
 
 function sharingHabitCard({row:r, mine}) {
@@ -57,7 +109,7 @@ function sharingPage() {
     people:people.map(person => `<button type="button" class="share-person ${person === selected ? 'is-selected' : ''}" data-action="sharing-person" data-person="${esc(person.key)}" aria-pressed="${person === selected}">
       <span class="avatar" aria-hidden="true">${esc(person.name.slice(0, 1).toUpperCase())}</span><span class="share-person-label"><strong>${esc(person.name)}</strong>${person.name !== person.email ? `<small>${esc(person.email)}</small>` : ''}<small>${esc(t(S.sharingTab === 'invitations' ? 'sharing_invitation_count' : 'sharing_item_count', {count:person.entries.length}))}</small></span>${icon('chevron')}</button>`).join('') || `<p class="muted share-no-people">${esc(t(search ? 'no_results' : S.sharingTab === 'invitations' ? 'no_invitations' : 'sharing_no_people'))}</p>`,
     detailsHeading:selected ? `<h2>${esc(selected.name)}</h2>${selected.name !== selected.email ? `<p class="muted">${esc(selected.email)}</p>` : ''}` : '',
-    cards:selected ? selected.entries.map(entry => `<div class="share-resource"><span class="share-direction">${esc(t(S.sharingTab === 'invitations' ? entry.mine ? 'sharing_sent' : 'sharing_received' : entry.mine ? 'by_me' : 'with_me'))}</span>${entry.type === 'mindspace' ? mindSpaceShareCards(entry.mine ? 'by_me' : 'invitations', [entry.row]) : sharingHabitCard(entry)}</div>`).join('')
+    cards:selected ? S.sharingTab !== 'invitations' ? `<div class="sharing-resource-list">${selected.entries.map(sharingResourceRow).join('')}</div>` : selected.entries.map(entry => `<div class="share-resource"><span class="share-direction">${esc(t(entry.mine ? 'sharing_sent' : 'sharing_received'))}</span>${entry.type === 'mindspace' ? mindSpaceShareCards(entry.mine ? 'by_me' : 'invitations', [entry.row]) : sharingHabitCard(entry)}</div>`).join('')
       : `<div class="card empty-wide">${empty('sharing_choose_person', people.length ? 'sharing_choose_person_hint' : 'no_shared_hint')}</div>`,
   });
 }
@@ -180,6 +232,8 @@ class SharingPage extends PageController {
       'share-category',
       'sharing-tab',
       'sharing-person',
+      'sharing-sidebar-toggle',
+      'sharing-sidebar-person',
       'share-category-view',
       'accept',
       'decline',
@@ -208,8 +262,19 @@ class SharingPage extends PageController {
         manageMindSpaceShare(id);
         break;
       case 'sharing-person':
-        S.sharePerson = el.dataset.person;
-        render();
+      case 'sharing-sidebar-person':
+        await selectSharingPerson(el.dataset.person, {sidebar:action === 'sharing-sidebar-person', invitations:el.dataset.invitations === 'true'});
+        break;
+      case 'sharing-sidebar-toggle':
+        if (S.view !== 'sharing') {
+          setSharingSidebarOpen(true);
+          await navigate('sharing');
+        } else {
+          setSharingSidebarOpen(!sharingSidebarOpen());
+          document.getElementById('sharing-sidebar-toggle')?.setAttribute('aria-expanded', String(sharingSidebarOpen()));
+          const list = document.getElementById('sharing-sidebar-people');
+          if (list) list.hidden = !sharingSidebarOpen();
+        }
         break;
       case 'share-category-view': {
         const mine = el.dataset.direction === 'outgoing';

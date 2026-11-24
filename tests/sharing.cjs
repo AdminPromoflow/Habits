@@ -8,20 +8,59 @@ function fixture() {
   const state = {user:{id:1}, sharingTab:'all', sharePerson:null, shareFilter:{search:''}, data:{habits:[], incoming:[], outgoing:[], mindspace_shares:{incoming:[],outgoing:[]}}};
   const context = vm.createContext({S:state, PageController:class{}, esc, t:(key,values={})=>key+Object.values(values).join(''), icon:()=>'', badge:key=>key,
     heading:()=>'', empty:(title,hint)=>title+hint, renderTemplate:(name,values)=>values,
-    pageControllers:{home:{mindspace:{kindIcon:()=>''}}}, openModal:(title,html)=>{context.modal=html;}, formFooter:()=>''});
-  vm.runInContext(fs.readFileSync('view/sharing/sharing.js','utf8')+'\nthis.page=sharingPage;this.entries=sharingEntries;this.people=sharingPeople;this.fields=mindSpacePermissionFields;this.manage=manageMindSpaceShare;', context);
+    pageControllers:{home:{mindspace:{kindIcon:()=>'',explorer:()=>'<div>Workspace files</div>',flush:async()=>true}}},
+    document:{body:{classList:{remove:()=>{}}}}, window:{scrollTo:()=>{}}, render:()=>{context.rendered=true;},
+    leaveSharedWorkspace:()=>{state.sharedWorkspace=null;},openSharedWorkspace:async id=>{context.opened=id;},
+    openModal:(title,html)=>{context.modal=html;}, formFooter:()=>''});
+  vm.runInContext(fs.readFileSync('view/sharing/sharing.js','utf8')+'\nthis.page=sharingPage;this.entries=sharingEntries;this.people=sharingPeople;this.fields=mindSpacePermissionFields;this.manage=manageMindSpaceShare;this.sidebar=sharingSidebar;this.selectPerson=selectSharingPerson;', context);
   return {state,context};
 }
 
-test('All combines both accepted directions and groups the same person across resource types',()=>{
+test('All includes pending outgoing invitations and accepted incoming resources, grouped by person',()=>{
   const {state,context}=fixture();
   state.data.incoming=[{id:1,status:'accepted',owner_user_id:2,owner_name:'Alex',owner_email:'alex@example.test',resource_name:'Habit'}, {id:2,status:'pending',owner_email:'pending@example.test',owner_name:'Pending'}];
   state.data.mindspace_shares.outgoing=[{id:1,status:'accepted',recipient_email:'ALEX@example.test',recipient_name:'Alex',resource_name:'Workspace'}, {id:2,status:'pending',recipient_email:'waiting@example.test'}];
-  const entries=context.entries(); assert.equal(entries.length,2);
-  const people=context.people(entries); assert.equal(people.length,1); assert.equal(people[0].name,'Alex');assert.equal(people[0].entries.length,2);
+  const entries=context.entries(); assert.equal(entries.length,3);
+  const people=context.people(entries); assert.equal(people.length,2); assert.equal(people[0].name,'Alex');assert.equal(people[0].entries.length,2);
   state.sharingTab='with_me';assert.equal(context.entries().length,1);assert.equal(context.entries()[0].mine,false);
-  state.sharingTab='by_me';assert.equal(context.entries().length,1);assert.equal(context.entries()[0].mine,true);
+  state.sharingTab='by_me';assert.equal(context.entries().length,2);assert.ok(context.entries().every(entry=>entry.mine));
   state.sharingTab='invitations';assert.equal(context.entries().length,4);
+});
+
+test('pending recipients stay visible with an editable workspace link while revoked invitations are excluded',()=>{
+  const {state,context}=fixture();state.sharingTab='by_me';state.sharePerson='waiting@example.test';
+  state.data.mindspace_shares.outgoing=[{id:7,status:'pending',recipient_email:'waiting@example.test',resource_name:'Pending workspace',kind:'space',permissions:{}},{id:8,status:'revoked',recipient_email:'revoked@example.test'}];
+  const page=context.page();assert.match(page.people,/waiting@example.test/);assert.doesNotMatch(page.people,/revoked@example.test/);
+  assert.match(page.cards,/sharing-resource-list/);assert.match(page.cards,/data-action="ms-share-preview" data-id="7"/);assert.match(page.cards,/pending/);
+});
+
+test('sidebar groups both directions, includes pending people and displays the selected workspace tree',()=>{
+  const {state,context}=fixture();state.view='sharing';state.sharingSidebarExpanded=true;state.sharePerson='alex@example.test';state.sharedWorkspace={id:7};
+  state.data.mindspace_shares={outgoing:[{id:7,status:'pending',recipient_email:'alex@example.test',resource_name:'Workspace',kind:'space'}],incoming:[{id:8,status:'pending',owner_email:'bea@example.test',owner_name:'Bea <img>',resource_name:'Incoming',kind:'notes'},{id:9,status:'revoked',owner_email:'removed@example.test'}]};
+  const html=context.sidebar(1);assert.match(html,/aria-expanded="true"/);assert.match(html,/data-person="alex@example.test"/);assert.match(html,/Bea &lt;img&gt;/);assert.match(html,/Workspace files/);assert.doesNotMatch(html,/removed@example.test/);
+  state.sharePerson='bea@example.test';state.sharedWorkspace=null;
+  const incoming=context.sidebar();assert.match(incoming,/data-invitations="true"/);assert.doesNotMatch(incoming,/data-action="ms-share-preview" data-id="8"/);
+});
+
+test('selecting one pending outgoing workspace opens the editor; incoming pending invitations stay in Invitations',async()=>{
+  const {state,context}=fixture();state.view='sharing';state.sharingTab='by_me';
+  state.data.mindspace_shares.outgoing=[{id:7,status:'pending',recipient_email:'waiting@example.test',resource_name:'Workspace',kind:'space'}];
+  await context.selectPerson('waiting@example.test');assert.equal(context.opened,7);assert.equal(state.sharingTab,'by_me');assert.equal(state.sharingSidebarExpanded,true);
+  context.opened=null;state.sharedWorkspace={id:7};state.data.mindspace_shares.incoming=[{id:8,status:'pending',owner_email:'new@example.test',owner_name:'New'}];
+  await context.selectPerson('new@example.test',{sidebar:true});assert.equal(context.opened,null);assert.equal(state.sharedWorkspace,null);assert.equal(state.sharingTab,'invitations');assert.equal(state.sharePerson,'new@example.test');
+});
+
+test('switching participants waits for autosave and stops if saving fails',async()=>{
+  const {state,context}=fixture();state.view='sharing';state.sharePerson='current@example.test';state.sharedWorkspace={id:3};
+  context.pageControllers.home.mindspace.flush=async()=>false;
+  await context.selectPerson('next@example.test',{sidebar:true});assert.equal(state.sharePerson,'current@example.test');assert.equal(state.sharedWorkspace.id,3);assert.equal(context.opened,undefined);
+});
+
+test('sidebar selection combines both directions regardless of the previously selected tab',async()=>{
+  const {state,context}=fixture();state.view='sharing';state.sharingTab='by_me';
+  state.data.mindspace_shares={outgoing:[{id:7,status:'pending',recipient_email:'alex@example.test',resource_name:'Sent',kind:'space'}],incoming:[{id:8,status:'accepted',owner_email:'alex@example.test',owner_name:'Alex',resource_name:'Received',kind:'space'}]};
+  await context.selectPerson('alex@example.test',{sidebar:true});assert.equal(state.sharingTab,'all');assert.equal(context.opened,undefined);
+  const page=context.page();assert.match(page.cards,/Sent/);assert.match(page.cards,/Received/);
 });
 
 test('only four ordered tabs appear and selecting a person limits the displayed resources',()=>{

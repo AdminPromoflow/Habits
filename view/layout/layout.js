@@ -47,6 +47,7 @@ function shell() {
     navigation: nav
       .map(
         (v) =>
+          !admin && v === 'sharing' ? sharingSidebar(pending) :
           `<button data-view="${v}" class="nav-item ${S.view === v || (v === 'habits' && ['routine', 'categoryWeek'].includes(S.view)) ? 'active' : ''}">${icon({ users: 'sharing', requests: 'book', templates: 'habits', statistics: 'progress' }[v] || v)}<span>${t(v)}</span>${v === 'sharing' && pending ? `<span class="nav-count">${pending}</span>` : ''}</button>${!admin && v === 'home' ? pageControllers.home.mindspace.sidebar() : ''}`
       )
       .join(''),
@@ -105,6 +106,7 @@ async function navigate(view) {
   if (S.view === 'home' && view !== 'home' && pageControllers.home.mindspace.enabled() && !await pageControllers.home.mindspace.flush()) return;
   if (S.mode === 'personal' && view === 'categories') view = 'settings';
   if (view === 'sharing') {
+    setSharingSidebarOpen(true);
     S.sharingTab = 'all'; S.sharePerson = null;
     S.shareFilter = { permission: '', category: '', owner: '', status: '', search: '' };
   }

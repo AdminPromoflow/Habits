@@ -4,6 +4,7 @@ async function bootstrap() {
     if (S.user) pageControllers.home.nodeTools.clearClipboard();
     pageControllers.home.reset();
     S.sharedWorkspace = null; S.ownedWorkspace = null; S.sharePerson = null; S.sharingTab = 'all';
+    S.sharingSidebarExpanded = undefined;
   }
   Object.assign(S, {
     user: r.user,

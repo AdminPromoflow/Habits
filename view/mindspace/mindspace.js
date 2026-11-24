@@ -165,7 +165,7 @@ class MindSpace extends PageController {
     const expanded = this.treeState();
     const tree = (spaceId, parent, seen = new Set()) => this.items(spaceId).filter(item => item.parent_id === parent && !seen.has(item.id))
       .sort((a,b) => Number(b.kind === 'folder') - Number(a.kind === 'folder') || a.name.localeCompare(b.name)).map(item => {
-        const folder = item.kind === 'folder', current = item.id === this.active?.id && S.view === 'home';
+        const folder = item.kind === 'folder', current = item.id === this.active?.id && (S.view === 'home' || S.sharedWorkspace);
         const row = `<button type="button" class="ms-entry-label ${current ? 'is-current' : ''}" data-action="${folder ? 'ms-folder' : 'ms-open'}" data-id="${item.id}"
           ${folder ? `data-ms-drop="${item.id}"` : ''} draggable="true" data-ms-draggable="${item.id}" ${current ? 'aria-current="page"' : ''} title="${esc(item.name)}">${this.kindIcon(item.kind)}<span>${esc(item.name)}</span></button>${this.moreButton('item', item.id, item.name)}`;
         if (!folder) return `<div class="ms-tree-row ms-tree-document">${row}</div>`;
@@ -173,7 +173,7 @@ class MindSpace extends PageController {
           <div class="ms-tree-children">${tree(spaceId, item.id, new Set([...seen, item.id]))}${this.addButton(spaceId, item.id)}</div></details>`;
       }).join('');
     return this.spaces().map(space => {
-      const selected = space.id === this.spaceId(), current = selected && !this.active && S.view === 'home';
+      const selected = space.id === this.spaceId(), current = selected && !this.active && (S.view === 'home' || S.sharedWorkspace);
       return `<details class="ms-sidebar-space" data-ms-tree="space-${space.id}" ${expanded[`space-${space.id}`] ?? selected ? 'open' : ''}><summary class="ms-tree-row">
         <button type="button" class="ms-entry-label ms-explorer-root ${current ? 'is-current' : ''}" data-action="ms-space-open" data-space="${space.id}"
         data-ms-drop="0" data-ms-space="${space.id}" ${current ? 'aria-current="page"' : ''} title="${esc(space.name)}">${this.kindIcon('folder')}<span>${esc(space.name)}</span></button>${this.moreButton('space', space.id, space.name)}</summary>

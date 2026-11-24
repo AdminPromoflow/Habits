@@ -18,6 +18,9 @@ async function openSharedWorkspace(id, preserveUrl = false) {
   const previousUrl = S.sharedWorkspace?.previousUrl || (preserveUrl ? location.origin + location.pathname : location.href);
   if (!S.sharedWorkspace) S.ownedWorkspace = sharedOwnCatalog(S.data);
   S.sharedWorkspace = {id, previousUrl, ...result};
+  const entry = sharingEntries('invitations').find(entry => entry.type === 'mindspace' && entry.row.id === id);
+  if (entry) S.sharePerson = entry.key;
+  setSharingSidebarOpen(true);
   sharedApply(result);
   S.view = 'sharing'; S.mode = 'personal';
   const url = new URL(location.href);
@@ -31,7 +34,7 @@ async function openSharedWorkspace(id, preserveUrl = false) {
     else url.searchParams.set('item', root.id);
   }
   history.replaceState(null, '', url.href);
-  pageControllers.home.reset(); closeModal(); render();
+  pageControllers.home.reset(); closeModal(); render(); window.scrollTo(0, 0);
 }
 function leaveSharedWorkspace() {
   if (!S.sharedWorkspace) return;
@@ -42,10 +45,9 @@ function leaveSharedWorkspace() {
   pageControllers.home.reset(); history.replaceState(null, '', previousUrl.href);
 }
 function sharedWorkspacePage() {
-  const space = pageControllers.home.mindspace;
   const content = homePage();
   return `<div class="shared-workspace-header"><button class="btn secondary" data-action="shared-workspace-back">← ${esc(t('sharing'))}</button><span>${sharingPermissionsText(S.sharedWorkspace.permissions)}</span></div>
-    <div class="shared-workspace-layout${sharedCan('edit') ? '' : ' is-readonly'}"><aside class="mindspace-explorer shared-explorer">${space.explorer()}</aside><div class="shared-workspace-editor">${content}</div></div>`;
+    <div class="shared-workspace-layout with-sidebar${sharedCan('edit') ? '' : ' is-readonly'}"><div class="shared-workspace-editor">${content}</div></div>`;
 }
 function mountSharedWorkspace() {
   if (!S.sharedWorkspace) return;

@@ -99,3 +99,14 @@ El formulario publicado devolvía `error_mindspace_sharing_setup`: la interfaz e
 - 016: `de8df8f0b112e0b146e45ea8e2d979bbfc7ce22ceb7d5c29ff841c1a63ac5d07`
 
 La comprobación posterior confirmó ambos checksums y las cuatro columnas de permisos. Antes y después se conservaron los conteos: un usuario, dos espacios, un elemento, cero diagramas y cero nodos. No se envió la invitación del formulario abierto ni se alteró su texto. El usuario puede reintentar el envío; el mensaje anterior permanece en el formulario hasta la siguiente solicitud. Evidencia: `tests/.runtime/hostinger-sharing-migrations-015-016.png`.
+
+
+## Destinatarios pendientes y navegación lateral
+
+Shared by me y All incluyen ahora las invitaciones enviadas pendientes. El emisor abre el contenido original con sus propios permisos antes de la aceptación; no se amplía el acceso del destinatario. La sección lateral Sharing & collaboration se expande y conserva ese estado por cuenta. Lista participantes de ambas direcciones e incluye invitaciones pendientes. Los nombres no disponibles se muestran como correos, sin revelar información de cuentas que aún no aceptaron. Seleccionar una persona desde la barra lateral reúne sus recursos de ambas direcciones; una invitación recibida pendiente lleva a Invitations.
+
+Al seleccionar una persona con un único workspace se abre directamente el editor. Si hay varios recursos se muestran en una lista. El workspace abierto muestra el árbol de MindSpace dentro de la barra lateral bajo el participante, con carpetas, archivos y sus controles. Cambiar de participante guarda primero los cambios y se cancela si el guardado falla.
+
+Validación local: 44 pruebas JavaScript, 245 comprobaciones HTTP y nueve comprobaciones de esquema/código. En el navegador se verificaron destinatarios pendientes, edición antes de aceptar, guardado al cambiar de persona, ambas direcciones y expansión/contracción de la barra lateral. Evidencia: `tests/.runtime/sharing-participant-sidebar.jpg`.
+
+Paquete preparado: `tests/.runtime/hostinger-sharing-sidebar-2026-11-24.zip`, con seis archivos de interfaz; no contiene configuración ni datos y no requiere SQL adicional. Este cambio de interfaz todavía no se ha publicado en Hostinger.
