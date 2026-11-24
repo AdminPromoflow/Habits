@@ -1,5 +1,12 @@
 # Verificación realizada
 
+## Reparación del guardado de anchos y estilos en Hostinger — 23 de noviembre de 2026
+
+- Diagnóstico en Chrome/phpMyAdmin: la columna `diagram_nodes.node_width` y la migración 007 no existían. Todos los guardados del árbol incluyen esa columna, por lo que fallaban también los cambios de estilo e hijos.
+- Se ejecutó exactamente `007_diagram_node_width.sql`, después se registró su SHA-256. La consulta posterior confirmó columna y checksum presentes, con el mismo diagrama y ocho nodos. No se reemplazaron datos ni se subieron archivos.
+- Safari conservaba los cambios pendientes y el botón «Try again». Se indicó reintentar antes de recargar; la usuaria confirmó: «Sí, ahora guarda correctamente». Localhost ya tenía aplicada la 007.
+- Evidencia: `tests/.runtime/hostinger-migration-007.png`.
+
 ## Ancho individual con el icono de dos triángulos — 23 de noviembre de 2026
 
 - Icono exterior activo como control de ancho: arrastre horizontal con captura de puntero, cursor de ajuste, límites de 100–600 px y escala compensada por el zoom. Se mantiene la esquina superior izquierda del cuadro durante el ajuste, se redistribuye el texto y se recalculan las conexiones. Teclado: flechas, Shift para pasos de 50 px e Inicio/Fin.

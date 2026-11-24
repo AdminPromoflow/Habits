@@ -61,7 +61,7 @@ Los enlaces duran 30 minutos y solo pueden usarse una vez. Pedir un enlace no ca
 
 Para la selección voluntaria de categorías, aplica `004_category_choices.sql` antes de desplegar esa versión. Conserva inscripciones de categorías globales que ya tengan hábitos/rutinas; las categorías privadas propias permanecen disponibles. El catálogo global se conserva en Hostinger, mientras que cada usuario elige en Ajustes cuáles añadir. En Mis hábitos se muestran las categorías con hábitos, y cada una abre su tablero semanal.
 
-Para el editor de diagramas, aplica `005_diagrams.sql` antes de desplegar esa versión. El panel autenticado consulta `diagrams`; si falta la tabla, devuelve `error_database`, aunque el formulario de acceso sí cargue. El migrador registra el nombre y el SHA-256 de cada archivo en `schema_migrations`.
+Para el editor de diagramas, aplica las migraciones pendientes hasta `007_diagram_node_width.sql` antes de desplegar los archivos nuevos. La 005 crea `diagrams`, la 006 añade los nodos y la 007 sus anchos individuales. Si falta una tabla o columna requerida, la consulta o el guardado devuelve `error_database`. El migrador registra el nombre y el SHA-256 de cada archivo en `schema_migrations`.
 
 Sube los archivos de aplicación, incluidos `.htaccess`, `assets`, `app`, `controller`, `model`, `view` y `translations`. Los archivos `config/local.php` y el contenido de `storage` no se versionan. No despliegues `tests/.runtime`, archivos SQL privados ni la carpeta `.git` a una ruta pública.
 
@@ -76,6 +76,8 @@ La comprobación posterior mostró 22 tablas, checksum correcto y la clave forá
 El modelo documentado desde las migraciones está en [database-model](database-model/). La página pública cargó el formulario de acceso y la usuaria confirmó posteriormente que, al iniciar sesión, el panel volvió a abrir correctamente y desapareció `error_database`.
 
 ## Verificación en producción
+
+La migración 007 se aplicó mediante Chrome/phpMyAdmin el 23 de noviembre de 2026 tras comprobar que faltaba `node_width`. Se registró su checksum, se conservaron un diagrama y ocho nodos, y la usuaria confirmó que el guardado funciona al reintentar. Si una pestaña conserva cambios pendientes tras un error, usar «Try again» antes de recargar para recuperarlos.
 
 1. Abre `/MyRemarkableMind/` y comprueba que aparece el formulario de acceso.
 2. Verifica que `/MyRemarkableMind/config/local.php`, `/MyRemarkableMind/storage/initial-access.txt` y `/MyRemarkableMind/.git/config` devuelven 403/404.
