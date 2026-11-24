@@ -367,6 +367,7 @@ return [
     'diagram_canvas' => 'Lienzo del diagrama',
     'diagram_name' => 'Nombre del diagrama',
     'diagram_default_name' => 'Nuevo diagrama',
+    'diagram_interaction_hint' => 'Un clic selecciona el cuadro. Doble clic o Enter permite editar el texto.',
     'diagram_name_required' => 'Escribe un nombre para el diagrama.',
     'diagram_saving' => 'Guardando diagrama…',
     'diagram_saved' => 'Diagrama guardado',

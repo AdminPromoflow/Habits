@@ -29,7 +29,7 @@
 }
 
 .diagram-node {
-  width: min(220px, calc(100vw - 48px));
+  width: min(220px, calc(100vw - 112px));
   padding: 10px;
   display: grid;
   place-items: center;
@@ -37,14 +37,22 @@
   background: var(--lavender-wash);
   border: 2px solid var(--lavender);
   box-shadow: 0 8px 28px #70579512;
+  cursor: default;
+  touch-action: manipulation;
   transition:
     border-color 0.15s,
     box-shadow 0.15s;
 }
 
-.diagram-node:focus-within {
+.diagram-root.is-selected .diagram-node,
+.diagram-root.is-editing .diagram-node {
   border-color: var(--purple);
   box-shadow: 0 0 0 5px #b8a4d420;
+}
+
+.diagram-node:focus-visible {
+  outline: 2px solid var(--purple);
+  outline-offset: 4px;
 }
 
 .diagram-node textarea {
@@ -72,6 +80,48 @@
   opacity: 1;
 }
 
+.diagram-node textarea[readonly] {
+  pointer-events: none;
+  user-select: none;
+  cursor: default;
+}
+
+.diagram-controls {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.diagram-controls[hidden] {
+  display: none;
+}
+
+.diagram-handle {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 2px solid #77787f;
+  border-radius: 50%;
+  background: linear-gradient(#a5a5ab, #7b7b82);
+  color: #fff;
+  box-shadow: 0 2px 5px #34304418;
+  pointer-events: auto;
+  cursor: default;
+}
+
+.diagram-handle svg {
+  width: 21px;
+  height: 21px;
+}
+
+.diagram-handle-more { top: -48px; left: 20px; }
+.diagram-handle-text { top: -48px; right: 20px; }
+.diagram-handle-add { top: calc(50% - 18px); right: -48px; }
+.diagram-handle-star { bottom: -48px; left: 20px; }
+.diagram-handle-arrows { bottom: -48px; right: 20px; }
+
 .diagram-status.is-error {
   position: absolute;
   top: calc(100% + 22px);
@@ -84,6 +134,10 @@
 
 .diagram-status .text-btn {
   font-size: inherit;
+}
+
+.diagram-root.is-selected .diagram-status.is-error {
+  top: calc(100% + 64px);
 }
 
 @media (max-width: 580px) {

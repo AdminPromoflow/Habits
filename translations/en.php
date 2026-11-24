@@ -367,6 +367,7 @@ return [
     'diagram_canvas' => 'Diagram canvas',
     'diagram_name' => 'Diagram name',
     'diagram_default_name' => 'New diagram',
+    'diagram_interaction_hint' => 'Click once to select the node. Double-click or press Enter to edit the text.',
     'diagram_name_required' => 'Give your diagram a name.',
     'diagram_saving' => 'Saving diagram…',
     'diagram_saved' => 'Diagram saved',

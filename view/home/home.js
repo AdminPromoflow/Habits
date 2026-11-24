@@ -5,36 +5,79 @@ class HomePage extends PageController {
     super(['create-diagram', 'retry-diagram']);
     this.generation = 0;
     this.reset();
+    document.addEventListener('click', (event) => {
+      const node = event.target.closest?.('.diagram-node');
+      if (node) {
+        this.selectNode();
+        if (!this.editing) node.focus();
+      } else if (this.selected && !event.target.closest?.('.diagram-root')) {
+        document.getElementById('diagram-name')?.blur();
+        this.selected = false;
+        this.syncNodeState();
+      }
+    });
+    document.addEventListener('dblclick', (event) => {
+      if (!event.target.closest?.('.diagram-node') || this.editing) return;
+      event.preventDefault();
+      this.beginEditing();
+    });
     document.addEventListener('input', (event) => {
-      if (event.target.id !== 'diagram-name') return;
+      if (event.target.id !== 'diagram-name' || event.target.readOnly) return;
       this.name = event.target.value;
       this.resizeNode(event.target);
       this.scheduleSave();
     });
     document.addEventListener('focusin', (event) => {
-      if (event.target.id === 'diagram-name') this.editing = true;
+      if (event.target.id === 'diagram-node') this.selectNode();
+      if (event.target.id === 'diagram-name' && !event.target.readOnly) {
+        this.selected = true;
+        this.editing = true;
+        this.syncNodeState();
+      }
     });
     document.addEventListener('focusout', (event) => {
-      if (event.target.id !== 'diagram-name') return;
+      if (event.target.id !== 'diagram-name' || !this.editing) return;
       this.editing = false;
+      this.syncNodeState();
       void this.save();
     });
     document.addEventListener('keydown', (event) => {
-      if (event.target.id !== 'diagram-name' || event.isComposing) return;
+      if (event.isComposing) return;
+      if (event.target.id === 'diagram-node') {
+        if (event.key === 'Enter' || event.key === 'F2') {
+          event.preventDefault();
+          this.beginEditing();
+        } else if (event.key === ' ') {
+          event.preventDefault();
+          this.selectNode();
+        } else if (event.key === 'Escape') {
+          event.preventDefault();
+          this.selected = false;
+          this.syncNodeState();
+        }
+        return;
+      }
+      if (event.target.id !== 'diagram-name' || event.target.readOnly) return;
       if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
         if (!this.name.trim()) this.showStatus(t('diagram_name_required'), true);
-        else event.target.blur();
+        else {
+          event.target.blur();
+          document.getElementById('diagram-node')?.focus();
+        }
       } else if (event.key === 'Escape') {
         event.preventDefault();
         clearTimeout(this.timer);
         if (this.saving) return;
         this.name = this.active?.name || '';
         this.draft = null;
+        this.selected = !!this.active;
         this.editing = false;
         this.error = '';
         this.drawStage();
-        document.querySelector('[data-action="create-diagram"]')?.focus();
+        const target = document.getElementById('diagram-node') ||
+          document.querySelector('[data-action="create-diagram"]');
+        target?.focus();
       }
     });
     window.addEventListener('resize', () => this.resizeNode());
@@ -52,6 +95,7 @@ class HomePage extends PageController {
     this.active = null;
     this.draft = null;
     this.name = '';
+    this.selected = false;
     this.editing = false;
     this.saving = false;
     this.error = '';
@@ -80,13 +124,54 @@ class HomePage extends PageController {
     return renderTemplate('diagram-node', {
       label: t('diagram_name'),
       placeholder: t('diagram_name'),
+      hint: t('diagram_interaction_hint'),
+      nodeLabel: esc(`${t('diagram_name')}: ${this.name}`),
       name: esc(this.name),
     });
   }
 
   mount() {
+    this.syncNodeState();
     this.resizeNode();
     if (this.error) this.showStatus(this.error, true);
+  }
+
+  selectNode() {
+    if (!this.active && !this.draft) return;
+    this.selected = true;
+    this.syncNodeState();
+  }
+
+  beginEditing() {
+    if (!this.active && !this.draft) return;
+    this.selected = true;
+    this.editing = true;
+    this.syncNodeState();
+    const input = document.getElementById('diagram-name');
+    input?.focus();
+    input?.select();
+  }
+
+  syncNodeState() {
+    const root = document.getElementById('diagram-root');
+    const node = document.getElementById('diagram-node');
+    const input = document.getElementById('diagram-name');
+    const controls = document.getElementById('diagram-controls');
+    root?.classList.toggle('is-selected', this.selected);
+    root?.classList.toggle('is-editing', this.editing);
+    if (controls) controls.hidden = !this.selected;
+    if (node) {
+      node.tabIndex = this.editing ? -1 : 0;
+      node.setAttribute('role', this.editing ? 'group' : 'button');
+      node.setAttribute('aria-label', `${t('diagram_name')}: ${this.name}`);
+      if (this.editing) node.removeAttribute('aria-pressed');
+      else node.setAttribute('aria-pressed', String(this.selected));
+    }
+    if (input) {
+      input.readOnly = !this.editing;
+      input.tabIndex = this.editing ? 0 : -1;
+      input.setAttribute('aria-hidden', String(!this.editing));
+    }
   }
 
   resizeNode(input = document.getElementById('diagram-name')) {
@@ -112,11 +197,10 @@ class HomePage extends PageController {
     this.draft = { client_key: crypto.randomUUID() };
     this.name = t('diagram_default_name');
     this.error = '';
-    this.editing = true;
+    this.selected = true;
+    this.editing = false;
     this.drawStage();
-    const input = document.getElementById('diagram-name');
-    input?.focus();
-    input?.select();
+    document.getElementById('diagram-node')?.focus();
     // Persist the creation itself, even when the user has not named it yet.
     await this.save();
   }
@@ -124,6 +208,7 @@ class HomePage extends PageController {
   isEditing() {
     return !!(
       this.draft ||
+      this.selected ||
       this.editing ||
       this.saving ||
       this.error ||

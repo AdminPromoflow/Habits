@@ -9,27 +9,83 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
   const documentListeners = new Map();
   const windowListeners = new Map();
   let nextTimer = 0;
-  const stage = { innerHTML: '' };
-  const field = {
-    id: 'diagram-name',
+  const elements = [];
+  const document = {
+    activeElement: null,
+    addEventListener: (name, callback) => documentListeners.set(name, callback),
+    getElementById: (id) => elements.find((element) => element.id === id) || null,
+    querySelector: (selector) => elements.find((element) => element.matches(selector)) || null,
+  };
+  function element(id, className = '', parentElement = null) {
+    const classes = new Set(className.split(' ').filter(Boolean));
+    const attributes = new Map();
+    const item = {
+      id, parentElement, style: {}, hidden: false, tabIndex: 0,
+      classList: {
+        contains: (name) => classes.has(name),
+        add: (...names) => names.forEach((name) => classes.add(name)),
+        remove: (...names) => names.forEach((name) => classes.delete(name)),
+        toggle(name, force = !classes.has(name)) {
+          if (force) classes.add(name); else classes.delete(name);
+          return force;
+        },
+      },
+      setAttribute: (name, value) => attributes.set(name, String(value)),
+      getAttribute: (name) => attributes.get(name) ?? null,
+      removeAttribute: (name) => attributes.delete(name),
+      matches(selector) {
+        return selector.startsWith('#') ? selector.slice(1) === id
+          : selector.startsWith('.') ? classes.has(selector.slice(1))
+          : selector === '[data-action="create-diagram"]' && id === 'create-diagram';
+      },
+      closest(selector) {
+        for (let current = this; current; current = current.parentElement) {
+          if (current.matches(selector)) return current;
+        }
+        return null;
+      },
+      focus() {
+        if (document.activeElement === this) return;
+        document.activeElement?.blur();
+        document.activeElement = this;
+        documentListeners.get('focusin')?.({ target: this });
+      },
+      blur() {
+        this.blurred = true;
+        if (document.activeElement !== this) return;
+        document.activeElement = null;
+        documentListeners.get('focusout')?.({ target: this });
+      },
+    };
+    elements.push(item);
+    return item;
+  }
+  const stage = element('mindmap-stage');
+  const root = element('diagram-root', 'diagram-root', stage);
+  const node = element('diagram-node', 'diagram-node', root);
+  const controls = element('diagram-controls', 'diagram-controls', root);
+  const tool = element('diagram-tool', 'diagram-tool', controls);
+  const outside = element('outside');
+  element('create-diagram', '', stage);
+  const field = Object.assign(element('diagram-name', '', node), {
     value: '',
     style: { height: '24px' },
     scrollHeight: 24,
+    readOnly: true,
     blurred: false,
-    focus() { documentListeners.get('focusin')?.({ target: this }); },
-    blur() {
-      this.blurred = true;
-      documentListeners.get('focusout')?.({ target: this });
+    select() { this.selectionStart = 0; this.selectionEnd = this.value.length; },
+  });
+  let html = '';
+  Object.defineProperty(stage, 'innerHTML', {
+    get: () => html,
+    set(value) {
+      html = value;
+      const view = JSON.parse(value);
+      if (view.template === 'diagram-node') field.value = view.name;
     },
-    select() {},
-  };
+  });
   const context = vm.createContext({
-    PageController: class {},
-    document: {
-      addEventListener: (name, callback) => documentListeners.set(name, callback),
-      getElementById: (id) => ({ 'mindmap-stage': stage, 'diagram-name': field })[id] || null,
-      querySelector: () => null,
-    },
+    PageController: class {}, document,
     window: { addEventListener: (name, callback) => windowListeners.set(name, callback) },
     crypto: { randomUUID },
     S: state,
@@ -43,27 +99,165 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
   const HomePage = vm.runInContext(fs.readFileSync('view/home/home.js', 'utf8') + '\nHomePage;', context);
   const home = new HomePage();
   if (draft) home.draft = { client_key: 'b15dcc74-7f1a-4d39-974e-ab2828e3e72f' };
+  function dispatch(name, target, options = {}) {
+    const event = {
+      target, prevented: false,
+      preventDefault() { this.prevented = true; },
+      ...options,
+    };
+    documentListeners.get(name)(event);
+    return event;
+  }
   return {
-    home, state, timers, stage, field, windowListeners,
+    home, state, timers, stage, field, root, node, controls, tool, outside, document, windowListeners,
     typeName(value) {
       field.value = value;
       documentListeners.get('input')({ target: field });
     },
-    pressKey(key, modifiers = {}) {
-      const event = {
-        target: field,
-        key,
-        shiftKey: false,
-        isComposing: false,
-        prevented: false,
-        preventDefault() { this.prevented = true; },
-        ...modifiers,
-      };
-      documentListeners.get('keydown')(event);
-      return event;
-    },
+    click: (target = node) => dispatch('click', target),
+    doubleClick: (target = node) => dispatch('dblclick', target),
+    pressKey: (key, modifiers = {}) => dispatch('keydown', field, {
+      key, shiftKey: false, isComposing: false, ...modifiers,
+    }),
   };
 }
+
+function savedEditor() {
+  const fixture = editor({
+    draft: false,
+    state: { user: { name: 'Aleina' }, data: { diagrams: [{ id: 51, name: 'Idea guardada', version: 1 }] } },
+  });
+  fixture.home.render();
+  fixture.home.drawStage();
+  return fixture;
+}
+
+test('a single click selects the node and reveals controls without editing or saving', () => {
+  const { home, node, field, controls, root, document, click } = savedEditor();
+  home.makeRequest = () => { throw new Error('Selection must not save'); };
+  assert.equal(controls.hidden, true);
+  assert.equal(field.readOnly, true);
+  click();
+  assert.equal(home.selected, true);
+  assert.equal(home.editing, false);
+  assert.equal(controls.hidden, false);
+  assert.equal(root.classList.contains('is-selected'), true);
+  assert.equal(field.readOnly, true);
+  assert.equal(document.activeElement, node);
+  assert.equal(home.isEditing(), true, 'selection protects the node from polling redraws');
+});
+
+test('only the double click unlocks the text area, and clicking inside keeps the caret', () => {
+  const { home, field, controls, document, click, doubleClick } = savedEditor();
+  click();
+  click();
+  assert.equal(field.readOnly, true);
+  const event = doubleClick();
+  assert.equal(event.prevented, true);
+  assert.equal(home.editing, true);
+  assert.equal(home.selected, true);
+  assert.equal(controls.hidden, false);
+  assert.equal(field.readOnly, false);
+  assert.equal(document.activeElement, field);
+  field.selectionStart = 3;
+  field.selectionEnd = 3;
+  click(field);
+  assert.equal(field.selectionStart, 3);
+  assert.equal(field.selectionEnd, 3);
+});
+
+test('clicking outside deselects while decorative controls do not start actions', () => {
+  const { home, field, controls, tool, outside, click } = savedEditor();
+  home.makeRequest = () => { throw new Error('Decorative symbols must not save'); };
+  click();
+  click(tool);
+  assert.equal(home.selected, true);
+  assert.equal(home.editing, false);
+  assert.equal(field.readOnly, true);
+  assert.equal(controls.hidden, false);
+  click(outside);
+  assert.equal(home.selected, false);
+  assert.equal(home.editing, false);
+  assert.equal(controls.hidden, true);
+  assert.equal(home.isEditing(), false);
+});
+
+test('leaving the editor saves its current name and returns to readonly selection', async () => {
+  const { home, field, controls, doubleClick, typeName } = savedEditor();
+  let requests = 0;
+  home.makeRequest = async (action, data) => {
+    requests++;
+    assert.equal(data.id, 51);
+    assert.equal(data.version, 1);
+    assert.equal(data.name, 'Nombre editado\nSegunda línea');
+    return { id: 51, name: data.name, version: 2 };
+  };
+  doubleClick();
+  typeName('Nombre editado\nSegunda línea');
+  field.blur();
+  await new Promise(setImmediate);
+  assert.equal(requests, 1);
+  assert.equal(home.active.name, 'Nombre editado\nSegunda línea');
+  assert.equal(home.editing, false);
+  assert.equal(home.selected, true);
+  assert.equal(field.readOnly, true);
+  assert.equal(controls.hidden, false);
+});
+
+test('clicking outside an active editor saves and hides its controls', async () => {
+  const { home, field, controls, outside, click, doubleClick, typeName } = savedEditor();
+  home.makeRequest = async (action, data) => ({ id: 51, name: data.name, version: 2 });
+  doubleClick();
+  typeName('Texto conservado al salir');
+  click(outside);
+  await new Promise(setImmediate);
+  assert.equal(home.active.name, 'Texto conservado al salir');
+  assert.equal(home.selected, false);
+  assert.equal(home.editing, false);
+  assert.equal(field.readOnly, true);
+  assert.equal(controls.hidden, true);
+  assert.equal(home.isEditing(), false);
+});
+
+test('keyboard selection and editing preserve Enter, F2 and Escape behavior', () => {
+  const { home, node, field, controls, document, pressKey, typeName } = savedEditor();
+  node.focus();
+  assert.equal(pressKey(' ', { target: node }).prevented, true);
+  assert.equal(home.selected, true);
+  assert.equal(home.editing, false);
+  assert.equal(pressKey('F2', { target: node }).prevented, true);
+  assert.equal(document.activeElement, field);
+  assert.equal(field.readOnly, false);
+  typeName('Cambio pendiente');
+  assert.equal(pressKey('Escape').prevented, true);
+  assert.equal(home.name, 'Idea guardada');
+  assert.equal(field.value, 'Idea guardada');
+  assert.equal(home.editing, false);
+  assert.equal(field.readOnly, true);
+  assert.equal(document.activeElement, node);
+  assert.equal(pressKey('Escape', { target: node }).prevented, true);
+  assert.equal(home.selected, false);
+  assert.equal(controls.hidden, true);
+  assert.equal(pressKey('Enter', { target: node }).prevented, true);
+  assert.equal(home.editing, true);
+  assert.equal(field.readOnly, false);
+});
+
+test('account reset and reload do not retain a previous node selection or editing state', () => {
+  const { home, state, doubleClick } = savedEditor();
+  doubleClick();
+  assert.equal(home.selected, true);
+  assert.equal(home.editing, true);
+  home.reset();
+  assert.equal(home.selected, false);
+  assert.equal(home.editing, false);
+  const restored = editor({ draft: false, state: JSON.parse(JSON.stringify(state)) });
+  restored.home.render();
+  restored.home.drawStage();
+  assert.equal(restored.home.selected, false);
+  assert.equal(restored.controls.hidden, true);
+  assert.equal(restored.field.readOnly, true);
+});
 
 test('Shift Enter allows a native line break while Enter alone saves and leaves editing', async () => {
   const { home, field, typeName, pressKey } = editor();
@@ -72,7 +266,7 @@ test('Shift Enter allows a native line break while Enter alone saves and leaves 
     requests.push({ action, ...data });
     return { id: 31, name: data.name, version: 1 };
   };
-  field.focus();
+  home.beginEditing();
   typeName('Primera línea');
   const newline = pressKey('Enter', { shiftKey: true });
   assert.equal(newline.prevented, false);
@@ -140,6 +334,7 @@ test('text area grows and shrinks on mount, input and viewport resizing', () => 
   field.scrollHeight = 72;
   home.mount();
   assert.equal(field.style.height, '72px');
+  home.beginEditing();
   field.scrollHeight = 24;
   typeName('Breve');
   assert.equal(field.style.height, '24px');
@@ -162,7 +357,7 @@ test('names containing only whitespace and line breaks are never submitted', asy
 });
 
 test('creating a diagram saves immediately without typing and restores after reload', async () => {
-  const { home, state, stage, windowListeners } = editor({ draft: false });
+  const { home, state, stage, field, controls, windowListeners } = editor({ draft: false });
   let finish;
   const requests = [];
   home.makeRequest = (action, data) => {
@@ -176,6 +371,10 @@ test('creating a diagram saves immediately without typing and restores after rel
   assert.match(requests[0].client_key, /^[a-f0-9-]{36}$/);
   assert.equal(JSON.parse(stage.innerHTML).template, 'diagram-node');
   assert.equal(home.saving, true);
+  assert.equal(home.selected, true);
+  assert.equal(home.editing, false);
+  assert.equal(field.readOnly, true);
+  assert.equal(controls.hidden, false);
   const beforeUnload = { preventDefault() { this.prevented = true; } };
   windowListeners.get('beforeunload')(beforeUnload);
   assert.equal(beforeUnload.prevented, true);
@@ -197,6 +396,7 @@ test('typing while the initial creation is pending saves the new name afterward'
   let finish;
   home.makeRequest = () => new Promise((resolve) => { finish = resolve; });
   const pending = home.handleAction('create-diagram');
+  home.beginEditing();
   typeName('Mi plan de hoy');
   finish({ id: 22, name: 'Nuevo diagrama', version: 1 });
   await pending;

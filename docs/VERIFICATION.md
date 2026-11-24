@@ -1,5 +1,15 @@
 # Verificación realizada
 
+## Selección del nodo y doble clic para editar — 23 de noviembre de 2026
+
+- Un clic selecciona el cuadro y muestra los cinco símbolos de referencia; el texto permanece de solo lectura. Doble clic habilita el editor y selecciona el nombre para reemplazarlo. Los símbolos son únicamente visuales, conforme a la confirmación de la usuaria.
+- Un clic fuera guarda la edición y oculta los símbolos. La creación sigue guardándose inmediatamente, pero el nuevo nodo queda seleccionado sin entrar automáticamente al editor. El teclado permite enfocar con Tab, editar con Enter/F2 y deseleccionar con Escape.
+- 20 pruebas JavaScript completadas, incluidas las regresiones de guardado, múltiples líneas, autoaltura, cambio de cuenta y reintentos. Comprobadas sintaxis PHP/JavaScript y diferencias sin errores de espacios.
+- Navegador local y base aislada: un clic mantiene `readonly`, doble clic lo desactiva y enfoca el texto; edición con Shift + Enter, guardado al pulsar fuera y recuperación tras recargar. Los símbolos vuelven a estar ocultos al abrir la página.
+- Revisado escritorio y móvil de 320 × 740: los cinco símbolos caben en pantalla, sin desbordamiento horizontal. Capturas en `tests/.runtime/diagram-selected-desktop.png` y `tests/.runtime/diagram-selected-mobile.png`.
+
+Cambios únicamente locales; sin publicación ni cambios de esquema o datos en Hostinger.
+
 ## Nodo compacto y texto multilínea — 23 de noviembre de 2026
 
 - Espacio interior de 10 px, altura inicial de una línea y crecimiento/reducción automática al escribir, borrar, recargar y cambiar el ancho de la ventana.
