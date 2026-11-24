@@ -1,5 +1,13 @@
 # Verificación realizada
 
+## Ancho individual con el icono de dos triángulos — 23 de noviembre de 2026
+
+- Icono exterior activo como control de ancho: arrastre horizontal con captura de puntero, cursor de ajuste, límites de 100–600 px y escala compensada por el zoom. Se mantiene la esquina superior izquierda del cuadro durante el ajuste, se redistribuye el texto y se recalculan las conexiones. Teclado: flechas, Shift para pasos de 50 px e Inicio/Fin.
+- Se guarda solo al terminar el arrastre; el ancho pertenece al cuadro, no se hereda ni cambia al aplicar una distribución. Se conserva selección, edición por doble clic, desplazamiento del lienzo y guardado con control de versión. Cancelación del puntero y pérdida de foco liberan la captura; cambiar de cuenta cancela sin guardar en la nueva sesión.
+- Migración 007 aplicada a `mi_rutina` local, sin reemplazar datos. Añade `node_width`, validación y compatibilidad con clientes que omiten el campo. Preparada para aplicar en Hostinger antes de habilitar los archivos nuevos; no se publicaron archivos ni se modificó Hostinger en esta revisión.
+- 99 pruebas JavaScript aprobadas (47 del editor, 41 de distribución y 11 de cámara), 120 comprobaciones HTTP y 7 de esquema/fuentes en una base aislada. Incluyen límites, redondeo, ancho con zoom, estilos, persistencia, compatibilidad y aislamiento entre cuentas.
+- Navegador local: arrastre real 220 → 320 → 150 px; texto pasa de una a tres líneas con altura 48 → 96 px y se recupera al recargar. Un hijo cambia de 220 a 260 px mientras su padre conserva 150 px. Sin errores de consola. Captura: `tests/.runtime/diagram-node-width.png`.
+
 ## Alcance del cambio de distribución — 23 de noviembre de 2026
 
 - El selector incluye dos opciones excluyentes debajo de las direcciones: «Modificar todo el diagrama» y «Modificar todos los hijos» (predeterminada, incluye el cuadro seleccionado). Afectan tanto al modo como a la dirección.
