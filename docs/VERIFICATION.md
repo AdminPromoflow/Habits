@@ -1,5 +1,14 @@
 # Verificación realizada
 
+## Reparación de Hostinger y comprobación local — 23 de noviembre de 2026
+
+- En Hostinger faltaba `diagram_nodes`; `schema_migrations` solo incluía las versiones 001–005. Se aplicó exactamente `006_diagram_nodes.sql` en la base del proyecto mediante Chrome/phpMyAdmin y se registró el checksum `8252174bd6ea4d20893b9e3366db05aa9a9a8ac767e93f8ce8814eb697ed867b`.
+- Resultado remoto: 1 diagrama y 1 nodo raíz; cero diagramas sin raíz, cero padres inexistentes y cero diferencias entre el texto raíz y el nombre original. El checksum registrado coincide.
+- Localhost/XAMPP: migraciones 001–006 presentes, tabla con sus dos claves foráneas y restricciones, cero relaciones inconsistentes. La base local todavía no contiene diagramas; no se añadieron datos de prueba.
+- Tras la sesión iniciada por la usuaria en Safari, se recargó la página pública: desapareció `error_database`, abrió «Hello Aleina» y mostró el diagrama guardado.
+- Modelo generado localmente desde migraciones 001–006: 23 tablas, 164 columnas y 36 claves foráneas. PNG general rápido en `docs/database-model/00-vista-rapida.png`; versión completa en `01-modelo-general.png`. No se usó generación de imágenes con IA.
+- Evidencia de la reparación remota en `tests/.runtime/hostinger-migration-006.png`. No se subieron archivos del proyecto.
+
 ## Distribución y herencia por rama — 23 de noviembre de 2026
 
 - Iconos exteriores de 28 px, panel de doce herramientas y selector central de distribución abierto desde el símbolo de ramas. Los demás botones del menú continúan deshabilitados. El signo «+» crea un hijo con estilo heredado.

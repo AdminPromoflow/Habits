@@ -2121,6 +2121,149 @@
       "ddl": "CREATE TABLE diagrams (\n    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,\n    owner_user_id BIGINT UNSIGNED NOT NULL,\n    name VARCHAR(120) NOT NULL,\n    client_key CHAR(36) NOT NULL,\n    version INT UNSIGNED NOT NULL DEFAULT 1,\n    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE KEY uq_diagram_create (owner_user_id, client_key),\n    KEY ix_diagrams_owner_updated (owner_user_id, updated_at),\n    CONSTRAINT fk_diagrams_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,\n    CONSTRAINT chk_diagram_name CHECK (CHAR_LENGTH(TRIM(name)) > 0)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
     },
     {
+      "name": "diagram_nodes",
+      "source": "006_diagram_nodes.sql",
+      "columns": [
+        {
+          "name": "diagram_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK",
+            "FK"
+          ]
+        },
+        {
+          "name": "node_key",
+          "type": "VARCHAR(36)",
+          "definition": "VARCHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "parent_key",
+          "type": "VARCHAR(36)",
+          "definition": "VARCHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": [
+            "FK"
+          ]
+        },
+        {
+          "name": "text",
+          "type": "VARCHAR(120)",
+          "definition": "VARCHAR(120) NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "sort_order",
+          "type": "SMALLINT UNSIGNED",
+          "definition": "SMALLINT UNSIGNED NOT NULL DEFAULT 0",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "layout_mode",
+          "type": "VARCHAR(16)",
+          "definition": "VARCHAR(16) NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "layout_direction",
+          "type": "VARCHAR(16)",
+          "definition": "VARCHAR(16) NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "layout_vertical",
+          "type": "VARCHAR(16)",
+          "definition": "VARCHAR(16) NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "layout_horizontal",
+          "type": "VARCHAR(8)",
+          "definition": "VARCHAR(8) NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "position_x",
+          "type": "DECIMAL(12,2)",
+          "definition": "DECIMAL(12,2) NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "position_y",
+          "type": "DECIMAL(12,2)",
+          "definition": "DECIMAL(12,2) NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": []
+        }
+      ],
+      "pk": [
+        "diagram_id",
+        "node_key"
+      ],
+      "unique": [],
+      "foreign_keys": [
+        {
+          "columns": [
+            "diagram_id"
+          ],
+          "parent": "diagrams",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        },
+        {
+          "columns": [
+            "diagram_id",
+            "parent_key"
+          ],
+          "parent": "diagram_nodes",
+          "parent_columns": [
+            "diagram_id",
+            "node_key"
+          ],
+          "on_delete": "RESTRICT (implícito)"
+        }
+      ],
+      "constraints": [
+        "PRIMARY KEY (diagram_id, node_key)",
+        "KEY ix_diagram_nodes_parent (diagram_id, parent_key)",
+        "CONSTRAINT fk_diagram_nodes_diagram FOREIGN KEY (diagram_id) REFERENCES diagrams(id) ON DELETE CASCADE",
+        "CONSTRAINT fk_diagram_nodes_parent FOREIGN KEY (diagram_id, parent_key) REFERENCES diagram_nodes(diagram_id, node_key)",
+        "CONSTRAINT chk_diagram_node_text CHECK (CHAR_LENGTH(TRIM(text)) > 0)",
+        "CONSTRAINT chk_diagram_node_layout CHECK (layout_mode IS NULL OR layout_mode IN ('free','horizontal','vertical','list','topdown','linear','radial','matrix'))",
+        "CONSTRAINT chk_diagram_node_direction CHECK (layout_direction IS NULL OR layout_direction IN ('auto','clockwise','left','right','top','bottom','manual'))",
+        "CONSTRAINT chk_diagram_node_vertical CHECK (layout_vertical IS NULL OR layout_vertical IN ('auto','compact','alternating','top','bottom'))",
+        "CONSTRAINT chk_diagram_node_horizontal CHECK (layout_horizontal IS NULL OR layout_horizontal IN ('auto','ltr','rtl'))"
+      ],
+      "engine": "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+      "ddl": "CREATE TABLE diagram_nodes (\n    diagram_id BIGINT UNSIGNED NOT NULL,\n    node_key VARCHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,\n    parent_key VARCHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,\n    text VARCHAR(120) NOT NULL,\n    sort_order SMALLINT UNSIGNED NOT NULL DEFAULT 0,\n    layout_mode VARCHAR(16) NULL,\n    layout_direction VARCHAR(16) NULL,\n    layout_vertical VARCHAR(16) NULL,\n    layout_horizontal VARCHAR(8) NULL,\n    position_x DECIMAL(12,2) NULL,\n    position_y DECIMAL(12,2) NULL,\n    PRIMARY KEY (diagram_id, node_key),\n    KEY ix_diagram_nodes_parent (diagram_id, parent_key),\n    CONSTRAINT fk_diagram_nodes_diagram FOREIGN KEY (diagram_id) REFERENCES diagrams(id) ON DELETE CASCADE,\n    CONSTRAINT fk_diagram_nodes_parent FOREIGN KEY (diagram_id, parent_key) REFERENCES diagram_nodes(diagram_id, node_key),\n    CONSTRAINT chk_diagram_node_text CHECK (CHAR_LENGTH(TRIM(text)) > 0),\n    CONSTRAINT chk_diagram_node_layout CHECK (layout_mode IS NULL OR layout_mode IN ('free','horizontal','vertical','list','topdown','linear','radial','matrix')),\n    CONSTRAINT chk_diagram_node_direction CHECK (layout_direction IS NULL OR layout_direction IN ('auto','clockwise','left','right','top','bottom','manual')),\n    CONSTRAINT chk_diagram_node_vertical CHECK (layout_vertical IS NULL OR layout_vertical IN ('auto','compact','alternating','top','bottom')),\n    CONSTRAINT chk_diagram_node_horizontal CHECK (layout_horizontal IS NULL OR layout_horizontal IN ('auto','ltr','rtl'))\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
+    },
+    {
       "name": "schema_migrations",
       "source": "bin/migrate.php",
       "columns": [

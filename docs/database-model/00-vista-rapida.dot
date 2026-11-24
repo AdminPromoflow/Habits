@@ -1,0 +1,29 @@
+digraph Vista {
+  graph [rankdir=LR, bgcolor="#FCFCFE", pad="0.45", nodesep="0.5", ranksep="0.85", splines=polyline, fontname="Arial", labelloc=t, labeljust=l,
+    label=<<FONT POINT-SIZE="26" COLOR="#252138"><B>MyRemarkableMind · Modelo relacional</B></FONT><BR ALIGN="LEFT"/><FONT POINT-SIZE="14" COLOR="#6E687B">Vista rápida · 23 tablas y 36 claves foráneas en el modelo completo</FONT><BR ALIGN="LEFT"/><FONT POINT-SIZE="12" COLOR="#6E687B">Flechas 1 → N: un registro puede relacionarse con varios. Se muestran las relaciones principales.</FONT>>];
+  node [shape=box, style="rounded,filled", fontname="Arial", fontsize=15, color="#C7BEDC", fillcolor="#F0EBF8", fontcolor="#342B49", margin="0.2,0.16", penwidth=1.2];
+  edge [fontname="Arial", fontsize=11, color="#9F92BC", fontcolor="#6E617F", arrowsize=0.7];
+  users [label="users\nUsuarios\nPK: id", fillcolor="#DDD3ED", fontsize=17];
+  diagrams [label="diagrams\nDiagramas de cada usuario\nPK: id · FK: owner_user_id"];
+  diagram_nodes [label="diagram_nodes\nCuadros, texto, estilo y posición\nPK: diagram_id + node_key\nFK: diagram_id + parent_key", fillcolor="#E2D9F1"];
+  habit_categories [label="habit_categories\nCategorías\nPK: id", fillcolor="#E7F3EE", color="#A5C8BA"];
+  routines [label="routines\nRutinas\nFK: category_id", fillcolor="#E7F3EE", color="#A5C8BA"];
+  habits [label="habits\nHábitos\nFK: category_id, routine_id", fillcolor="#E7F3EE", color="#A5C8BA"];
+  habit_completions [label="habit_completions\nRegistros de progreso\nFK: habit_id, user_id", fillcolor="#E7F3EE", color="#A5C8BA"];
+  habit_shares [label="habit_shares\nInvitaciones y permisos\nFK: owner_user_id, recipient_user_id", fillcolor="#FFF1E2", color="#DFC3A4"];
+  habit_collaborators [label="habit_collaborators\nParticipantes\nFK: share_id, habit_id, user_id", fillcolor="#FFF1E2", color="#DFC3A4"];
+  users -> diagrams [label="1 → N"];
+  diagrams -> diagram_nodes [label="1 → N"];
+  diagram_nodes -> diagram_nodes [label="padre → hijos\nmismo diagrama", tailport=n, headport=e];
+  users -> habits [label="propietario"];
+  habit_categories -> routines [label="1 → N"];
+  routines -> habits [label="1 → N"];
+  habit_categories -> habits [label="1 → N"];
+  habits -> habit_completions [label="1 → N"];
+  users -> habit_shares [label="envía / recibe"];
+  habit_shares -> habit_collaborators [label="1 → N"];
+  habits -> habit_collaborators [label="1 → N"];
+  nota [shape=note, style=filled, fillcolor="#F4F4F8", color="#D7D5DE", fontsize=12,
+    label="Estilo de los nodos\nSin estilo propio: hereda del padre.\nCon estilo propio: se aplica desde esa rama.\n\nLa versión completa incluye las demás\ntablas y todas sus claves foráneas."];
+  diagram_nodes -> nota [style=invis];
+}

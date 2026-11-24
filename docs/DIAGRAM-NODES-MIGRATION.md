@@ -35,4 +35,4 @@ No registrar la migración si falla alguna consulta anterior. Con el ejecutor CL
 
 114 comprobaciones HTTP y 7 de esquema/fuentes pasaron con PHP 8.4 y MariaDB en una base local aislada. Incluyen relectura de estilos heredados y propios, posiciones, saltos de línea, cuentas distintas, versiones obsoletas, reintentos de creación, ciclos, nodos huérfanos, límites y reemplazo de un árbol de 30 niveles.
 
-La migración también se aplicó a la base local `mi_rutina` de XAMPP, conservando sus registros. Esta revisión no ha aplicado la migración ni subido archivos a Hostinger. La base `tests/.runtime/environment.json` es exclusivamente de pruebas y no se debe publicar.
+La migración también se aplicó a la base local `mi_rutina` de XAMPP, conservando sus registros. El 23 de noviembre de 2026 se aplicó también en Hostinger mediante Chrome/phpMyAdmin, por solicitud de la usuaria. Se conservó el diagrama existente, se creó su nodo raíz y se registró el checksum de la migración. No se subieron archivos del proyecto. La base `tests/.runtime/environment.json` es exclusivamente de pruebas y no se debe publicar.

@@ -192,6 +192,19 @@ erDiagram
         timestamp created_at  "NOT NULL"
         timestamp updated_at  "NOT NULL"
     }
+    diagram_nodes {
+        bigint_unsigned diagram_id PK, FK "NOT NULL"
+        varchar_36_ node_key PK "NOT NULL"
+        varchar_36_ parent_key FK "NULL"
+        varchar_120_ text  "NOT NULL"
+        smallint_unsigned sort_order  "NOT NULL"
+        varchar_16_ layout_mode  "NULL"
+        varchar_16_ layout_direction  "NULL"
+        varchar_16_ layout_vertical  "NULL"
+        varchar_8_ layout_horizontal  "NULL"
+        decimal_12_2_ position_x  "NULL"
+        decimal_12_2_ position_y  "NULL"
+    }
     schema_migrations {
         varchar_190_ version PK "NOT NULL"
         char_64_ checksum  "NOT NULL"
@@ -231,3 +244,5 @@ erDiagram
     users ||--o{ user_categories : "user_id"
     habit_categories ||--o{ user_categories : "category_id"
     users ||..o{ diagrams : "owner_user_id"
+    diagrams ||--o{ diagram_nodes : "diagram_id"
+    diagram_nodes |o..o{ diagram_nodes : "diagram_id, parent_key"
