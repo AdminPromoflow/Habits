@@ -128,7 +128,9 @@ test('nodes, tools, actions, edited text, and secondary mouse buttons keep their
   const node = element({ classes: ['diagram-node'], parent: root });
   const tool = element({ tag: 'button', parent: surface });
   const action = element({ action: true, parent: surface });
-  for (const target of [node, tool, action]) {
+  const connector = element({ classes: ['diagram-connection'], parent: surface });
+  const line = element({ tag: 'path', parent: connector });
+  for (const target of [node, tool, action, line]) {
     assert.equal(surface.emit('pointerdown', { target }).prevented, false);
     assert.equal(camera.isInteracting(), false);
   }

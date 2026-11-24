@@ -60,5 +60,31 @@ def run(owner, other, guest, check):
     check(save(nodes=changed)['connections'] == [], 'Reparenting prunes a connection that becomes a tree edge')
     save(nodes=nodes, connections=links)
     check(save(connections=[])['connections'] == [], 'Explicit empty connections remove saved extra lines')
+    hidden = [{'from': 'root', 'to': a}, {'from': a, 'to': child}]
+    before = current()
+    removed_lines = save(hidden_connections=hidden)
+    check(removed_lines['nodes'] == before['nodes'] and removed_lines['connections'] == [] and removed_lines['hidden_connections'] == hidden,
+          'Deleting parent-child lines preserves every node, position and parent')
+    check(next(d for d in owner.boot()['data']['diagrams'] if d['id'] == initial['id']) == removed_lines,
+          'Removed parent-child lines stay removed after bootstrap reload')
+    save(409, version=before['version'], hidden_connections=[])
+    save(404, client=other, hidden_connections=[])
+    save(401, client=guest, hidden_connections=[])
+    check(current() == removed_lines, 'Hidden parent lines obey owner, authentication and version protections')
+    for bad in [None, 'invalid', {'bad': hidden}, [None], [{'from': a}], [{'from': a, 'to': a}],
+                [{'from': a, 'to': foreign}], [{'from': a, 'to': b}], [hidden[0], {'from': a, 'to': 'root'}], hidden * 101]:
+        save(422, name='Must roll back', hidden_connections=bad, connections=links)
+        assert current() == removed_lines, 'Invalid hidden lines changed the saved graph'
+    check(True, 'Invalid hidden connections reject the entire edit without altering other lines or nodes')
+    check(save(nodes=nodes, connections=links)['hidden_connections'] == hidden,
+          'Older clients preserve removed parent lines while saving additional connections')
+    check(save(hidden_connections=hidden[:1])['connections'] == links,
+          'Restoring a parent line preserves unrelated additional connections')
+    save(hidden_connections=hidden)
+    remaining = save(nodes=[n for n in nodes if n['id'] != child])
+    check(remaining['hidden_connections'] == hidden[:1], 'Node deletion removes obsolete hidden connections')
+    changed = copy.deepcopy(remaining['nodes'])
+    next(n for n in changed if n['id'] == a)['parent_id'] = b
+    check(save(nodes=changed)['hidden_connections'] == [], 'Reparenting removes obsolete hidden parent edges')
     for diagram in [current(), foreign_diagram]:
         owner.request('deleteDiagram', dict(id=diagram['id'], version=diagram['version']), module='diagrams')

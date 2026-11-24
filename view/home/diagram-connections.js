@@ -69,7 +69,13 @@ class DiagramConnections {
 
   click(event) {
     const line = event.target.closest?.('.diagram-connection');
-    if (!line) { this.clearSelection(); return false; }
+    if (!line) {
+      this.clearSelection();
+      if (document.activeElement?.closest?.('.diagram-connection')) {
+        document.getElementById('mindmap-stage')?.focus({ preventScroll: true });
+      }
+      return false;
+    }
     if (this.select(line)) line.focus({ preventScroll: true });
     return true;
   }

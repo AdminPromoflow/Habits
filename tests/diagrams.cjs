@@ -175,6 +175,14 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
     checkbox, checkboxTool, checkboxMenu, checkboxOptions, checkboxScopes, addHandle,
     change: (target) => dispatch('change', target),
     home, state, timers, stage, field, root, node, controls, tool, more, widthHandle, menu, menuItem, outside, document, windowListeners, location, navigations, title, titleLabel, titleInput,
+    addConnectionElement(from, to) {
+      const svg = document.getElementById('diagram-connections') || element('diagram-connections', 'diagram-connections', stage);
+      const group = element(`connection-${from}-${to}`, 'diagram-connection', svg);
+      group.dataset = { from, to };
+      const hit = element(`hit-${from}-${to}`, 'diagram-connection-hit', group);
+      svg.querySelectorAll = () => elements.filter(item => item.parentElement === svg);
+      return { group, hit, svg };
+    },
     addPicker() {
       const picker = element('diagram-picker', 'diagram-picker');
       const trigger = element('diagram-select', '', picker);
@@ -2563,4 +2571,152 @@ test('copying a branch remaps its internal connections and omits external connec
   assert.equal(internal.length, 1);
   assert.equal(home.connections.length, 3);
   assert.equal(home.connections.filter(edge => copied.has(edge.from) !== copied.has(edge.to)).length, 0);
+});
+
+test('clicking a connector highlights only that line and Delete preserves all nodes and other lines', async () => {
+  for (const key of ['Delete', 'Backspace']) {
+    const { home, addConnectionElement, click, handleKey, branch, state, document, stage } = branchDragEditor();
+    await home.connectionTool.connect('branch', 'sibling');
+    await home.connectionTool.connect('leaf', 'sibling');
+    const chosen = addConnectionElement('branch', 'sibling');
+    const other = addConnectionElement('leaf', 'sibling');
+    const before = JSON.parse(JSON.stringify(home.nodes));
+    home.selectNode('branch');
+    branch.node.focus();
+    click(chosen.hit);
+    assert.equal(home.selected, false);
+    assert.equal(chosen.group.classList.contains('is-selected'), true);
+    assert.equal(chosen.group.getAttribute('aria-pressed'), 'true');
+    assert.equal(other.group.getAttribute('aria-pressed'), 'false');
+    assert.equal(document.activeElement, chosen.group);
+    assert.equal(home.isEditing(), true, 'background refresh cannot replace the selected line');
+    assert.equal(handleKey(key, chosen.group).prevented, true);
+    await new Promise(setImmediate);
+    assert.deepEqual(JSON.parse(JSON.stringify(home.active.nodes)), before);
+    assert.deepEqual(JSON.parse(JSON.stringify(home.active.connections)), [{ from: 'leaf', to: 'sibling' }]);
+    assert.equal(home.hiddenConnections.length, 0);
+    assert.equal(home.connectionTool.selected, null);
+    assert.equal(document.activeElement, stage);
+    assert.equal(home.hasChanges(), false);
+    handleKey(key, stage, { repeat: true });
+    assert.deepEqual(JSON.parse(JSON.stringify(home.nodes)), before);
+    const restored = editor({ draft: false, state: JSON.parse(JSON.stringify(state)) });
+    restored.home.render();
+    assert.deepEqual(JSON.parse(JSON.stringify(restored.home.connections)), [{ from: 'leaf', to: 'sibling' }]);
+  }
+});
+
+test('deleting a parent connector persists only its visibility and plus can reconnect it', async () => {
+  const { home, click, handleKey, addConnectionElement, state } = branchDragEditor();
+  const line = addConnectionElement('root', 'branch');
+  const before = JSON.parse(JSON.stringify(home.nodes));
+  click(line.hit);
+  handleKey('Delete', line.group);
+  await new Promise(setImmediate);
+  assert.deepEqual(JSON.parse(JSON.stringify(home.active.nodes)), before);
+  assert.deepEqual(JSON.parse(JSON.stringify(home.active.hidden_connections)), [{ from: 'root', to: 'branch' }]);
+  assert.equal(home.connectionTool.visibleEdges().some(edge => edge.from === 'root' && edge.to === 'branch'), false);
+  const restored = editor({ draft: false, state: JSON.parse(JSON.stringify(state)) });
+  restored.home.render();
+  assert.deepEqual(JSON.parse(JSON.stringify(restored.home.hiddenConnections)), [{ from: 'root', to: 'branch' }]);
+  assert.equal(restored.home.connectionTool.visibleEdges().some(edge => edge.to === 'branch'), false);
+  assert.equal(home.connectionTool.canConnect('branch', 'root'), true);
+  await home.connectionTool.connect('branch', 'root');
+  assert.equal(home.active.hidden_connections.length, 0);
+  assert.equal(home.connections.length, 0);
+  assert.deepEqual(JSON.parse(JSON.stringify(home.active.nodes)), before);
+});
+
+test('connector selection clears on other lines, nodes, background, Escape and reset', async () => {
+  const { home, click, handleKey, addConnectionElement, branch, stage } = branchDragEditor();
+  const a = addConnectionElement('root', 'branch');
+  const b = addConnectionElement('branch', 'leaf');
+  click(a.hit);
+  click(b.hit);
+  assert.equal(a.group.classList.contains('is-selected'), false);
+  assert.equal(b.group.classList.contains('is-selected'), true);
+  click(branch.node);
+  assert.equal(home.connectionTool.selected, null);
+  assert.equal(home.selected, true);
+  click(a.hit);
+  click(stage);
+  assert.equal(home.connectionTool.selected, null);
+  a.group.focus();
+  assert.equal(a.group.classList.contains('is-selected'), true, 'Tab focus selects the connector');
+  handleKey('Escape', a.group);
+  assert.equal(home.connectionTool.selected, null);
+  click(a.hit);
+  home.reset();
+  assert.equal(home.connectionTool.selected, null);
+});
+
+test('connector Delete ignores editing, unrelated focus, repeats, modifiers and active gestures', () => {
+  const { home, addConnectionElement, click, handleKey, branch, titleInput, outside } = branchDragEditor();
+  const { group, hit } = addConnectionElement('root', 'branch');
+  click(hit);
+  let calls = 0;
+  home.connectionTool.remove = () => { calls++; };
+  handleKey('Delete', branch.field);
+  handleKey('Backspace', titleInput);
+  handleKey('Delete', outside);
+  for (const flag of ['editing', 'titleEditing', 'layoutOpen', 'switching', 'drag', 'resizing']) {
+    home[flag] = true;
+    handleKey('Delete', group);
+    home[flag] = false;
+  }
+  for (const modifier of ['repeat', 'isComposing', 'ctrlKey', 'metaKey', 'altKey', 'shiftKey']) handleKey('Delete', group, { [modifier]: true });
+  home.nodeTools.busy = true;
+  handleKey('Delete', group);
+  home.nodeTools.busy = false;
+  assert.equal(calls, 0);
+  handleKey('Delete', group);
+  assert.equal(calls, 1);
+});
+
+test('a failed line deletion remains retryable and saves without deleting or changing nodes', async () => {
+  const { home, click, handleKey, addConnectionElement } = branchDragEditor();
+  const { group, hit } = addConnectionElement('root', 'branch');
+  const before = JSON.parse(JSON.stringify(home.nodes));
+  const savedRequest = home.makeRequest;
+  home.makeRequest = async () => { throw new Error('Offline'); };
+  click(hit);
+  handleKey('Delete', group);
+  await new Promise(setImmediate);
+  assert.equal(home.hasChanges(), true);
+  assert.equal(home.error, 'Offline');
+  assert.deepEqual(JSON.parse(JSON.stringify(home.nodes)), before);
+  home.makeRequest = savedRequest;
+  await home.save();
+  assert.equal(home.hasChanges(), false);
+  assert.deepEqual(JSON.parse(JSON.stringify(home.active.hidden_connections)), [{ from: 'root', to: 'branch' }]);
+});
+
+test('rendering connectors excludes only hidden edges and keeps selectable paths for the others', () => {
+  const { home, addConnectionElement } = branchDragEditor();
+  const { svg } = addConnectionElement('root', 'branch');
+  home.hiddenConnections = [{ from: 'root', to: 'branch' }];
+  const edges = [{ from: 'root', to: 'branch', path: 'M 1 2 H 30' }, { from: 'branch', to: 'leaf', path: 'M 30 2 H 60' }];
+  home.connectionTool.render(svg, edges);
+  assert.equal(svg.innerHTML.includes('data-from="root"'), false);
+  assert.ok(svg.innerHTML.includes('data-from="branch" data-to="leaf"'));
+  assert.ok(svg.innerHTML.includes('tabindex="0" role="button"'));
+  assert.ok(svg.innerHTML.includes('class="diagram-connection-hit"'));
+  assert.ok(svg.innerHTML.includes('class="diagram-connection-line"'));
+  assert.deepEqual(edges.map(edge => edge.path), ['M 1 2 H 30', 'M 30 2 H 60']);
+});
+
+test('copying and removing branches preserve or prune hidden parent lines along with their endpoints', async () => {
+  const { home } = branchDragEditor();
+  home.hiddenConnections = [{ from: 'root', to: 'branch' }, { from: 'branch', to: 'leaf' }];
+  home.selectNode('branch');
+  await home.nodeTools.copy();
+  home.selectNode('root');
+  await home.nodeTools.paste();
+  const pasted = home.selectedKey;
+  assert.equal(home.hiddenConnections.filter(edge => edge.from === pasted).length, 1);
+  assert.equal(home.hiddenConnections.some(edge => edge.to === pasted), false);
+  home.selectNode('branch');
+  await home.nodeTools.remove();
+  assert.equal(home.hiddenConnections.length, 1);
+  assert.equal(home.hiddenConnections[0].from, pasted);
 });
