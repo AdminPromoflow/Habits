@@ -15,9 +15,12 @@
 
 <template id="view-diagram-toolbar">
   <div class="diagram-picker">
-    <label class="sr-only" for="diagram-select">{{label}}</label>
-    <select id="diagram-select" {{disabled}}>{{options}}</select>
-    <svg class="diagram-picker-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 9 7 7 7-7"/></svg>
+    <button type="button" id="diagram-select" class="diagram-picker-trigger" data-action="toggle-diagram-picker"
+      aria-label="{{triggerLabel}}" aria-haspopup="menu" aria-expanded="{{expanded}}" aria-controls="diagram-picker-options" {{disabled}}>
+      <span class="diagram-picker-title">{{selectedName}}</span>
+      <svg class="diagram-picker-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 9 7 7 7-7"/></svg>
+    </button>
+    <div id="diagram-picker-options" class="diagram-picker-options" role="menu" aria-label="{{label}}" {{hidden}}>{{options}}</div>
   </div>
 </template>
 

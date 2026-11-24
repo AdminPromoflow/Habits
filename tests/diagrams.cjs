@@ -171,6 +171,21 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
     checkbox, checkboxTool, checkboxMenu, checkboxOptions, checkboxScopes,
     change: (target) => dispatch('change', target),
     home, state, timers, stage, field, root, node, controls, tool, more, widthHandle, menu, menuItem, outside, document, windowListeners, location, navigations, title, titleLabel, titleInput,
+    addPicker() {
+      const picker = element('diagram-picker', 'diagram-picker');
+      const trigger = element('diagram-select', '', picker);
+      const menu = element('diagram-picker-options', '', picker);
+      menu.hidden = true;
+      trigger.setAttribute('aria-expanded', 'false');
+      const options = state.data.diagrams.map(diagram => {
+        const option = element(`picker-option-${diagram.id}`, '', menu);
+        option.dataset.id = String(diagram.id);
+        option.setAttribute('aria-checked', String(diagram.id === home.active?.id));
+        return option;
+      });
+      menu.querySelectorAll = () => options;
+      return { picker, trigger, menu, options };
+    },
     addNodeElement(id, value = '') {
       const root = element(`diagram-root-${id}`, 'diagram-root', stage);
       root.dataset.nodeKey = id;
@@ -1390,8 +1405,8 @@ test('the URL selects an older diagram and reload keeps its own complete tree', 
   assert.equal(home.nodes[1].width, 140);
   assert.equal(new URL(location.href).searchParams.get('diagram'), '51');
   const toolbar = JSON.parse(home.toolbarContent());
-  assert.match(toolbar.options, /value="51" selected/);
-  assert.match(toolbar.options, /value="52"/);
+  assert.match(toolbar.options, /data-id="51" aria-checked="true"/);
+  assert.match(toolbar.options, /data-id="52" aria-checked="false"/);
   const restored = editor({ draft: false, state: JSON.parse(JSON.stringify(state)), url: location.href });
   restored.home.render();
   assert.equal(restored.home.active.id, 51);
@@ -2273,4 +2288,65 @@ test('individual scope and direct checkbox clicks update only the selected child
   assert.equal(home.active.nodes.find(n => n.id === 'leaf').checkbox, true);
   assert.equal(home.active.nodes.find(n => n.id === 'inherited').checkbox, true);
   assert.equal(home.active.nodes.find(n => n.id === 'sibling').checkbox, undefined);
+});
+
+function pickerEditor() {
+  const fixture = savedEditor();
+  fixture.state.data.diagrams.push({ id: 52, name: 'Segundo', version: 1 }, { id: 53, name: 'Tercero', version: 1 });
+  return { ...fixture, picker: fixture.addPicker() };
+}
+
+test('the diagram picker supports arrow keys, Home, End and Escape without changing diagrams', async () => {
+  const { home, picker, handleKey, document, navigations } = pickerEditor();
+  home.makeRequest = () => { throw new Error('Opening the picker must not save'); };
+  handleKey('ArrowDown', picker.trigger);
+  assert.equal(picker.menu.hidden, false);
+  assert.equal(picker.trigger.getAttribute('aria-expanded'), 'true');
+  assert.equal(document.activeElement, picker.options[0]);
+  handleKey('ArrowDown', document.activeElement);
+  assert.equal(document.activeElement, picker.options[1]);
+  handleKey('End', document.activeElement);
+  assert.equal(document.activeElement, picker.options[2]);
+  handleKey('Home', document.activeElement);
+  assert.equal(document.activeElement, picker.options[0]);
+  handleKey('ArrowUp', document.activeElement);
+  assert.equal(document.activeElement, picker.options[2]);
+  handleKey('Escape', document.activeElement);
+  assert.equal(picker.menu.hidden, true);
+  assert.equal(picker.trigger.getAttribute('aria-expanded'), 'false');
+  assert.equal(document.activeElement, picker.trigger);
+  assert.equal(navigations.length, 0);
+});
+
+test('the diagram picker closes on outside click, outside focus and Tab', async () => {
+  const { home, picker, click, outside, handleKey, document } = pickerEditor();
+  for (const dismiss of [() => click(outside), () => outside.focus(), () => handleKey('Tab', document.activeElement)]) {
+    await home.handleAction('toggle-diagram-picker', picker.trigger);
+    assert.equal(home.pickerOpen, true);
+    dismiss();
+    assert.equal(home.pickerOpen, false);
+    assert.equal(picker.menu.hidden, true);
+  }
+});
+
+test('a diagram option closes its menu and preserves the full-page selection navigation', async () => {
+  const { home, picker, navigations } = pickerEditor();
+  home.openDiagramPicker();
+  await home.handleAction('select-diagram', picker.options[1]);
+  assert.equal(home.pickerOpen, false);
+  assert.equal(picker.menu.hidden, true);
+  assert.deepEqual(navigations, ['http://localhost/MyRemarkableMind/?diagram=52']);
+});
+
+test('the picker pauses background redraws and cannot open during a diagram switch', () => {
+  const { home, picker } = pickerEditor();
+  assert.equal(home.isEditing(), false);
+  home.openDiagramPicker();
+  assert.equal(home.isEditing(), true);
+  home.closeDiagramPicker();
+  assert.equal(home.isEditing(), false);
+  home.switching = true;
+  home.openDiagramPicker();
+  assert.equal(home.pickerOpen, false);
+  assert.equal(picker.menu.hidden, true);
 });

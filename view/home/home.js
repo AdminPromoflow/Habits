@@ -3,7 +3,7 @@
 class HomePage extends PageController {
   constructor() {
     super(['create-diagram', 'retry-diagram', 'toggle-diagram-menu', 'diagram-layout', 'add-diagram-child', 'add-diagram-sibling',
-      'diagram-checkbox-menu', 'diagram-checkbox-state',
+      'diagram-checkbox-menu', 'diagram-checkbox-state', 'toggle-diagram-picker', 'select-diagram',
       'copy-diagram-node', 'cut-diagram-node', 'paste-diagram-node', 'delete-diagram-node', 'image-diagram-node', 'labels-diagram-node']);
     this.nodeTools = new DiagramNodeTools(this);
     this.generation = 0;
@@ -19,7 +19,6 @@ class HomePage extends PageController {
       if (event.target.classList?.contains('diagram-node-image')) this.positionTree();
     }, true);
     document.addEventListener('change', (event) => {
-      if (event.target.id === 'diagram-select') void this.openDiagram(event.target.value);
       if (event.target.classList?.contains('diagram-checkbox-scope-option') && event.target.checked &&
           this.checkboxMenuOpen && ['node', 'branch'].includes(event.target.value)) {
         this.checkboxScope = event.target.value;
@@ -32,6 +31,7 @@ class HomePage extends PageController {
       }
     });
     document.addEventListener('click', (event) => {
+      if (this.pickerOpen && !event.target.closest?.('.diagram-picker')) this.closeDiagramPicker();
       if (this.suppressNodeClick) {
         this.suppressNodeClick = false;
         event.preventDefault();
@@ -69,6 +69,7 @@ class HomePage extends PageController {
       this.scheduleSave();
     });
     document.addEventListener('focusin', (event) => {
+      if (this.pickerOpen && !event.target.closest?.('.diagram-picker')) this.closeDiagramPicker();
       if (event.target.classList?.contains('diagram-task-checkbox')) this.selectNode(this.keyFor(event.target));
       if (event.target.classList?.contains('diagram-node')) {
         this.selectNode(this.keyFor(event.target));
@@ -93,6 +94,10 @@ class HomePage extends PageController {
     });
     document.addEventListener('keydown', (event) => {
       if (event.isComposing) return;
+      if (event.target.closest?.('.diagram-picker')) {
+        this.handlePickerKey(event);
+        return;
+      }
       if (event.target.id === 'diagram-title-label' && ['Enter', 'F2', ' '].includes(event.key)) {
         event.preventDefault();
         this.beginTitleEditing();
@@ -132,7 +137,15 @@ class HomePage extends PageController {
         return;
       }
       if (event.target.classList?.contains('diagram-node')) {
-        if (event.key === 'Enter' || event.key === 'F2') {
+        if (['Delete', 'Backspace'].includes(event.key) &&
+            !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey &&
+            this.selected && this.keyFor(event.target) === this.selectedKey &&
+            !this.editing && !this.titleEditing && !this.layoutOpen && !this.switching &&
+            !this.drag && !this.resizing && !this.viewport.isInteracting()) {
+          event.preventDefault();
+          // Holding Delete must not continue deleting the newly selected parent.
+          if (!event.repeat && !this.nodeTools.busy) void this.nodeTools.remove();
+        } else if (event.key === 'Enter' || event.key === 'F2') {
           event.preventDefault();
           this.beginEditing();
         } else if (event.key === ' ') {
@@ -213,6 +226,7 @@ class HomePage extends PageController {
     this.saving = false;
     this.savePromise = null;
     this.switching = false;
+    this.pickerOpen = false;
     this.error = '';
   }
 
@@ -311,11 +325,16 @@ class HomePage extends PageController {
     const diagrams = S.data.diagrams || [];
     if (!diagrams.length && !this.draft) return '';
     const options = diagrams.map((diagram) =>
-      `<option value="${esc(diagram.id)}" ${diagram.id === this.active?.id ? 'selected' : ''}>${esc(diagram.name.replace(/\s+/g, ' ').trim())}</option>`).join('');
+      `<button type="button" class="diagram-picker-option" role="menuitemradio" data-action="select-diagram" data-id="${esc(diagram.id)}" aria-checked="${diagram.id === this.active?.id}" tabindex="-1">${esc(diagram.name.replace(/\s+/g, ' ').trim())}</button>`).join('');
+    const selectedName = this.draft ? t('diagram_default_name') : this.active?.name || t('my_diagrams');
     return renderTemplate('diagram-toolbar', {
       label: t('my_diagrams'),
+      selectedName: esc(selectedName.replace(/\s+/g, ' ').trim()),
+      triggerLabel: esc(`${t('my_diagrams')}: ${selectedName}`),
+      expanded: String(this.pickerOpen),
+      hidden: this.pickerOpen ? '' : 'hidden',
       disabled: this.switching ? 'disabled' : '',
-      options: (this.draft ? `<option value="" selected>${esc(t('diagram_default_name'))}</option>` : '') + options,
+      options,
     });
   }
 
@@ -323,7 +342,43 @@ class HomePage extends PageController {
     const create = document.getElementById('create-diagram');
     if (create) create.disabled = this.switching;
     const toolbar = document.getElementById('diagram-toolbar');
-    if (toolbar) toolbar.innerHTML = this.toolbarContent();
+    if (toolbar && !this.pickerOpen) toolbar.innerHTML = this.toolbarContent();
+  }
+
+  openDiagramPicker(last = false) {
+    if (this.switching || !(S.data.diagrams || []).length) return;
+    this.syncToolbar();
+    this.pickerOpen = true;
+    const menu = document.getElementById('diagram-picker-options');
+    if (menu) menu.hidden = false;
+    document.getElementById('diagram-select')?.setAttribute('aria-expanded', 'true');
+    const options = [...(menu?.querySelectorAll('[role="menuitemradio"]') || [])];
+    (last ? options.at(-1) : options.find(option => option.getAttribute('aria-checked') === 'true') || options[0])?.focus();
+  }
+
+  closeDiagramPicker(restoreFocus = false) {
+    this.pickerOpen = false;
+    const menu = document.getElementById('diagram-picker-options');
+    if (menu) menu.hidden = true;
+    const trigger = document.getElementById('diagram-select');
+    trigger?.setAttribute('aria-expanded', 'false');
+    if (restoreFocus) trigger?.focus({ preventScroll: true });
+  }
+
+  handlePickerKey(event) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.closeDiagramPicker(true);
+    } else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+      event.preventDefault();
+      if (!this.pickerOpen) { this.openDiagramPicker(event.key === 'ArrowUp' || event.key === 'End'); return; }
+      const menu = document.getElementById('diagram-picker-options');
+      const options = [...(menu?.querySelectorAll('[role="menuitemradio"]') || [])];
+      const index = options.indexOf(event.target);
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1
+        : (index + (event.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length;
+      options[next]?.focus();
+    } else if (event.key === 'Tab') this.closeDiagramPicker(true);
   }
 
   rememberDiagram() {
@@ -348,6 +403,7 @@ class HomePage extends PageController {
 
   async openDiagram(id) {
     if (this.switching || !S.data.diagrams?.some((item) => String(item.id) === String(id))) return;
+    this.closeDiagramPicker();
     this.switching = true;
     this.syncToolbar();
     const generation = this.generation;
@@ -933,6 +989,8 @@ class HomePage extends PageController {
   }
 
   async handleAction(action, button) {
+    if (action === 'toggle-diagram-picker') return this.pickerOpen ? this.closeDiagramPicker(true) : this.openDiagramPicker();
+    if (action === 'select-diagram') return this.openDiagram(button.dataset.id);
     if (action === 'retry-diagram') return this.save();
     if (button?.closest?.('.diagram-root') && this.selectNode(this.keyFor(button)) === false) return;
     if (this.nodeTools.busy) return;
@@ -1012,6 +1070,7 @@ class HomePage extends PageController {
       this.titleEditing ||
       this.saving ||
       this.switching ||
+      this.pickerOpen ||
       this.nodeTools.busy ||
       this.error ||
       this.layoutOpen ||

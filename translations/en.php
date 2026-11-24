@@ -370,7 +370,7 @@ return [
     'diagram_title' => 'Diagram title',
     'diagram_title_hint' => 'Double-click to rename',
     'diagram_default_name' => 'New diagram',
-    'diagram_interaction_hint' => 'Click once to select the node. Double-click or press Enter to edit the text.',
+    'diagram_interaction_hint' => 'Click once to select the node. Double-click or press Enter to edit the text. Delete or Backspace removes the selected node and all its children.',
     'diagram_options' => 'Diagram options',
     'diagram_option_copy' => 'Copy',
     'diagram_option_cut' => 'Cut',

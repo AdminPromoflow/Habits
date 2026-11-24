@@ -370,7 +370,7 @@ return [
     'diagram_title' => 'Nombre del diagrama',
     'diagram_title_hint' => 'Doble clic para cambiar el nombre',
     'diagram_default_name' => 'Nuevo diagrama',
-    'diagram_interaction_hint' => 'Un clic selecciona el cuadro. Doble clic o Enter permite editar el texto.',
+    'diagram_interaction_hint' => 'Un clic selecciona el cuadro. Doble clic o Enter permite editar el texto. Delete o Retroceso elimina el cuadro seleccionado y todos sus hijos.',
     'diagram_options' => 'Opciones del diagrama',
     'diagram_option_copy' => 'Copiar',
     'diagram_option_cut' => 'Cortar',
