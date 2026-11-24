@@ -1,8 +1,17 @@
 # Verificación realizada
 
+## Distribución y herencia por rama — 23 de noviembre de 2026
+
+- Iconos exteriores de 28 px, panel de doce herramientas y selector central de distribución abierto desde el símbolo de ramas. Los demás botones del menú continúan deshabilitados. El signo «+» crea un hijo con estilo heredado.
+- Distribuciones libre, horizontal, vertical, lista, descendente, lineal y matriz, con sus direcciones. Radial se muestra deshabilitado como en las capturas. Cada nodo guarda una elección propia o hereda la del ancestro más cercano; las excepciones de las subramas se conservan.
+- 47 pruebas JavaScript del editor y motor de distribución; 114 comprobaciones HTTP y 7 de esquema/fuentes. Cubren herencia, excepciones, reintentos, concurrencia, cuentas distintas, ciclos, límites, multilinea y posiciones manuales.
+- Navegador local: doble clic deja ambos extremos de selección al final; creación/edición de hijos; aplicar y cancelar; Escape y foco; distribución descendente, matriz y libre; elección horizontal propia de una rama recuperada tras recargar; arrastre manual recuperado con la misma posición relativa.
+- Revisado el panel en escritorio de 1280 × 900 y móvil de 320 × 740: sin desbordamiento horizontal del diálogo ni de la página, con desplazamiento interno y Aplicar accesible. Capturas: `tests/.runtime/diagram-layout-panel-desktop.png`, `diagram-layout-panel-mobile.png` y `diagram-layout-tree-desktop.png`.
+- Migración 006 aplicada a la base aislada y a la base local de XAMPP. No se publicaron archivos ni se modificó Hostinger. La instalación pública necesita aplicar la migración antes de habilitar los archivos nuevos.
+
 ## Selección del nodo y doble clic para editar — 23 de noviembre de 2026
 
-- Un clic selecciona el cuadro y muestra los cinco símbolos de referencia; el texto permanece de solo lectura. Doble clic habilita el editor y selecciona el nombre para reemplazarlo. Los símbolos son únicamente visuales, conforme a la confirmación de la usuaria.
+- Un clic selecciona el cuadro y muestra los cinco símbolos de referencia; el texto permanece de solo lectura. Doble clic habilita el editor; la revisión posterior coloca el cursor al final sin seleccionar el texto. Los símbolos son únicamente visuales, conforme a la confirmación de la usuaria.
 - Un clic fuera guarda la edición y oculta los símbolos. La creación sigue guardándose inmediatamente, pero el nuevo nodo queda seleccionado sin entrar automáticamente al editor. El teclado permite enfocar con Tab, editar con Enter/F2 y deseleccionar con Escape.
 - 20 pruebas JavaScript completadas, incluidas las regresiones de guardado, múltiples líneas, autoaltura, cambio de cuenta y reintentos. Comprobadas sintaxis PHP/JavaScript y diferencias sin errores de espacios.
 - Navegador local y base aislada: un clic mantiene `readonly`, doble clic lo desactiva y enfoca el texto; edición con Shift + Enter, guardado al pulsar fuera y recuperación tras recargar. Los símbolos vuelven a estar ocultos al abrir la página.

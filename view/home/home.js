@@ -2,17 +2,17 @@
 
 class HomePage extends PageController {
   constructor() {
-    super(['create-diagram', 'retry-diagram', 'toggle-diagram-menu']);
+    super(['create-diagram', 'retry-diagram', 'toggle-diagram-menu', 'diagram-layout', 'add-diagram-child']);
     this.generation = 0;
     this.reset();
     document.addEventListener('click', (event) => {
       const node = event.target.closest?.('.diagram-node');
       if (node) {
         this.menuOpen = false;
-        this.selectNode();
+        this.selectNode(this.keyFor(node));
         if (!this.editing) node.focus();
       } else if (this.selected && !event.target.closest?.('.diagram-root')) {
-        document.getElementById('diagram-name')?.blur();
+        this.element('name')?.blur();
         this.selected = false;
         this.menuOpen = false;
         this.syncNodeState();
@@ -21,24 +21,25 @@ class HomePage extends PageController {
     document.addEventListener('dblclick', (event) => {
       if (!event.target.closest?.('.diagram-node') || this.editing) return;
       event.preventDefault();
+      this.selectNode(this.keyFor(event.target));
       this.beginEditing();
     });
     document.addEventListener('input', (event) => {
-      if (event.target.id !== 'diagram-name' || event.target.readOnly) return;
+      if (!this.isNameField(event.target) || event.target.readOnly) return;
       this.name = event.target.value;
       this.resizeNode(event.target);
       this.scheduleSave();
     });
     document.addEventListener('focusin', (event) => {
-      if (event.target.id === 'diagram-node') this.selectNode();
-      if (event.target.id === 'diagram-name' && !event.target.readOnly) {
+      if (event.target.classList?.contains('diagram-node')) this.selectNode(this.keyFor(event.target));
+      if (this.isNameField(event.target) && !event.target.readOnly) {
         this.selected = true;
         this.editing = true;
         this.syncNodeState();
       }
     });
     document.addEventListener('focusout', (event) => {
-      if (event.target.id !== 'diagram-name' || !this.editing) return;
+      if (!this.isNameField(event.target) || !this.editing) return;
       this.editing = false;
       this.syncNodeState();
       void this.save();
@@ -49,10 +50,10 @@ class HomePage extends PageController {
         event.preventDefault();
         this.menuOpen = false;
         this.syncNodeState();
-        document.getElementById('diagram-more')?.focus();
+        this.element('more')?.focus();
         return;
       }
-      if (event.target.id === 'diagram-node') {
+      if (event.target.classList?.contains('diagram-node')) {
         if (event.key === 'Enter' || event.key === 'F2') {
           event.preventDefault();
           this.beginEditing();
@@ -66,32 +67,34 @@ class HomePage extends PageController {
         }
         return;
       }
-      if (event.target.id !== 'diagram-name' || event.target.readOnly) return;
+      if (!this.isNameField(event.target) || event.target.readOnly) return;
       if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
         if (!this.name.trim()) this.showStatus(t('diagram_name_required'), true);
         else {
           event.target.blur();
-          document.getElementById('diagram-node')?.focus();
+          this.element('node')?.focus();
         }
       } else if (event.key === 'Escape') {
         event.preventDefault();
         clearTimeout(this.timer);
         if (this.saving) return;
-        this.name = this.active?.name || '';
+        this.name = this.savedNode()?.text || this.active?.name || '';
+        this.commitName();
         this.draft = null;
         this.selected = !!this.active;
         this.editing = false;
         this.error = '';
         this.drawStage();
-        const target = document.getElementById('diagram-node') ||
+        const target = this.element('node') ||
           document.querySelector('[data-action="create-diagram"]');
         target?.focus();
       }
     });
-    window.addEventListener('resize', () => this.resizeNode());
+    window.addEventListener('resize', () => { this.resizeNode(); this.positionTree(); });
+    this.bindDragging();
     window.addEventListener('beforeunload', (event) => {
-      if (this.saving || (this.name.trim() && this.normalizedName() !== this.active?.name)) {
+      if (this.saving || this.hasChanges()) {
         event.preventDefault();
         event.returnValue = '';
       }
@@ -101,6 +104,13 @@ class HomePage extends PageController {
   reset() {
     clearTimeout(this.timer);
     this.generation++;
+    this.layoutPanel?.close();
+    this.layoutPanel = null;
+    this.layoutOpen = false;
+    this.nodes = null;
+    this.selectedKey = 'root';
+    this.plan = null;
+    this.drag = null;
     this.active = null;
     this.draft = null;
     this.name = '';
@@ -117,6 +127,8 @@ class HomePage extends PageController {
         S.data.diagrams?.find((item) => item.id === this.active?.id) ||
         S.data.diagrams?.[0] ||
         null;
+      this.selectedKey = 'root';
+      this.nodes = this.treeFor(this.active);
       this.name = this.active?.name || '';
     }
     return renderTemplate('home', {
@@ -131,6 +143,15 @@ class HomePage extends PageController {
   stageContent() {
     if (!this.active && !this.draft)
       return renderTemplate('diagram-start', { label: t('create_diagram') });
+    this.commitName();
+    const nodes = this.ensureTree();
+    if (nodes.length > 1) return renderTemplate('diagram-tree', {
+      nodes: nodes.map((node) => this.nodeContent(node)).join(''),
+    });
+    return this.nodeContent(nodes[0]);
+  }
+
+  nodeContent(node) {
     const options = ['copy', 'cut', 'paste', 'trash', 'image', 'format',
       'link', 'checkbox', 'calendar', 'tag', 'branch', 'resize'];
     const menuFields = Object.fromEntries(options.flatMap((name) => [
@@ -139,23 +160,90 @@ class HomePage extends PageController {
     ]));
     return renderTemplate('diagram-node', {
       ...menuFields,
+      nodeKey: esc(node.id),
+      suffix: node.id === 'root' ? '' : `-${esc(node.id)}`,
+      addChildLabel: esc(t('diagram_add_child')),
       label: t('diagram_name'),
       placeholder: t('diagram_name'),
       hint: t('diagram_interaction_hint'),
-      nodeLabel: esc(`${t('diagram_name')}: ${this.name}`),
+      nodeLabel: esc(`${t('diagram_name')}: ${node.text}`),
       menuLabel: t('diagram_options'),
-      name: esc(this.name),
+      name: esc(node.text),
     });
   }
 
   mount() {
     this.syncNodeState();
-    this.resizeNode();
+    for (const node of this.ensureTree()) this.resizeNode(this.element('name', node.id), false);
+    this.positionTree();
     if (this.error) this.showStatus(this.error, true);
   }
 
-  selectNode() {
+  keyFor(target) {
+    return target.closest?.('.diagram-root')?.dataset?.nodeKey || 'root';
+  }
+
+  element(part, key = this.selectedKey) {
+    return document.getElementById(`diagram-${part}${key === 'root' ? '' : `-${key}`}`);
+  }
+
+  isNameField(target) {
+    return target.id === 'diagram-name' || target.id?.startsWith('diagram-name-');
+  }
+
+  treeFor(diagram) {
+    return diagram?.nodes?.length ? JSON.parse(JSON.stringify(diagram.nodes)) : [{
+      id: 'root', parent_id: null, text: diagram?.name || '', layout: null, x: null, y: null,
+    }];
+  }
+
+  ensureTree() {
+    if (!this.nodes) this.nodes = this.treeFor(this.active);
+    return this.nodes;
+  }
+
+  commitName() {
+    const node = this.ensureTree().find((item) => item.id === this.selectedKey);
+    if (node) node.text = this.name;
+  }
+
+  savedNode() {
+    return this.treeFor(this.active).find((item) => item.id === this.selectedKey);
+  }
+
+  snapshot() {
+    this.commitName();
+    return this.ensureTree().map((node) => ({ ...node, text: this.normalizedName(node.text) }));
+  }
+
+  hasChanges() {
+    if (!this.active && !this.draft) return false;
+    const nodes = this.snapshot();
+    if (nodes.some((node) => !node.text.trim())) return false;
+    return !!this.draft || this.fingerprint(nodes) !== this.fingerprint(this.treeFor(this.active));
+  }
+
+  fingerprint(nodes) {
+    return JSON.stringify(nodes.map((node) => ({
+      id: node.id, parent_id: node.parent_id, text: node.text,
+      layout: node.layout ? {
+        mode: node.layout.mode, direction: node.layout.direction,
+        vertical: node.layout.vertical, horizontal: node.layout.horizontal,
+      } : null,
+      x: node.x ?? null, y: node.y ?? null,
+    })).sort((a, b) => a.id.localeCompare(b.id)));
+  }
+
+  selectNode(key = this.selectedKey) {
     if (!this.active && !this.draft) return;
+    if (key !== this.selectedKey) {
+      this.element('name')?.blur();
+      this.commitName();
+      this.selectedKey = key;
+      this.name = this.ensureTree().find((node) => node.id === key)?.text || '';
+      this.editing = false;
+      this.menuOpen = false;
+    }
     this.selected = true;
     this.syncNodeState();
   }
@@ -166,47 +254,52 @@ class HomePage extends PageController {
     this.menuOpen = false;
     this.editing = true;
     this.syncNodeState();
-    const input = document.getElementById('diagram-name');
+    const input = this.element('name');
     input?.focus();
     input?.setSelectionRange(input.value.length, input.value.length);
   }
 
   syncNodeState() {
-    const root = document.getElementById('diagram-root');
-    const node = document.getElementById('diagram-node');
-    const input = document.getElementById('diagram-name');
-    const controls = document.getElementById('diagram-controls');
-    const menu = document.getElementById('diagram-menu');
-    const more = document.getElementById('diagram-more');
-    const menuVisible = this.selected && this.menuOpen;
-    root?.classList.toggle('is-selected', this.selected);
-    root?.classList.toggle('is-editing', this.editing);
-    if (controls) controls.hidden = !this.selected;
-    if (menu) menu.hidden = !menuVisible;
-    more?.setAttribute('aria-expanded', String(menuVisible));
-    if (node) {
-      node.tabIndex = this.editing ? -1 : 0;
-      node.setAttribute('role', this.editing ? 'group' : 'button');
-      node.setAttribute('aria-label', `${t('diagram_name')}: ${this.name}`);
-      if (this.editing) node.removeAttribute('aria-pressed');
-      else node.setAttribute('aria-pressed', String(this.selected));
-    }
-    if (input) {
-      input.readOnly = !this.editing;
-      input.tabIndex = this.editing ? 0 : -1;
-      input.setAttribute('aria-hidden', String(!this.editing));
+    for (const item of this.ensureTree()) {
+      const selected = this.selected && item.id === this.selectedKey;
+      const editing = selected && this.editing;
+      const root = this.element('root', item.id);
+      const node = this.element('node', item.id);
+      const input = this.element('name', item.id);
+      const controls = this.element('controls', item.id);
+      const menu = this.element('menu', item.id);
+      const more = this.element('more', item.id);
+      const menuVisible = selected && this.menuOpen;
+      root?.classList.toggle('is-selected', selected);
+      root?.classList.toggle('is-editing', editing);
+      if (controls) controls.hidden = !selected;
+      if (menu) menu.hidden = !menuVisible;
+      more?.setAttribute('aria-expanded', String(menuVisible));
+      if (node) {
+        node.tabIndex = editing ? -1 : 0;
+        node.setAttribute('role', editing ? 'group' : 'button');
+        node.setAttribute('aria-label', `${t('diagram_name')}: ${item.text}`);
+        if (editing) node.removeAttribute('aria-pressed');
+        else node.setAttribute('aria-pressed', String(selected));
+      }
+      if (input) {
+        input.readOnly = !editing;
+        input.tabIndex = editing ? 0 : -1;
+        input.setAttribute('aria-hidden', String(!editing));
+      }
     }
   }
 
-  resizeNode(input = document.getElementById('diagram-name')) {
+  resizeNode(input = this.element('name'), relayout = true) {
     if (!input) return;
     input.style.height = 'auto';
     input.style.height = `${input.scrollHeight}px`;
+    if (relayout && this.nodes?.length > 1) this.positionTree();
   }
 
-  normalizedName() {
+  normalizedName(value = this.name) {
     // Keep intentional newlines, including an empty first or last line.
-    return this.name.replace(/^[^\S\r\n]+|[^\S\r\n]+$/g, '');
+    return value.replace(/^[^\S\r\n]+|[^\S\r\n]+$/g, '');
   }
 
   drawStage() {
@@ -215,8 +308,158 @@ class HomePage extends PageController {
     this.mount();
   }
 
-  async handleAction(action) {
+  positionTree() {
+    const stage = document.getElementById('mindmap-stage');
+    const scene = document.getElementById('diagram-scene');
+    stage?.classList.toggle('has-tree', this.ensureTree().length > 1);
+    if (!scene) return;
+    this.commitName();
+    const sizes = Object.fromEntries(this.nodes.map((node) => {
+      const input = this.element('name', node.id);
+      return [node.id, { width: 220, height: Math.max(48, (input?.scrollHeight || 24) + 24) }];
+    }));
+    this.plan = DiagramLayout.arrange(this.nodes, sizes);
+    scene.style.width = `${this.plan.width}px`;
+    scene.style.height = `${this.plan.height}px`;
+    const connections = document.getElementById('diagram-connections');
+    if (connections) {
+      connections.setAttribute('width', this.plan.width);
+      connections.setAttribute('height', this.plan.height);
+      connections.innerHTML = this.plan.edges.map((edge) => `<path d="${edge.path}"/>`).join('');
+    }
+    for (const position of this.plan.nodes) {
+      const root = this.element('root', position.id);
+      if (!root) continue;
+      root.style.transform = `translate(${position.x}px, ${position.y}px)`;
+      const box = this.element('node', position.id);
+      if (box) {
+        box.style.width = `${position.width}px`;
+        box.style.minHeight = `${position.height}px`;
+      }
+      const node = this.nodes.find((item) => item.id === position.id);
+      const parentLayout = DiagramLayout.effective(this.nodes, node.parent_id || node.id);
+      root.dataset.draggable = String(!!node.parent_id &&
+        (parentLayout.mode === 'free' || parentLayout.direction === 'manual'));
+    }
+  }
+
+  async addChild() {
+    this.commitName();
+    const nodes = this.ensureTree();
+    if (nodes.length >= 200) {
+      this.showStatus(t('diagram_node_limit'), true);
+      return;
+    }
+    let ancestor = nodes.find((node) => node.id === this.selectedKey);
+    let depth = 0;
+    while (ancestor?.parent_id) {
+      depth++;
+      ancestor = nodes.find((node) => node.id === ancestor.parent_id);
+    }
+    if (depth >= 29) {
+      this.showStatus(t('diagram_depth_limit'), true);
+      return;
+    }
+    const child = {
+      id: crypto.randomUUID(), parent_id: this.selectedKey,
+      text: t('diagram_child_name'), layout: null, x: null, y: null,
+    };
+    nodes.push(child);
+    this.selectedKey = child.id;
+    this.name = child.text;
+    this.selected = true;
+    this.editing = false;
+    this.menuOpen = false;
+    this.drawStage();
+    this.element('node')?.focus({ preventScroll: true });
+    this.element('root')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    await this.save();
+  }
+
+  openLayout() {
+    if (!this.active && !this.draft) return;
+    this.element('name')?.blur();
+    this.commitName();
+    const node = this.nodes.find((item) => item.id === this.selectedKey);
+    const key = node.id;
+    const generation = this.generation;
+    this.menuOpen = false;
+    this.layoutOpen = true;
+    this.syncNodeState();
+    this.layoutPanel = new DiagramLayoutPanel({
+      onApply: (layout) => {
+        if (this.generation !== generation) return;
+        this.applyLayout(key, layout);
+      },
+      onClose: () => {
+        this.layoutOpen = false;
+        this.element('more')?.focus();
+      },
+    });
+    this.layoutPanel.open({
+      layout: node.layout,
+      inherited: node.parent_id
+        ? DiagramLayout.effective(this.nodes, node.parent_id)
+        : DiagramLayout.defaults('horizontal'),
+      isRoot: !node.parent_id,
+    });
+  }
+
+  applyLayout(key, layout) {
+    const node = this.ensureTree().find((item) => item.id === key);
+    if (!node) return;
+    node.layout = layout ? { ...layout } : null;
+    this.positionTree();
+    void this.save();
+  }
+
+  bindDragging() {
+    document.addEventListener('pointerdown', (event) => {
+      const node = event.target.closest?.('.diagram-node');
+      const root = node?.closest('.diagram-root');
+      if (event.button !== 0 || !root || root.dataset.draggable !== 'true' || this.editing) return;
+      this.selectNode(root.dataset.nodeKey);
+      const position = this.plan?.nodes.find((item) => item.id === this.selectedKey);
+      if (!position) return;
+      this.drag = {
+        key: this.selectedKey, root, pointerId: event.pointerId,
+        startX: event.clientX, startY: event.clientY,
+        x: position.x - this.plan.origin.x, y: position.y - this.plan.origin.y,
+        moving: false,
+      };
+    });
+    document.addEventListener('pointermove', (event) => {
+      const drag = this.drag;
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      const dx = event.clientX - drag.startX;
+      const dy = event.clientY - drag.startY;
+      if (!drag.moving && Math.hypot(dx, dy) < 5) return;
+      event.preventDefault();
+      if (!drag.moving) drag.root.setPointerCapture(event.pointerId);
+      drag.moving = true;
+      drag.root.classList.add('is-dragging');
+      const node = this.nodes.find((item) => item.id === drag.key);
+      node.x = Math.round(Math.max(-50000, Math.min(50000, drag.x + dx)));
+      node.y = Math.round(Math.max(-50000, Math.min(50000, drag.y + dy)));
+      this.positionTree();
+    });
+    const finish = (event) => {
+      const drag = this.drag;
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      this.drag = null;
+      drag.root.classList.remove('is-dragging');
+      if (drag.root.hasPointerCapture?.(event.pointerId)) drag.root.releasePointerCapture(event.pointerId);
+      if (drag.moving) void this.save();
+    };
+    document.addEventListener('pointerup', finish);
+    document.addEventListener('pointercancel', finish);
+  }
+
+  async handleAction(action, button) {
     if (action === 'retry-diagram') return this.save();
+    if (button?.closest?.('.diagram-root')) this.selectNode(this.keyFor(button));
+    if (action === 'diagram-layout') return this.openLayout();
+    if (action === 'add-diagram-child') return this.addChild();
     if (action === 'toggle-diagram-menu') {
       if (!this.active && !this.draft) return;
       this.selected = true;
@@ -224,14 +467,14 @@ class HomePage extends PageController {
       this.syncNodeState();
       return;
     }
-    if (this.active || this.draft) return;
+    if (action !== 'create-diagram' || this.active || this.draft) return;
     this.draft = { client_key: crypto.randomUUID() };
     this.name = t('diagram_default_name');
     this.error = '';
     this.selected = true;
     this.editing = false;
     this.drawStage();
-    document.getElementById('diagram-node')?.focus();
+    this.element('node')?.focus();
     // Persist the creation itself, even when the user has not named it yet.
     await this.save();
   }
@@ -243,7 +486,8 @@ class HomePage extends PageController {
       this.editing ||
       this.saving ||
       this.error ||
-      (this.active && this.normalizedName() !== this.active.name)
+      this.layoutOpen ||
+      this.hasChanges()
     );
   }
 
@@ -254,19 +498,21 @@ class HomePage extends PageController {
 
   async save() {
     clearTimeout(this.timer);
-    const name = this.normalizedName();
-    if (!name.trim() || this.saving || (!this.active && !this.draft)) {
-      if (!name.trim() && this.active) this.showStatus(t('diagram_name_required'), true);
+    const nodes = this.snapshot();
+    const name = nodes.find((node) => node.id === 'root').text;
+    const invalid = nodes.some((node) => !node.text.trim());
+    if (invalid || this.saving || (!this.active && !this.draft)) {
+      if (invalid && this.active) this.showStatus(t('diagram_name_required'), true);
       return;
     }
-    if (this.active?.name === name) {
+    if (!this.hasChanges()) {
       this.showStatus(t('diagram_saved'));
       return;
     }
     const generation = this.generation;
     const data = this.active
-      ? { id: this.active.id, version: this.active.version, name }
-      : { client_key: this.draft.client_key, name };
+      ? { id: this.active.id, version: this.active.version, name, nodes }
+      : { client_key: this.draft.client_key, name, nodes };
     this.saving = true;
     this.error = '';
     this.showStatus(t('diagram_saving'));
@@ -274,6 +520,7 @@ class HomePage extends PageController {
     try {
       const diagram = await this.makeRequest('saveDiagram', data);
       if (generation !== this.generation) return;
+      diagram.nodes ||= nodes.map((node) => node.id === 'root' ? { ...node, text: diagram.name } : node);
       this.active = diagram;
       this.draft = null;
       S.data.diagrams = [
@@ -288,14 +535,14 @@ class HomePage extends PageController {
       if (generation === this.generation) {
         this.saving = false;
         // Serialize typing during a request so the newest name always wins.
-        if (saved && this.normalizedName() !== this.active.name) this.scheduleSave();
+        if (saved && this.hasChanges()) this.scheduleSave();
       }
     }
   }
 
   showStatus(message, error = false) {
     this.error = error ? message : '';
-    const status = document.getElementById('diagram-status');
+    const status = this.element('status');
     if (!status) return;
     status.className = error ? 'diagram-status is-error' : 'diagram-status sr-only';
     status.textContent = message;

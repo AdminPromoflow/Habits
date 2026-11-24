@@ -87,11 +87,13 @@ try:
  multiline_name='\nMi diagrama\nSegunda línea\n'
  multiline=owner.request('saveDiagram',{'id':diagram['id'],'version':renamed['version'],'name':multiline_name},module='diagrams')
  check(multiline['name']==multiline_name and owner.boot()['data']['diagrams'][0]['name']==multiline_name,'Leading, internal and trailing diagram line breaks persist through the database and reload')
+ from diagram_nodes_acceptance import run as test_diagram_nodes
+ test_diagram_nodes(owner, bob, guest, diagram['id'], check)
  owner.request('saveDiagram',{'name':'Wrong endpoint','client_key':str(uuid.uuid4())},404,module='habits')
  owner.request('diagrams',{},405,module='diagrams')
  check(True,'Module endpoints reject unrelated actions and incorrect HTTP methods')
  direct=owner.request('data',module='dashboard')
- check(direct['habits']==owner.data()['habits'] and direct['diagrams'][0]['id']==diagram['id'],'Module controllers and the compatibility API return the same existing data')
+ check(direct['habits']==owner.data()['habits'] and any(item['id']==diagram['id'] for item in direct['diagrams']),'Module controllers and the compatibility API return the same existing data')
  bob.request('admin',expected=403);check(True,'Normal users cannot read administration data')
  check(not bob.data()['habits'],'New users cannot see Aleina’s private routine')
  check(not bob.data()['categories'] and not bob.data()['templates'],'New users have no preselected categories or templates')

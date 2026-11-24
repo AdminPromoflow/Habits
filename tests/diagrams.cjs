@@ -626,3 +626,77 @@ test('empty edits keep the saved name and restoring it clears validation errors'
   assert.equal(home.error, '');
   assert.equal(home.isEditing(), false);
 });
+
+test('children persist their parent and inherit layout without changing the root name', async () => {
+  const { home } = savedEditor();
+  let snapshot;
+  home.makeRequest = async (action, data) => {
+    snapshot = JSON.parse(JSON.stringify(data));
+    return { id: data.id, name: data.name, nodes: snapshot.nodes, version: data.version + 1 };
+  };
+  await home.addChild();
+  const child = home.nodes.find((node) => node.id !== 'root');
+  assert.equal(child.parent_id, 'root');
+  assert.equal(child.layout, null);
+  assert.equal(home.selectedKey, child.id);
+  assert.equal(snapshot.name, 'Idea guardada');
+  home.name = 'Idea hija\nDetalle';
+  await home.save();
+  assert.equal(snapshot.name, 'Idea guardada');
+  assert.equal(snapshot.nodes.find((node) => node.id === child.id).text, 'Idea hija\nDetalle');
+  assert.equal(home.hasChanges(), false);
+});
+
+test('a child layout override survives root changes, save, and reload', async () => {
+  const { home, state } = savedEditor();
+  home.makeRequest = async (action, data) => ({
+    id: data.id, name: data.name, nodes: JSON.parse(JSON.stringify(data.nodes)), version: data.version + 1,
+  });
+  await home.addChild();
+  const childKey = home.selectedKey;
+  const childStyle = { mode: 'vertical', direction: 'bottom', vertical: 'auto', horizontal: 'auto' };
+  const rootStyle = { mode: 'linear', direction: 'auto', vertical: 'compact', horizontal: 'ltr' };
+  home.applyLayout(childKey, childStyle);
+  await new Promise(setImmediate);
+  home.applyLayout('root', rootStyle);
+  await new Promise(setImmediate);
+  const restored = editor({ draft: false, state: JSON.parse(JSON.stringify(state)) });
+  restored.home.render();
+  assert.deepEqual(JSON.parse(JSON.stringify(restored.home.nodes.find((node) => node.id === childKey).layout)), childStyle);
+  assert.deepEqual(JSON.parse(JSON.stringify(restored.home.nodes.find((node) => node.id === 'root').layout)), rootStyle);
+  home.applyLayout(childKey, null);
+  await new Promise(setImmediate);
+  assert.equal(home.active.nodes.find((node) => node.id === childKey).layout, null);
+});
+
+test('layout changes during a request are queued with the returned version', async () => {
+  const { home, timers } = savedEditor();
+  let finish;
+  home.makeRequest = (action, data) => new Promise((resolve) => {
+    finish = () => resolve({ id: data.id, name: data.name, nodes: JSON.parse(JSON.stringify(data.nodes)), version: 2 });
+  });
+  home.name = 'Nombre nuevo';
+  const pending = home.save();
+  const layout = { mode: 'matrix', direction: 'auto', vertical: 'bottom', horizontal: 'rtl' };
+  home.applyLayout('root', layout);
+  finish();
+  await pending;
+  assert.equal(timers.size, 1);
+  home.makeRequest = async (action, data) => {
+    assert.equal(data.version, 2);
+    assert.deepEqual(JSON.parse(JSON.stringify(data.nodes[0].layout)), layout);
+    return { id: data.id, name: data.name, nodes: data.nodes, version: 3 };
+  };
+  await home.save();
+  assert.equal(home.hasChanges(), false);
+});
+
+test('server node ordering does not create a perpetual save loop', async () => {
+  const { home, timers } = savedEditor();
+  home.makeRequest = async (action, data) => ({
+    id: data.id, name: data.name, nodes: JSON.parse(JSON.stringify(data.nodes)).reverse(), version: data.version + 1,
+  });
+  await home.addChild();
+  assert.equal(home.hasChanges(), false);
+  assert.equal(timers.size, 0);
+});

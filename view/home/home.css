@@ -98,8 +98,8 @@
 
 .diagram-handle {
   position: absolute;
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   display: grid;
   place-items: center;
@@ -117,20 +117,20 @@ button.diagram-handle {
 }
 
 .diagram-handle svg {
-  width: 21px;
-  height: 21px;
+  width: 16px;
+  height: 16px;
 }
 
-.diagram-handle-more { top: -48px; left: 20px; }
-.diagram-handle-text { top: -48px; right: 20px; }
-.diagram-handle-add { top: calc(50% - 18px); right: -48px; }
-.diagram-handle-star { bottom: -48px; left: 20px; }
-.diagram-handle-arrows { bottom: -48px; right: 20px; }
+.diagram-handle-more { top: -38px; left: 20px; }
+.diagram-handle-text { top: -38px; right: 20px; }
+.diagram-handle-add { top: calc(50% - 14px); right: -38px; }
+.diagram-handle-star { bottom: -38px; left: 20px; }
+.diagram-handle-arrows { bottom: -38px; right: 20px; }
 
 .diagram-menu {
   position: absolute;
   z-index: 5;
-  bottom: calc(100% + 64px);
+  bottom: calc(100% + 50px);
   left: 50%;
   transform: translateX(-50%);
   width: min(360px, calc(100vw - 32px));
@@ -219,3 +219,38 @@ button.diagram-handle {
     min-height: 340px;
   }
 }
+
+.diagram-menu-row button:not(:disabled):hover,
+.diagram-menu-row button:not(:disabled):focus-visible {
+  background: #dcd5e9;
+  border-radius: 5px;
+  outline-color: var(--purple);
+}
+
+.mindmap-stage.has-tree {
+  display: block;
+  overflow: auto;
+  min-height: 460px;
+  height: calc(100dvh - 220px);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+}
+
+.diagram-scene {
+  position: relative;
+  margin: 180px auto 90px;
+}
+
+.diagram-scene > .diagram-root {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.diagram-scene > .diagram-root.is-selected { z-index: 3; }
+.diagram-scene .diagram-node { width: 220px; }
+.diagram-connections { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+.diagram-connections path { fill: none; stroke: var(--lavender); stroke-width: 2; }
+.diagram-root[data-draggable="true"] .diagram-node { cursor: grab; touch-action: none; }
+.diagram-root.is-dragging .diagram-node { cursor: grabbing; }

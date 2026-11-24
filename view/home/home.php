@@ -19,44 +19,44 @@
 </template>
 
 <template id="view-diagram-node">
-  <div class="diagram-root" id="diagram-root">
+  <div class="diagram-root" data-node-key="{{nodeKey}}" id="diagram-root{{suffix}}">
     <div
       class="diagram-node"
-      id="diagram-node"
+      id="diagram-node{{suffix}}"
       role="button"
       tabindex="0"
       aria-pressed="false"
       aria-label="{{nodeLabel}}"
-      aria-describedby="diagram-interaction-hint diagram-status"
+      aria-describedby="diagram-interaction-hint{{suffix}} diagram-status{{suffix}}"
     >
       <textarea
-        id="diagram-name"
+        id="diagram-name{{suffix}}"
         rows="1"
         maxlength="120"
         spellcheck="true"
         autocomplete="off"
         aria-label="{{label}}"
         placeholder="{{placeholder}}"
-        aria-describedby="diagram-status"
+        aria-describedby="diagram-status{{suffix}}"
         readonly
         tabindex="-1"
         aria-hidden="true"
       >
 {{name}}</textarea>
     </div>
-    <span id="diagram-interaction-hint" class="sr-only">{{hint}}</span>
-    <div class="diagram-controls" id="diagram-controls" hidden>
-      <button type="button" class="diagram-handle diagram-handle-more" id="diagram-more"
+    <span id="diagram-interaction-hint{{suffix}}" class="sr-only">{{hint}}</span>
+    <div class="diagram-controls" id="diagram-controls{{suffix}}" hidden>
+      <button type="button" class="diagram-handle diagram-handle-more" id="diagram-more{{suffix}}"
         data-action="toggle-diagram-menu" aria-label="{{menuLabel}}" title="{{menuLabel}}"
-        aria-controls="diagram-menu" aria-expanded="false" aria-haspopup="menu">
+        aria-controls="diagram-menu{{suffix}}" aria-expanded="false" aria-haspopup="menu">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2 10h4v4H2zm8 0h4v4h-4zm8 0h4v4h-4z"/></svg>
       </button>
       <span class="diagram-handle diagram-handle-text" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="M3 4h18M12 4v18"/></svg>
       </span>
-      <span class="diagram-handle diagram-handle-add" aria-hidden="true">
+      <button type="button" class="diagram-handle diagram-handle-add" data-action="add-diagram-child" aria-label="{{addChildLabel}}" title="{{addChildLabel}}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="M12 2v20M2 12h20"/></svg>
-      </span>
+      </button>
       <span class="diagram-handle diagram-handle-star" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="M12 2v20M3 7l18 10M3 17 21 7"/></svg>
       </span>
@@ -64,7 +64,7 @@
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="m9 3-8 9 8 9zm6 0 8 9-8 9z"/></svg>
       </span>
     </div>
-    <div class="diagram-menu" id="diagram-menu" role="menu" aria-label="{{menuLabel}}" hidden>
+    <div class="diagram-menu" id="diagram-menu{{suffix}}" role="menu" aria-label="{{menuLabel}}" hidden>
       <div class="diagram-menu-row" role="presentation">
         <button type="button" role="menuitem" disabled aria-label="{{copyLabel}}" title="{{copyLabel}}">{{copyIcon}}</button>
         <button type="button" role="menuitem" disabled aria-label="{{cutLabel}}" title="{{cutLabel}}">{{cutIcon}}</button>
@@ -78,10 +78,17 @@
         <button type="button" role="menuitem" disabled aria-label="{{checkboxLabel}}" title="{{checkboxLabel}}">{{checkboxIcon}}</button>
         <button type="button" role="menuitem" disabled aria-label="{{calendarLabel}}" title="{{calendarLabel}}">{{calendarIcon}}</button>
         <button type="button" role="menuitem" disabled aria-label="{{tagLabel}}" title="{{tagLabel}}">{{tagIcon}}</button>
-        <button type="button" role="menuitem" disabled aria-label="{{branchLabel}}" title="{{branchLabel}}">{{branchIcon}}</button>
+        <button type="button" role="menuitem" data-action="diagram-layout" aria-label="{{branchLabel}}" title="{{branchLabel}}">{{branchIcon}}</button>
         <button type="button" role="menuitem" disabled aria-label="{{resizeLabel}}" title="{{resizeLabel}}">{{resizeIcon}}</button>
       </div>
     </div>
-    <div id="diagram-status" class="diagram-status sr-only" role="status" aria-live="polite"></div>
+    <div id="diagram-status{{suffix}}" class="diagram-status sr-only" role="status" aria-live="polite"></div>
+  </div>
+</template>
+
+<template id="view-diagram-tree">
+  <div class="diagram-scene" id="diagram-scene">
+    <svg class="diagram-connections" id="diagram-connections" aria-hidden="true"></svg>
+    {{nodes}}
   </div>
 </template>

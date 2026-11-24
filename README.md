@@ -57,13 +57,15 @@ Los constructores JavaScript registran las acciones una sola vez. Los eventos co
 
 `api.php` y `app/bootstrap.php` se conservan como entradas de compatibilidad; la implementación está en las carpetas nuevas. Solo los `index.php` de controladores enumerados son endpoints públicos. Los modelos, la configuración y los archivos internos de seguridad están bloqueados por el router local y `.htaccess`.
 
-## Primer paso del editor de diagramas
+## Editor de diagramas
 
-En Inicio, **Crear diagrama** muestra inmediatamente un rectángulo con esquinas redondeadas en el centro y guarda su creación como «Nuevo diagrama». Queda seleccionado, con cinco símbolos alrededor. **Un clic** selecciona el cuadro; **doble clic** habilita la edición con el cursor al final del texto, sin seleccionarlo. Los símbolos son visuales por ahora, sin acciones asignadas. Pulsar fuera del cuadro oculta los símbolos y guarda la edición. También se puede usar Tab para enfocar el nodo y Enter o F2 para editarlo.
+En Inicio, **Crear diagrama** muestra inmediatamente un rectángulo con esquinas redondeadas en el centro y guarda su creación como «Nuevo diagrama». Queda seleccionado, con cinco símbolos alrededor. **Un clic** selecciona el cuadro; **doble clic** habilita la edición con el cursor al final del texto, sin seleccionarlo. Los iconos exteriores miden 28 px. Los tres puntos abren el panel de herramientas; el símbolo de ramas abre el selector central de distribución. El botón «+» añade una idea hija al cuadro seleccionado. Las demás herramientas siguen pendientes de definir. Pulsar fuera del cuadro oculta los símbolos y guarda la edición. También se puede usar Tab para enfocar el nodo y Enter o F2 para editarlo.
 
 El nodo tiene 10 px de espacio interior y ajusta su altura al texto: durante la edición, **Shift + Enter** añade una línea y **Enter** guarda y termina de editar. Los nombres y saltos de línea se guardan automáticamente y se recuperan al volver a entrar. Escape restaura el último nombre guardado al editar, o deselecciona el cuadro fuera de la edición. Los diagramas son privados y tienen control de versión para no sobrescribir cambios hechos en otra pestaña.
 
-Esta primera entrega incluye el nodo inicial. Las ramas, conexiones y herramientas adicionales se definirán en los siguientes pasos; no depende de servicios externos de SimpleMind.
+El selector ofrece distribución libre, horizontal, vertical, lista, de arriba abajo, lineal y matriz, con las direcciones correspondientes. Radial aparece deshabilitado, como en la referencia. Aplicar guarda la elección; Cancelar o Escape la descartan. «Del padre» hereda el estilo del ancestro más cercano; una rama con estilo propio lo transmite a sus descendientes y conserva esa excepción cuando cambia el padre. La raíz sin estilo propio usa horizontal.
+
+Los cuadros y sus conexiones se redistribuyen en el mismo lienzo, sin recargar. En modo libre o con dirección manual se pueden arrastrar los hijos; sus posiciones se guardan. Cada diagrama admite hasta 200 ideas. El editor no depende de servicios externos de SimpleMind.
 
 ## Actualizar una instalación existente
 
@@ -73,7 +75,7 @@ Los cambios de esta entrega están guardados localmente y no se publican automá
 php bin/migrate.php
 ```
 
-La migración `005_diagrams.sql` añade la tabla de diagramas. No importa una base nueva ni reemplaza usuarios, hábitos, rutinas o registros existentes. Conserva el `config/local.php` propio del servidor.
+La migración `005_diagrams.sql` añade la tabla de diagramas; `006_diagram_nodes.sql` añade los nodos, sus padres, estilos y posiciones, y conserva los cuadros ya existentes. La migración 006 debe aplicarse antes de habilitar los archivos nuevos en Hostinger; consulta [las instrucciones de actualización](docs/DIAGRAM-NODES-MIGRATION.md). No importa una base nueva ni reemplaza usuarios, hábitos, rutinas o registros existentes. Conserva el `config/local.php` propio del servidor.
 
 ## Abrir la instalación local
 
@@ -117,7 +119,7 @@ El importador utiliza identificadores de origen para no duplicar rutinas ni ejer
 
 ```sh
 PHP_BIN=/opt/homebrew/bin/php python3 tests/functional.py
-node --test tests/diagrams.cjs
+node --test tests/diagrams.cjs tests/diagram-layout.cjs
 ```
 
 Requiere Python 3, PHP con PDO MySQL y un usuario de MySQL autorizado para crear una base aislada `mi_rutina_test_*`. Configura `RUTINA_TEST_DB_USER` y `RUTINA_TEST_DB_PASSWORD` según tu entorno; el valor predeterminado `root` sin contraseña corresponde únicamente al XAMPP local. No usa la base real de Aleina.
