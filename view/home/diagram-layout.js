@@ -75,7 +75,8 @@ const DiagramLayout = (() => {
 
   function measure(item, sizes) {
     const supplied = sizes instanceof Map ? sizes.get(item.node.id) : sizes?.[item.node.id];
-    const width = dimension(supplied?.width, item.node.parent_id == null ? 220 : 180, 80, 420);
+    const preferredWidth = dimension(item.node.width, item.node.parent_id == null ? 220 : 180, 100, 600);
+    const width = dimension(supplied?.width, preferredWidth, 80, 600);
     const lines = String(item.node.text || '').split('\n').reduce((count, line) =>
       count + Math.max(1, Math.ceil(line.length / Math.max(8, Math.floor((width - 24) / 8)))), 0);
     return { width, height: dimension(supplied?.height, Math.max(48, lines * 24 + 24), 40, 3000) };
@@ -186,7 +187,8 @@ const DiagramLayout = (() => {
         if (blocks.length) {
           const total = blocks.reduce((sum, block) => sum + blockHeight(block), 0) + 8 * (blocks.length - 1);
           if (isRoot) {
-            self.width = Math.max(self.width, ...blocks.map(blockWidth));
+            // An explicit node width remains adjustable even in a matrix header.
+            if (!finite(item.node.width)) self.width = Math.max(self.width, ...blocks.map(blockWidth));
             let top = self.height + 8;
             for (const block of blocks) {
               entries.push(...move(block, -block.minX, top - block.minY));

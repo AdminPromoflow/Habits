@@ -10,9 +10,16 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
   const windowListeners = new Map();
   let nextTimer = 0;
   const elements = [];
+  function listen(listeners, name, callback) {
+    const previous = listeners.get(name);
+    listeners.set(name, (event) => {
+      previous?.(event);
+      if (!event?.immediatePropagationStopped) callback(event);
+    });
+  }
   const document = {
     activeElement: null,
-    addEventListener: (name, callback) => documentListeners.set(name, callback),
+    addEventListener: (name, callback) => listen(documentListeners, name, callback),
     getElementById: (id) => elements.find((element) => element.id === id) || null,
     querySelector: (selector) => elements.find((element) => element.matches(selector)) || null,
   };
@@ -22,7 +29,8 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
     const pointers = new Set();
     const item = {
       id, parentElement, style: {}, dataset: {}, hidden: false, tabIndex: 0,
-      isConnected: true, offsetWidth: 220, offsetHeight: 48,
+      isConnected: true, offsetHeight: 48,
+      get offsetWidth() { return parseFloat(this.style.width) || 220; },
       setPointerCapture: (id) => pointers.add(id),
       hasPointerCapture: (id) => pointers.has(id),
       releasePointerCapture: (id) => pointers.delete(id),
@@ -72,6 +80,7 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
   const controls = element('diagram-controls', 'diagram-controls', root);
   const tool = element('diagram-tool', 'diagram-tool', controls);
   const more = element('diagram-more', 'diagram-handle diagram-handle-more', controls);
+  const widthHandle = element('diagram-width', 'diagram-handle diagram-handle-arrows', controls);
   const menu = element('diagram-menu', 'diagram-menu diagram-popover', root);
   const menuItem = element('diagram-menu-item', 'diagram-menu-item', menu);
   const outside = element('outside');
@@ -103,7 +112,7 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
       reveal(target) { this.revealed = target; }
       isInteracting() { return this.interacting; }
     },
-    window: { addEventListener: (name, callback) => windowListeners.set(name, callback) },
+    window: { addEventListener: (name, callback) => listen(windowListeners, name, callback) },
     crypto: { randomUUID },
     S: state,
     t: (key) => key === 'diagram_default_name' ? 'Nuevo diagrama' : key,
@@ -121,23 +130,25 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
       target, prevented: false,
       preventDefault() { this.prevented = true; },
       stopPropagation() { this.propagationStopped = true; },
-      stopImmediatePropagation() { this.propagationStopped = true; },
+      stopImmediatePropagation() { this.propagationStopped = true; this.immediatePropagationStopped = true; },
       ...options,
     };
     documentListeners.get(name)(event);
     return event;
   }
   return {
-    home, state, timers, stage, field, root, node, controls, tool, more, menu, menuItem, outside, document, windowListeners,
+    home, state, timers, stage, field, root, node, controls, tool, more, widthHandle, menu, menuItem, outside, document, windowListeners,
     addNodeElement(id, value = '') {
       const root = element(`diagram-root-${id}`, 'diagram-root', stage);
       root.dataset.nodeKey = id;
       const node = element(`diagram-node-${id}`, 'diagram-node', root);
+      const controls = element(`diagram-controls-${id}`, 'diagram-controls', root);
+      const widthHandle = element(`diagram-width-${id}`, 'diagram-handle diagram-handle-arrows', controls);
       const field = Object.assign(element(`diagram-name-${id}`, '', node), {
         value, readOnly: true, scrollHeight: 24,
         setSelectionRange(start, end) { this.selectionStart = start; this.selectionEnd = end; },
       });
-      return { root, node, field };
+      return { root, node, field, widthHandle };
     },
     pointer: (name, target = node, options = {}) => dispatch(name, target, {
       button: 0, buttons: 1, pointerId: 1, pointerType: 'mouse', isPrimary: true,
@@ -150,6 +161,9 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
     click: (target = node) => dispatch('click', target),
     doubleClick: (target = node) => dispatch('dblclick', target),
     pressKey: (key, modifiers = {}) => dispatch('keydown', field, {
+      key, shiftKey: false, isComposing: false, ...modifiers,
+    }),
+    handleKey: (key, target = widthHandle, modifiers = {}) => dispatch('keydown', target, {
       key, shiftKey: false, isComposing: false, ...modifiers,
     }),
   };

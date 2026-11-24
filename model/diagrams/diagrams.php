@@ -64,7 +64,7 @@ final class DiagramsModel extends BaseModel
 
     private static function rootNode(string $name): array
     {
-        return ['id' => 'root', 'parent_id' => null, 'text' => $name, 'layout' => null, 'x' => null, 'y' => null];
+        return ['id' => 'root', 'parent_id' => null, 'text' => $name, 'layout' => null, 'x' => null, 'y' => null, 'width' => null];
     }
 
     private static function validateNodes(mixed $input, string $name): array
@@ -96,6 +96,12 @@ final class DiagramsModel extends BaseModel
                 if ($value !== null && ((!is_int($value) && !is_float($value)) || !is_finite((float) $value) || abs($value) > 1000000)) fail('error_validation');
                 $node[$axis] = $value === null ? null : round((float) $value, 2);
             }
+            // Omission preserves a saved width for older clients; explicit null resets it.
+            if (array_key_exists('width', $item)) {
+                $width = $item['width'];
+                if ($width !== null && ((!is_int($width) && !is_float($width)) || !is_finite((float) $width) || $width < 100 || $width > 600)) fail('error_validation');
+                $node['width'] = $width === null ? null : round((float) $width, 2);
+            }
             $nodes[$id] = $node;
         }
         if (!isset($nodes['root'])) fail('error_validation');
@@ -114,14 +120,23 @@ final class DiagramsModel extends BaseModel
 
     private function replaceNodes(int $id, array $nodes): void
     {
+        $existingWidths = [];
+        foreach ($nodes as $node) {
+            if (!array_key_exists('width', $node)) {
+                foreach ($this->db->all('SELECT node_key,node_width FROM diagram_nodes WHERE diagram_id=?', [$id]) as $existing) {
+                    $existingWidths[$existing['node_key']] = $existing['node_width'];
+                }
+                break;
+            }
+        }
         // Detach old edges first: immediate SQL foreign keys also protect deep trees.
         $this->db->run('UPDATE diagram_nodes SET parent_key=NULL WHERE diagram_id=?', [$id]);
         $this->db->run('DELETE FROM diagram_nodes WHERE diagram_id=?', [$id]);
         foreach ($nodes as $position => $node) {
             $layout = $node['layout'];
             $this->db->run(
-                'INSERT INTO diagram_nodes(diagram_id,node_key,parent_key,text,sort_order,layout_mode,layout_direction,layout_vertical,layout_horizontal,position_x,position_y) VALUES (?,?,NULL,?,?,?,?,?,?,?,?)',
-                [$id, $node['id'], $node['text'], $position, $layout['mode'] ?? null, $layout['direction'] ?? null, $layout['vertical'] ?? null, $layout['horizontal'] ?? null, $node['x'], $node['y']],
+                'INSERT INTO diagram_nodes(diagram_id,node_key,parent_key,text,sort_order,layout_mode,layout_direction,layout_vertical,layout_horizontal,position_x,position_y,node_width) VALUES (?,?,NULL,?,?,?,?,?,?,?,?,?)',
+                [$id, $node['id'], $node['text'], $position, $layout['mode'] ?? null, $layout['direction'] ?? null, $layout['vertical'] ?? null, $layout['horizontal'] ?? null, $node['x'], $node['y'], array_key_exists('width', $node) ? $node['width'] : ($existingWidths[$node['id']] ?? null)],
             );
         }
         foreach ($nodes as $node) {
@@ -139,6 +154,7 @@ final class DiagramsModel extends BaseModel
             ],
             'x' => $node['position_x'] === null ? null : (float) $node['position_x'],
             'y' => $node['position_y'] === null ? null : (float) $node['position_y'],
+            'width' => $node['node_width'] === null ? null : (float) $node['node_width'],
         ];
     }
 }
