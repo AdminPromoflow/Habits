@@ -20,6 +20,11 @@ class HomePage extends PageController {
     }, true);
     document.addEventListener('change', (event) => {
       if (event.target.id === 'diagram-select') void this.openDiagram(event.target.value);
+      if (event.target.classList?.contains('diagram-checkbox-scope-option') && event.target.checked &&
+          this.checkboxMenuOpen && ['node', 'branch'].includes(event.target.value)) {
+        this.checkboxScope = event.target.value;
+        this.syncNodeState();
+      }
       if (event.target.classList?.contains('diagram-task-checkbox')) {
         const checked = event.target.checked;
         this.selectNode(this.keyFor(event.target));
@@ -115,6 +120,7 @@ class HomePage extends PageController {
         return;
       }
       if (this.checkboxMenuOpen && event.target.closest?.('.diagram-checkbox-menu') &&
+          !event.target.classList?.contains('diagram-checkbox-scope-option') &&
           ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
         event.preventDefault();
         const options = ['none', 'toggle', 'unchecked', 'checked']
@@ -202,6 +208,7 @@ class HomePage extends PageController {
     this.selected = false;
     this.menuOpen = false;
     this.checkboxMenuOpen = false;
+    this.checkboxScope = 'node';
     this.editing = false;
     this.saving = false;
     this.savePromise = null;
@@ -374,6 +381,9 @@ class HomePage extends PageController {
       checkboxUncheckedLabel: esc(t('diagram_checkbox_unchecked')),
       checkboxCheckedLabel: esc(t('diagram_checkbox_checked')),
       checkboxTaskLabel: esc(t('diagram_checkbox_task', { name: node.text })),
+      checkboxScopeLabel: esc(t('diagram_checkbox_scope')),
+      checkboxScopeNodeLabel: esc(t('diagram_checkbox_scope_node')),
+      checkboxScopeBranchLabel: esc(t('diagram_checkbox_scope_branch')),
       nodeKey: esc(node.id),
       suffix: node.id === 'root' ? '' : `-${esc(node.id)}`,
       addChildLabel: esc(t('diagram_add_child')),
@@ -525,6 +535,11 @@ class HomePage extends PageController {
       const checkboxMenu = this.element('checkbox-menu', item.id);
       if (checkboxMenu) checkboxMenu.hidden = !checkboxMenuVisible;
       menu?.classList.toggle('is-checkbox-menu', checkboxMenuVisible);
+      menu?.setAttribute('role', checkboxMenuVisible ? 'group' : 'menu');
+      for (const scope of ['node', 'branch']) {
+        const radio = this.element(`checkbox-scope-${scope}`, item.id);
+        if (radio) radio.checked = this.checkboxScope === scope;
+      }
       this.element('checkbox-tool', item.id)?.setAttribute('aria-expanded', String(checkboxMenuVisible));
       for (const [state, value] of [['none', null], ['unchecked', false], ['checked', true]]) {
         this.element(`checkbox-${state}`, item.id)?.setAttribute('aria-checked', String(checkboxState === value));
@@ -558,10 +573,11 @@ class HomePage extends PageController {
     }
   }
 
-  setCheckbox(value) {
+  setCheckbox(value, scope = 'node') {
     const node = this.ensureTree().find((item) => item.id === this.selectedKey);
-    if (!node || ![null, false, true].includes(value)) return;
-    node.checkbox = value;
+    if (!node || ![null, false, true].includes(value) || !['node', 'branch'].includes(scope)) return;
+    const affected = scope === 'branch' ? this.branchNodes(node.id) : [node];
+    for (const item of affected) item.checkbox = value;
     this.menuOpen = false;
     this.syncNodeState();
     this.positionTree();
@@ -932,6 +948,7 @@ class HomePage extends PageController {
     if (action === 'diagram-checkbox-menu') {
       this.menuOpen = true;
       this.checkboxMenuOpen = true;
+      this.checkboxScope = 'node';
       this.syncNodeState();
       this.viewport.reveal(this.element('menu'));
       const value = this.ensureTree().find((item) => item.id === this.selectedKey)?.checkbox ?? null;
@@ -943,7 +960,7 @@ class HomePage extends PageController {
       const state = button?.dataset.state;
       if (state === 'toggle' && current === null) return;
       const value = { none: null, unchecked: false, checked: true, toggle: !current }[state];
-      const pending = this.setCheckbox(value);
+      const pending = this.setCheckbox(value, this.checkboxScope);
       this.element('node')?.focus({ preventScroll: true });
       return pending;
     }

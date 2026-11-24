@@ -101,12 +101,19 @@
         <button type="button" role="menuitem" data-action="diagram-layout" aria-label="{{branchLabel}}" title="{{branchLabel}}">{{branchIcon}}</button>
         <button type="button" role="menuitem" disabled aria-label="{{resizeLabel}}" title="{{resizeLabel}}">{{resizeIcon}}</button>
       </div>
-      <div class="diagram-checkbox-menu" id="diagram-checkbox-menu{{suffix}}" role="menu" aria-label="{{checkboxLabel}}" hidden>
+      <div class="diagram-checkbox-menu" id="diagram-checkbox-menu{{suffix}}" role="group" aria-label="{{checkboxLabel}}" hidden>
+        <fieldset class="diagram-checkbox-scope">
+          <legend>{{checkboxScopeLabel}}</legend>
+          <label><input type="radio" class="diagram-checkbox-scope-option" id="diagram-checkbox-scope-node{{suffix}}" name="diagram-checkbox-scope{{suffix}}" value="node" checked><span>{{checkboxScopeNodeLabel}}</span></label>
+          <label><input type="radio" class="diagram-checkbox-scope-option" id="diagram-checkbox-scope-branch{{suffix}}" name="diagram-checkbox-scope{{suffix}}" value="branch"><span>{{checkboxScopeBranchLabel}}</span></label>
+        </fieldset>
+        <div role="menu" aria-label="{{checkboxLabel}}">
         <button type="button" role="menuitemradio" aria-checked="false" id="diagram-checkbox-none{{suffix}}" data-action="diagram-checkbox-state" data-state="none"><span class="diagram-option-check" aria-hidden="true">✓</span>{{checkboxNoneLabel}}</button>
         <button type="button" role="menuitem" id="diagram-checkbox-toggle{{suffix}}" data-action="diagram-checkbox-state" data-state="toggle"><span></span>{{checkboxToggleLabel}}</button>
         <div role="separator"></div>
         <button type="button" role="menuitemradio" aria-checked="false" id="diagram-checkbox-unchecked{{suffix}}" data-action="diagram-checkbox-state" data-state="unchecked"><span class="diagram-option-check" aria-hidden="true">✓</span>{{checkboxUncheckedLabel}}</button>
         <button type="button" role="menuitemradio" aria-checked="false" id="diagram-checkbox-checked{{suffix}}" data-action="diagram-checkbox-state" data-state="checked"><span class="diagram-option-check" aria-hidden="true">✓</span>{{checkboxCheckedLabel}}</button>
+        </div>
       </div>
     </div>
     <div id="diagram-status{{suffix}}" class="diagram-status sr-only" role="status" aria-live="polite"></div>

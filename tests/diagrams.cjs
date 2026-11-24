@@ -96,6 +96,13 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
   const checkbox = element('diagram-checkbox', 'diagram-task-checkbox', node);
   const checkboxTool = element('diagram-checkbox-tool', '', menu);
   const checkboxMenu = element('diagram-checkbox-menu', 'diagram-checkbox-menu', menu);
+  function scopeInputs(menu, suffix = '') {
+    return Object.fromEntries(['node', 'branch'].map((scope) => [scope, Object.assign(
+      element(`diagram-checkbox-scope-${scope}${suffix}`, 'diagram-checkbox-scope-option', menu),
+      { value: scope, checked: scope === 'node' },
+    )]));
+  }
+  const checkboxScopes = scopeInputs(checkboxMenu);
   const checkboxOptions = Object.fromEntries(['none', 'toggle', 'unchecked', 'checked'].map((state) => {
     const option = element(`diagram-checkbox-${state}`, '', checkboxMenu);
     option.dataset.state = state;
@@ -161,20 +168,28 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
     return event;
   }
   return {
-    checkbox, checkboxTool, checkboxMenu, checkboxOptions,
+    checkbox, checkboxTool, checkboxMenu, checkboxOptions, checkboxScopes,
     change: (target) => dispatch('change', target),
     home, state, timers, stage, field, root, node, controls, tool, more, widthHandle, menu, menuItem, outside, document, windowListeners, location, navigations, title, titleLabel, titleInput,
     addNodeElement(id, value = '') {
       const root = element(`diagram-root-${id}`, 'diagram-root', stage);
       root.dataset.nodeKey = id;
       const node = element(`diagram-node-${id}`, 'diagram-node', root);
+      const checkbox = element(`diagram-checkbox-${id}`, 'diagram-task-checkbox', node);
+      const menu = element(`diagram-checkbox-menu-${id}`, 'diagram-checkbox-menu', root);
+      const checkboxScopes = scopeInputs(menu, `-${id}`);
+      const checkboxOptions = Object.fromEntries(['none', 'toggle', 'unchecked', 'checked'].map((state) => {
+        const option = element(`diagram-checkbox-${state}-${id}`, '', menu);
+        option.dataset.state = state;
+        return [state, option];
+      }));
       const controls = element(`diagram-controls-${id}`, 'diagram-controls', root);
       const widthHandle = element(`diagram-width-${id}`, 'diagram-handle diagram-handle-arrows', controls);
       const field = Object.assign(element(`diagram-name-${id}`, '', node), {
         value, readOnly: true, scrollHeight: 24,
         setSelectionRange(start, end) { this.selectionStart = start; this.selectionEnd = end; },
       });
-      return { root, node, field, widthHandle };
+      return { root, node, field, widthHandle, checkbox, checkboxScopes, checkboxOptions };
     },
     pointer: (name, target = node, options = {}) => dispatch(name, target, {
       button: 0, buttons: 1, pointerId: 1, pointerType: 'mouse', isPrimary: true,
@@ -2193,4 +2208,69 @@ test('an untouched empty child is autosaved and remains available for copying an
   await home.nodeTools.paste();
   assert.equal(home.active.nodes.length, 3);
   assert.equal(home.active.nodes.filter(node => node.text === '').length, 2);
+});
+
+test('checkbox scope radios choose one target without saving and reset on reopening the menu', async () => {
+  const { home, checkboxScopes, checkboxOptions, change, pressKey } = savedEditor();
+  home.makeRequest = () => { throw new Error('Choosing a scope must not change the diagram'); };
+  await home.handleAction('diagram-checkbox-menu');
+  assert.equal(checkboxScopes.node.checked, true);
+  assert.equal(checkboxScopes.branch.checked, false);
+  checkboxScopes.branch.checked = true;
+  change(checkboxScopes.branch);
+  assert.equal(home.checkboxScope, 'branch');
+  assert.equal(checkboxScopes.node.checked, false);
+  assert.equal(checkboxScopes.branch.checked, true);
+  assert.equal(home.menuOpen, true);
+  assert.equal(home.hasChanges(), false);
+  assert.equal(pressKey('ArrowDown', { target: checkboxScopes.branch }).prevented, false,
+    'native radio keyboard navigation must not be intercepted by the action menu');
+  pressKey('Escape', { target: checkboxOptions.none });
+  await home.handleAction('diagram-checkbox-menu');
+  assert.equal(home.checkboxScope, 'node');
+  assert.equal(checkboxScopes.node.checked, true);
+  assert.equal(checkboxScopes.branch.checked, false);
+});
+
+test('checkbox branch actions apply the same state to every descendant while preserving ancestors and other branches', async () => {
+  const { home, branch, change, state } = branchDragEditor();
+  home.nodes.push({ id: 'grandchild', parent_id: 'leaf', text: 'Deep task', checkbox: true, width: 190 });
+  home.nodes.push({ id: 'other-root', parent_id: null, text: 'Separate tree', checkbox: false });
+  home.active.nodes = JSON.parse(JSON.stringify(home.nodes));
+  const initial = JSON.parse(JSON.stringify(home.nodes));
+  home.selectNode('branch');
+  for (const [action, value] of [['unchecked', false], ['checked', true], ['toggle', false], ['none', null]]) {
+    await home.handleAction('diagram-checkbox-menu');
+    branch.checkboxScopes.branch.checked = true;
+    change(branch.checkboxScopes.branch);
+    await home.handleAction('diagram-checkbox-state', branch.checkboxOptions[action]);
+    const expected = initial.map((node) => ['branch', 'leaf', 'inherited', 'grandchild'].includes(node.id)
+      ? { ...node, checkbox: value } : node);
+    assert.deepEqual(JSON.parse(JSON.stringify(home.active.nodes)), expected);
+    assert.equal(home.menuOpen, false);
+    assert.equal(home.hasChanges(), false);
+    const restored = editor({ draft: false, state: JSON.parse(JSON.stringify(state)) });
+    restored.home.render();
+    assert.deepEqual(JSON.parse(JSON.stringify(restored.home.nodes)), expected);
+  }
+});
+
+test('individual scope and direct checkbox clicks update only the selected child even after using branch scope', async () => {
+  const { home, branch, change } = branchDragEditor();
+  home.selectNode('branch');
+  await home.handleAction('diagram-checkbox-menu');
+  await home.handleAction('diagram-checkbox-state', branch.checkboxOptions.checked);
+  assert.equal(home.nodes.find(n => n.id === 'branch').checkbox, true);
+  assert.equal(home.nodes.find(n => n.id === 'leaf').checkbox, undefined);
+  await home.handleAction('diagram-checkbox-menu');
+  branch.checkboxScopes.branch.checked = true;
+  change(branch.checkboxScopes.branch);
+  await home.handleAction('diagram-checkbox-state', branch.checkboxOptions.checked);
+  branch.checkbox.checked = false;
+  change(branch.checkbox);
+  await home.save();
+  assert.equal(home.active.nodes.find(n => n.id === 'branch').checkbox, false);
+  assert.equal(home.active.nodes.find(n => n.id === 'leaf').checkbox, true);
+  assert.equal(home.active.nodes.find(n => n.id === 'inherited').checkbox, true);
+  assert.equal(home.active.nodes.find(n => n.id === 'sibling').checkbox, undefined);
 });
