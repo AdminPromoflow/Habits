@@ -112,6 +112,7 @@ class DiagramNodeTools {
         await home.makeRequest('deleteDiagram', { id, version: home.active.version });
         if (generation !== home.generation) return;
         S.data.diagrams = S.data.diagrams.filter((item) => item.id !== id);
+        if (S.data.mindspace) S.data.mindspace.items = S.data.mindspace.items.filter(item => item.diagram_id !== id);
         home.reset();
         home.active = S.data.diagrams[0] || null;
         home.nodes = home.treeFor(home.active);

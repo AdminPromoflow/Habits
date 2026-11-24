@@ -11,6 +11,7 @@ index.php                         Entrada de la aplicación
 view/
   layout/                         Documento HTML, navegación y marco de la aplicación
   home/                           Inicio: botón y nodo editable del diagrama
+  mindspace/                      Pestañas, carpetas y editores de documentos
   habits/                         Hábitos y sus formularios
   categories/                     Categorías y suscripciones
   category_week/                  Tablero semanal por categoría
@@ -56,6 +57,16 @@ view/home/home.php               HTML del botón y del nodo
 Los constructores JavaScript registran las acciones una sola vez. Los eventos compartidos delegan al controlador de cada pantalla. Las plantillas reciben campos con nombre, como `{{heading}}` o `{{name}}`; los datos personales se escapan antes de insertarse. Las solicitudes comparten el transporte AJAX para evitar copias divergentes de la lógica de sesiones y errores.
 
 `api.php` y `app/bootstrap.php` se conservan como entradas de compatibilidad; la implementación está en las carpetas nuevas. Solo los `index.php` de controladores enumerados son endpoints públicos. Los modelos, la configuración y los archivos internos de seguridad están bloqueados por el router local y `.htaccess`.
+
+## MindSpace
+
+Inicio reúne los documentos en un contenedor con pestañas y un botón **+**. Permite crear diagramas, hojas de cálculo, tableros Kanban/Scrum, espacios de hábitos y notas. Los diagramas existentes se incorporan mediante referencias a sus identificadores originales; sus nodos y enlaces se conservan.
+
+El explorador permite crear carpetas y subcarpetas, abrirlas y volver mediante la ruta superior. El botón **+** crea dentro de la carpeta abierta. Arrastra un archivo, una pestaña o una carpeta sobre una carpeta del explorador para moverlo; **Mover a…** ofrece el mismo control con teclado y en móvil. Se impide mover una carpeta dentro de sí misma o de sus descendientes. Las pestañas muestran todos los documentos del MindSpace.
+
+Notas, celdas y tableros se guardan automáticamente y antes de navegar. Kanban ofrece tres estados; Scrum añade backlog, puntos y fechas/objetivo del sprint. Los espacios de hábitos reutilizan el seguimiento existente. Las hojas admiten hasta 200 filas y 52 columnas, operaciones aritméticas, referencias, SUM/SUMA, AVERAGE/PROMEDIO, MIN, MAX y COUNT/CONTAR, pegado tabulado desde Excel y exportación CSV. No son un importador de libros `.xlsx`.
+
+Aplica **013_mindspaces.sql** y **014_mindspace_folders.sql** mediante `php bin/migrate.php` después de subir los archivos. Si faltan estas migraciones, se mantiene el editor anterior: las carpetas no aparecen todavía. Véase [la actualización de MindSpace](docs/MINDSPACE-MIGRATION.md).
 
 ## Editor de diagramas
 
@@ -154,6 +165,7 @@ El importador utiliza identificadores de origen para no duplicar rutinas ni ejer
 ```sh
 PHP_BIN=/opt/homebrew/bin/php python3 tests/functional.py
 node --test tests/diagrams.cjs tests/diagram-layout.cjs tests/diagram-viewport.cjs tests/diagram-routing.cjs tests/diagram-link-navigation.cjs
+node --test tests/mindspace.cjs
 ```
 
 Requiere Python 3, PHP con PDO MySQL y un usuario de MySQL autorizado para crear una base aislada `mi_rutina_test_*`. Configura `RUTINA_TEST_DB_USER` y `RUTINA_TEST_DB_PASSWORD` según tu entorno; el valor predeterminado `root` sin contraseña corresponde únicamente al XAMPP local. No usa la base real de Aleina.
