@@ -8,6 +8,7 @@ class HomePage extends PageController {
     document.addEventListener('input', (event) => {
       if (event.target.id !== 'diagram-name') return;
       this.name = event.target.value;
+      this.resizeNode(event.target);
       this.scheduleSave();
     });
     document.addEventListener('focusin', (event) => {
@@ -20,7 +21,7 @@ class HomePage extends PageController {
     });
     document.addEventListener('keydown', (event) => {
       if (event.target.id !== 'diagram-name' || event.isComposing) return;
-      if (event.key === 'Enter') {
+      if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
         if (!this.name.trim()) this.showStatus(t('diagram_name_required'), true);
         else event.target.blur();
@@ -36,8 +37,9 @@ class HomePage extends PageController {
         document.querySelector('[data-action="create-diagram"]')?.focus();
       }
     });
+    window.addEventListener('resize', () => this.resizeNode());
     window.addEventListener('beforeunload', (event) => {
-      if (this.saving || (this.name.trim() && this.name.trim() !== this.active?.name)) {
+      if (this.saving || (this.name.trim() && this.normalizedName() !== this.active?.name)) {
         event.preventDefault();
         event.returnValue = '';
       }
@@ -83,7 +85,19 @@ class HomePage extends PageController {
   }
 
   mount() {
+    this.resizeNode();
     if (this.error) this.showStatus(this.error, true);
+  }
+
+  resizeNode(input = document.getElementById('diagram-name')) {
+    if (!input) return;
+    input.style.height = 'auto';
+    input.style.height = `${input.scrollHeight}px`;
+  }
+
+  normalizedName() {
+    // Keep intentional newlines, including an empty first or last line.
+    return this.name.replace(/^[^\S\r\n]+|[^\S\r\n]+$/g, '');
   }
 
   drawStage() {
@@ -113,7 +127,7 @@ class HomePage extends PageController {
       this.editing ||
       this.saving ||
       this.error ||
-      (this.active && this.name.trim() !== this.active.name)
+      (this.active && this.normalizedName() !== this.active.name)
     );
   }
 
@@ -124,9 +138,9 @@ class HomePage extends PageController {
 
   async save() {
     clearTimeout(this.timer);
-    const name = this.name.trim();
-    if (!name || this.saving || (!this.active && !this.draft)) {
-      if (!name && this.active) this.showStatus(t('diagram_name_required'), true);
+    const name = this.normalizedName();
+    if (!name.trim() || this.saving || (!this.active && !this.draft)) {
+      if (!name.trim() && this.active) this.showStatus(t('diagram_name_required'), true);
       return;
     }
     if (this.active?.name === name) {
@@ -158,7 +172,7 @@ class HomePage extends PageController {
       if (generation === this.generation) {
         this.saving = false;
         // Serialize typing during a request so the newest name always wins.
-        if (saved && this.name.trim() !== this.active.name) this.scheduleSave();
+        if (saved && this.normalizedName() !== this.active.name) this.scheduleSave();
       }
     }
   }

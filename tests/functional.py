@@ -71,6 +71,7 @@ try:
  owner.request('saveDiagram',{'name':'Private diagram','client_key':diagram_key},419,csrf=False,module='diagrams')
  check(True,'Diagram creation requires a signed-in session and CSRF protection')
  owner.request('saveDiagram',{'name':'   ','client_key':diagram_key},422,module='diagrams')
+ owner.request('saveDiagram',{'name':' \n\t\n ','client_key':diagram_key},422,module='diagrams')
  owner.request('saveDiagram',{'name':'x'*121,'client_key':diagram_key},422,module='diagrams')
  check(True,'Diagram names must be non-empty and at most 120 characters')
  diagram=owner.request('saveDiagram',{'name':'My first diagram','client_key':diagram_key,'owner_user_id':bob.boot()['user']['id']},module='diagrams')
@@ -83,6 +84,9 @@ try:
  check(renamed['name']=='Ideas <script>literal</script>' and renamed['version']==2,'Renaming persists the exact name and advances its version')
  owner.request('saveDiagram',{'id':diagram['id'],'version':diagram['version'],'name':'Stale edit'},409,module='diagrams')
  check(owner.request('diagrams',module='diagrams')[0]['name']==renamed['name'],'Stale diagram edits cannot overwrite a newer name')
+ multiline_name='\nMi diagrama\nSegunda línea\n'
+ multiline=owner.request('saveDiagram',{'id':diagram['id'],'version':renamed['version'],'name':multiline_name},module='diagrams')
+ check(multiline['name']==multiline_name and owner.boot()['data']['diagrams'][0]['name']==multiline_name,'Leading, internal and trailing diagram line breaks persist through the database and reload')
  owner.request('saveDiagram',{'name':'Wrong endpoint','client_key':str(uuid.uuid4())},404,module='habits')
  owner.request('diagrams',{},405,module='diagrams')
  check(True,'Module endpoints reject unrelated actions and incorrect HTTP methods')

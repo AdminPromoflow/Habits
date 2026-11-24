@@ -24,7 +24,7 @@
       <span class="sr-only">{{label}}</span>
       <textarea
         id="diagram-name"
-        rows="3"
+        rows="1"
         maxlength="120"
         spellcheck="true"
         autocomplete="off"

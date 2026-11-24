@@ -59,7 +59,7 @@ Los constructores JavaScript registran las acciones una sola vez. Los eventos co
 
 ## Primer paso del editor de diagramas
 
-En Inicio, **Crear diagrama** muestra inmediatamente un nodo circular en el centro y enfoca el campo del nombre. El nombre se guarda después de escribir o pulsar Enter; se puede editar dentro del mismo nodo y se recupera al volver a entrar. Escape cancela un borrador vacío. Los diagramas son privados y tienen control de versión para no sobrescribir cambios hechos en otra pestaña.
+En Inicio, **Crear diagrama** muestra inmediatamente un rectángulo con esquinas redondeadas en el centro y guarda su creación como «Nuevo diagrama». El nombre queda seleccionado para reemplazarlo. El nodo tiene 10 px de espacio interior y ajusta su altura al texto: **Shift + Enter** añade una línea y **Enter** guarda y termina la edición. Los nombres y saltos de línea se guardan automáticamente y se recuperan al volver a entrar. Escape restaura el último nombre guardado. Los diagramas son privados y tienen control de versión para no sobrescribir cambios hechos en otra pestaña.
 
 Esta primera entrega incluye el nodo inicial. Las ramas, conexiones y herramientas adicionales se definirán en los siguientes pasos; no depende de servicios externos de SimpleMind.
 

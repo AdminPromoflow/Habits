@@ -1,5 +1,15 @@
 # Verificación realizada
 
+## Nodo compacto y texto multilínea — 23 de noviembre de 2026
+
+- Espacio interior de 10 px, altura inicial de una línea y crecimiento/reducción automática al escribir, borrar, recargar y cambiar el ancho de la ventana.
+- Shift + Enter inserta un renglón sin salir del editor. Enter guarda y termina la edición. Los saltos de línea iniciales, interiores y finales se conservan en MySQL; un nombre compuesto únicamente por espacios o saltos sigue siendo inválido.
+- 13 pruebas JavaScript y 101 comprobaciones HTTP completadas en una base aislada; también pasaron las 7 comprobaciones existentes de esquema y datos.
+- Navegador: una línea ocupa 48 px de altura total; dos líneas, 72 px; tres líneas, 96 px, con padding calculado de 10 px. Comprobado que una línea vacía final permanece tras recargar. Vista móvil de 390 × 844 sin desbordamiento horizontal ni texto recortado.
+- Capturas locales: `tests/.runtime/compact-multiline-desktop.png` y `tests/.runtime/compact-multiline-mobile.png`.
+
+No cambia el esquema de la base. Esta revisión está guardada localmente, sin publicación ni cambios en Hostinger.
+
 ## Nodo redondeado y creación persistente — 23 de noviembre de 2026
 
 - Nodo inicial cambiado a rectángulo de 220 × 128 px con esquinas de 24 px.

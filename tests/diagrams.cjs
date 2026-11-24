@@ -10,12 +10,25 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
   const windowListeners = new Map();
   let nextTimer = 0;
   const stage = { innerHTML: '' };
-  const field = { id: 'diagram-name', value: '', focus() {}, select() {} };
+  const field = {
+    id: 'diagram-name',
+    value: '',
+    style: { height: '24px' },
+    scrollHeight: 24,
+    blurred: false,
+    focus() { documentListeners.get('focusin')?.({ target: this }); },
+    blur() {
+      this.blurred = true;
+      documentListeners.get('focusout')?.({ target: this });
+    },
+    select() {},
+  };
   const context = vm.createContext({
     PageController: class {},
     document: {
       addEventListener: (name, callback) => documentListeners.set(name, callback),
       getElementById: (id) => ({ 'mindmap-stage': stage, 'diagram-name': field })[id] || null,
+      querySelector: () => null,
     },
     window: { addEventListener: (name, callback) => windowListeners.set(name, callback) },
     crypto: { randomUUID },
@@ -31,13 +44,122 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
   const home = new HomePage();
   if (draft) home.draft = { client_key: 'b15dcc74-7f1a-4d39-974e-ab2828e3e72f' };
   return {
-    home, state, timers, stage, windowListeners,
+    home, state, timers, stage, field, windowListeners,
     typeName(value) {
       field.value = value;
       documentListeners.get('input')({ target: field });
     },
+    pressKey(key, modifiers = {}) {
+      const event = {
+        target: field,
+        key,
+        shiftKey: false,
+        isComposing: false,
+        prevented: false,
+        preventDefault() { this.prevented = true; },
+        ...modifiers,
+      };
+      documentListeners.get('keydown')(event);
+      return event;
+    },
   };
 }
+
+test('Shift Enter allows a native line break while Enter alone saves and leaves editing', async () => {
+  const { home, field, typeName, pressKey } = editor();
+  const requests = [];
+  home.makeRequest = async (action, data) => {
+    requests.push({ action, ...data });
+    return { id: 31, name: data.name, version: 1 };
+  };
+  field.focus();
+  typeName('Primera línea');
+  const newline = pressKey('Enter', { shiftKey: true });
+  assert.equal(newline.prevented, false);
+  assert.equal(field.blurred, false);
+  assert.equal(home.editing, true);
+  assert.equal(requests.length, 0);
+
+  // The browser inserts the newline and dispatches input when keydown is not cancelled.
+  field.scrollHeight = 48;
+  typeName('Primera línea\nSegunda línea');
+  assert.equal(field.style.height, '48px');
+  const save = pressKey('Enter');
+  assert.equal(save.prevented, true);
+  assert.equal(field.blurred, true);
+  assert.equal(home.editing, false);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].name, 'Primera línea\nSegunda línea');
+  await new Promise(setImmediate);
+  assert.equal(home.active.name, 'Primera línea\nSegunda línea');
+});
+
+test('saved multiline names preserve leading, internal and trailing line breaks after reload', async () => {
+  const { home, state, timers, windowListeners } = editor();
+  const name = '\nMi plan\nSegunda idea\n';
+  home.name = name;
+  home.makeRequest = async (action, data) => {
+    assert.equal(data.name, name);
+    return { id: 32, name: data.name, version: 1 };
+  };
+  await home.save();
+  assert.equal(state.data.diagrams[0].name, name);
+  assert.equal(home.isEditing(), false);
+  assert.equal(timers.size, 0);
+  const beforeUnload = { preventDefault() { this.prevented = true; } };
+  windowListeners.get('beforeunload')(beforeUnload);
+  assert.equal(beforeUnload.prevented, undefined);
+
+  const { home: restored } = editor({ draft: false, state: JSON.parse(JSON.stringify(state)) });
+  const node = JSON.parse(JSON.parse(restored.render()).content);
+  assert.equal(node.name, name);
+});
+
+test('adding only a final line break is an unsaved change and gets persisted', async () => {
+  const { home, windowListeners } = editor({ draft: false });
+  home.active = { id: 33, name: 'Idea guardada', version: 1 };
+  home.name = 'Idea guardada\n';
+  assert.equal(home.isEditing(), true);
+  const beforeUnload = { preventDefault() { this.prevented = true; } };
+  windowListeners.get('beforeunload')(beforeUnload);
+  assert.equal(beforeUnload.prevented, true);
+  let requests = 0;
+  home.makeRequest = async (action, data) => {
+    requests++;
+    assert.equal(data.name, 'Idea guardada\n');
+    return { id: 33, name: data.name, version: 2 };
+  };
+  await home.save();
+  assert.equal(requests, 1);
+  assert.equal(home.active.name, 'Idea guardada\n');
+  assert.equal(home.isEditing(), false);
+});
+
+test('text area grows and shrinks on mount, input and viewport resizing', () => {
+  const { home, field, typeName, windowListeners } = editor();
+  field.scrollHeight = 72;
+  home.mount();
+  assert.equal(field.style.height, '72px');
+  field.scrollHeight = 24;
+  typeName('Breve');
+  assert.equal(field.style.height, '24px');
+  field.scrollHeight = 96;
+  typeName('Una idea\nDos ideas\nTres ideas\nCuatro ideas');
+  assert.equal(field.style.height, '96px');
+  field.scrollHeight = 120;
+  windowListeners.get('resize')();
+  assert.equal(field.style.height, '120px');
+});
+
+test('names containing only whitespace and line breaks are never submitted', async () => {
+  const { home } = editor({ draft: false });
+  home.active = { id: 34, name: 'Nombre válido', version: 1 };
+  home.name = ' \n\t\n ';
+  home.makeRequest = () => { throw new Error('No request expected'); };
+  await home.save();
+  assert.equal(home.error, 'diagram_name_required');
+  assert.equal(home.active.name, 'Nombre válido');
+});
 
 test('creating a diagram saves immediately without typing and restores after reload', async () => {
   const { home, state, stage, windowListeners } = editor({ draft: false });

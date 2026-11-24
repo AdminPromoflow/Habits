@@ -13,7 +13,12 @@ final class DiagramsModel extends BaseModel
 
     public function save(array $data): array
     {
-        $name = trim(Validate::text($data, 'name', 120));
+        // Trim edge spacing without removing intentional first/last newlines.
+        $name = preg_replace(
+            '/^[^\S\r\n]+|[^\S\r\n]+$/u',
+            '',
+            Validate::text($data, 'name', 120),
+        );
         $id = (int) ($data['id'] ?? 0);
         if ($id) {
             $diagram = $this->db->one(
