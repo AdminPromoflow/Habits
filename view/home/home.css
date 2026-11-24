@@ -551,6 +551,12 @@ button.diagram-handle-arrows { cursor: ew-resize; touch-action: none; }
 .diagram-scene .diagram-node { width: 220px; }
 .diagram-connections { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
 .diagram-connections path { fill: none; stroke: var(--lavender); stroke-width: 2; }
+.diagram-connection { cursor: pointer; outline: none; }
+.diagram-connections .diagram-connection-hit { stroke: transparent; stroke-width: 14; vector-effect: non-scaling-stroke; pointer-events: stroke; }
+.diagram-connection-line { pointer-events: none; }
+.diagram-connection:hover .diagram-connection-line { stroke: var(--purple); stroke-width: 3; }
+.diagram-connection.is-selected .diagram-connection-line,
+.diagram-connection:focus-visible .diagram-connection-line { stroke: var(--purple-dark); stroke-width: 4; }
 .diagram-root.is-selected:not(.is-editing) .diagram-node { cursor: grab; touch-action: none; }
 .diagram-root.is-dragging .diagram-node { cursor: grabbing; }
 

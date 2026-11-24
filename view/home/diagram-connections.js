@@ -4,24 +4,135 @@ class DiagramConnections {
   constructor(home) {
     this.home = home;
     this.drag = null;
+    this.selected = null;
     document.addEventListener('pointerdown', (event) => this.start(event));
     document.addEventListener('pointermove', (event) => this.move(event));
     document.addEventListener('pointerup', (event) => this.finish(event, true));
     document.addEventListener('pointercancel', (event) => this.finish(event, false));
     document.addEventListener('lostpointercapture', (event) => this.finish(event, false));
-    document.addEventListener('keydown', (event) => {
-      if (event.key !== 'Escape' || !this.drag) return;
+    document.addEventListener('focusin', (event) => {
+      const line = event.target.closest?.('.diagram-connection');
+      if (line) this.select(line);
+      else this.clearSelection();
+    });
+    document.addEventListener('keydown', (event) => this.keydown(event));
+    window.addEventListener('blur', () => this.cancel());
+  }
+
+  same(a, b) {
+    return !!a && !!b && (a.from === b.from && a.to === b.to || a.from === b.to && a.to === b.from);
+  }
+
+  available() {
+    const home = this.home;
+    return !this.drag && !home.drag && !home.resizing && !home.editing && !home.titleEditing &&
+      !home.layoutOpen && !home.switching && !home.nodeTools.busy && !home.viewport.isInteracting();
+  }
+
+  visibleEdges() {
+    const home = this.home;
+    return [...home.ensureTree().filter(node => node.parent_id !== null)
+      .map(node => ({ from: node.parent_id, to: node.id })), ...home.connections]
+      .filter(edge => !home.hiddenConnections.some(hidden => this.same(edge, hidden)));
+  }
+
+  elements() {
+    return [...(document.getElementById('diagram-connections')?.querySelectorAll('.diagram-connection') || [])];
+  }
+
+  syncSelection() {
+    for (const line of this.elements()) {
+      const selected = this.same(line.dataset, this.selected);
+      line.classList.toggle('is-selected', selected);
+      line.setAttribute('aria-pressed', String(selected));
+    }
+  }
+
+  clearSelection() {
+    if (!this.selected) return;
+    this.selected = null;
+    this.syncSelection();
+  }
+
+  select(line) {
+    if (!this.available()) return false;
+    const edge = this.visibleEdges().find(edge => this.same(edge, line.dataset));
+    if (!edge) return false;
+    const home = this.home;
+    home.selected = false;
+    home.menuOpen = false;
+    home.syncNodeState();
+    this.selected = { from: edge.from, to: edge.to };
+    this.syncSelection();
+    return true;
+  }
+
+  click(event) {
+    const line = event.target.closest?.('.diagram-connection');
+    if (!line) { this.clearSelection(); return false; }
+    if (this.select(line)) line.focus({ preventScroll: true });
+    return true;
+  }
+
+  keydown(event) {
+    if (event.isComposing) return;
+    if (event.key === 'Escape' && this.drag) {
       event.preventDefault();
       event.stopImmediatePropagation();
       this.cancel();
-    });
-    window.addEventListener('blur', () => this.cancel());
+      return;
+    }
+    const line = event.target.closest?.('.diagram-connection');
+    if (!line || !this.available()) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.clearSelection();
+      document.getElementById('mindmap-stage')?.focus({ preventScroll: true });
+    } else if (['Enter', ' '].includes(event.key)) {
+      event.preventDefault();
+      this.select(line);
+    } else if (['Delete', 'Backspace'].includes(event.key) &&
+        !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && this.same(line.dataset, this.selected)) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (!event.repeat) void this.remove();
+    }
+  }
+
+  remove() {
+    if (!this.available() || !this.selected) return;
+    const home = this.home, edge = this.visibleEdges().find(edge => this.same(edge, this.selected));
+    if (!edge) { this.clearSelection(); return; }
+    const extra = home.connections.findIndex(item => this.same(item, edge));
+    if (extra >= 0) home.connections.splice(extra, 1);
+    else home.hiddenConnections.push({ ...edge });
+    this.clearSelection();
+    home.positionTree();
+    document.getElementById('mindmap-stage')?.focus({ preventScroll: true });
+    return home.save();
+  }
+
+  render(svg, edges) {
+    const focused = document.activeElement?.closest?.('.diagram-connection');
+    const focusKey = focused && { ...focused.dataset };
+    const visible = edges.filter(edge => !this.home.hiddenConnections.some(hidden => this.same(edge, hidden)));
+    if (!visible.some(edge => this.same(edge, this.selected))) this.selected = null;
+    const names = new Map(this.home.ensureTree().map(node => [node.id, node.text]));
+    svg.innerHTML = visible.map(edge => {
+      const selected = this.same(edge, this.selected);
+      const label = t('diagram_connection_label', { from: names.get(edge.from), to: names.get(edge.to) });
+      return `<g class="diagram-connection${selected ? ' is-selected' : ''}" data-from="${esc(edge.from)}" data-to="${esc(edge.to)}"
+        tabindex="0" role="button" aria-pressed="${selected}" aria-label="${esc(label)}">
+        <path class="diagram-connection-hit" d="${edge.path}"/><path class="diagram-connection-line" d="${edge.path}"/></g>`;
+    }).join('');
+    if (focusKey) this.elements().find(line => this.same(line.dataset, focusKey))?.focus({ preventScroll: true });
   }
 
   canConnect(from, to) {
     const home = this.home;
     const source = home.ensureTree().find((node) => node.id === from);
     const target = home.ensureTree().find((node) => node.id === to);
+    if (source && target && home.hiddenConnections.some(edge => this.same(edge, { from, to }))) return true;
     return !!source && !!target && from !== to && source.parent_id !== to && target.parent_id !== from &&
       !home.connections.some((edge) => edge.from === from && edge.to === to || edge.from === to && edge.to === from);
   }
@@ -29,8 +140,12 @@ class DiagramConnections {
   connect(from, to) {
     const home = this.home;
     if (!this.canConnect(from, to)) return;
-    if (home.connections.length >= 1000) { home.showStatus(t('diagram_connection_limit'), true); return; }
-    home.connections.push({ from, to });
+    const hidden = home.hiddenConnections.findIndex(edge => this.same(edge, { from, to }));
+    if (hidden >= 0) home.hiddenConnections.splice(hidden, 1);
+    else {
+      if (home.connections.length >= 1000) { home.showStatus(t('diagram_connection_limit'), true); return; }
+      home.connections.push({ from, to });
+    }
     home.positionTree();
     return home.save();
   }

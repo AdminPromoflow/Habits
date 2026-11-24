@@ -39,6 +39,7 @@ class HomePage extends PageController {
         event.stopImmediatePropagation();
         return;
       }
+      if (this.connectionTool.click(event)) return;
       const node = event.target.closest?.('.diagram-node');
       if (node) {
         if (event.target.closest?.('.diagram-task-checkbox')) return;
@@ -200,6 +201,7 @@ class HomePage extends PageController {
     clearTimeout(this.timer);
     this.generation++;
     this.connectionTool?.cancel();
+    this.connectionTool?.clearSelection();
     this.finishNodeDrag(false);
     this.finishNodeResize(false);
     this.viewport?.reset();
@@ -209,6 +211,7 @@ class HomePage extends PageController {
     this.layoutOpen = false;
     this.nodes = null;
     this.connections = [];
+    this.hiddenConnections = [];
     this.childDrafts = new Set();
     this.draftOrigins = new Map();
     this.submittedChildren = new Map();
@@ -243,6 +246,7 @@ class HomePage extends PageController {
       this.selectedKey = 'root';
       this.nodes = this.treeFor(this.active);
       this.connections = this.connectionsFor(this.active);
+      this.hiddenConnections = this.connectionsFor(this.active, 'hidden_connections');
       this.name = this.nodes.find((node) => node.id === 'root')?.text || '';
       this.diagramTitle = this.active?.name || '';
       this.rememberDiagram();
@@ -489,8 +493,8 @@ class HomePage extends PageController {
     }];
   }
 
-  connectionsFor(diagram) {
-    return (diagram?.connections || []).map((edge) => ({ ...edge }));
+  connectionsFor(diagram, field = 'connections') {
+    return (diagram?.[field] || []).map((edge) => ({ ...edge }));
   }
 
   connectionFingerprint(connections) {
@@ -540,6 +544,7 @@ class HomePage extends PageController {
     const nodes = this.snapshot();
     return !!this.draft || this.titleName() !== this.active.name ||
       this.connectionFingerprint(this.connections) !== this.connectionFingerprint(this.connectionsFor(this.active)) ||
+      this.connectionFingerprint(this.hiddenConnections) !== this.connectionFingerprint(this.connectionsFor(this.active, 'hidden_connections')) ||
       this.fingerprint(nodes) !== this.fingerprint(this.treeFor(this.active));
   }
 
@@ -561,6 +566,7 @@ class HomePage extends PageController {
   selectNode(key = this.selectedKey) {
     if (!this.active && !this.draft) return;
     if (!this.ensureTree().some((node) => node.id === key)) return false;
+    this.connectionTool.clearSelection();
     if (key !== this.selectedKey) {
       this.element('name')?.blur();
       this.commitName();
@@ -731,7 +737,7 @@ class HomePage extends PageController {
     if (connections) {
       connections.setAttribute('width', this.plan.width);
       connections.setAttribute('height', this.plan.height);
-      connections.innerHTML = this.plan.edges.map((edge) => `<path d="${edge.path}"/>`).join('');
+      this.connectionTool.render(connections, this.plan.edges);
     }
     for (const position of this.plan.nodes) {
       const root = this.element('root', position.id);
@@ -1097,6 +1103,7 @@ class HomePage extends PageController {
       this.pickerOpen ||
       this.nodeTools.busy ||
       this.connectionTool.drag ||
+      this.connectionTool.selected ||
       this.error ||
       this.layoutOpen ||
       this.drag ||
@@ -1138,6 +1145,7 @@ class HomePage extends PageController {
       ? { id: this.active.id, version: this.active.version, name, nodes }
       : { client_key: this.draft.client_key, name, nodes };
     data.connections = this.connections.map((edge) => ({ ...edge }));
+    data.hidden_connections = this.hiddenConnections.map((edge) => ({ ...edge }));
     this.saving = true;
     for (const node of nodes) {
       if (this.childDrafts.has(node.id)) this.submittedChildren.set(node.id, node.text);
@@ -1150,6 +1158,7 @@ class HomePage extends PageController {
       if (generation !== this.generation) return;
       diagram.nodes ||= nodes.map((node) => ({ ...node }));
       diagram.connections ||= data.connections;
+      diagram.hidden_connections ||= data.hidden_connections;
       const created = !!this.draft;
       this.active = diagram;
       // Keep any pan/zoom made while the new diagram's first save was pending.

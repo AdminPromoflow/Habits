@@ -418,6 +418,7 @@ return [
     'diagram_add_child' => 'Añadir idea hija',
     'diagram_add_child_hint' => 'Clic para crear un hijo. Mantén presionado y arrastra a otro cuadro para conectarlos.',
     'diagram_connection_limit' => 'Has alcanzado el límite de 1000 conexiones adicionales.',
+    'diagram_connection_label' => 'Conexión de {from} a {to}. Delete o Retroceso elimina solo la línea.',
     'diagram_add_sibling' => 'Añadir idea hermana con las mismas características',
     'diagram_node_width' => 'Ancho del cuadro',
     'diagram_node_width_hint' => 'Mantén presionado y arrastra para cambiar el ancho. También puedes usar las flechas izquierda y derecha.',

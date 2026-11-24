@@ -172,7 +172,7 @@ class DiagramViewport {
     this.suppressClickUntil = 0;
     this.lastPoint = this.point(event);
     if (event.button !== 0 || this.pan || this.gesture || !this.allowed(event) ||
-        event.target.closest?.('.diagram-root')) return;
+        event.target.closest?.('.diagram-root') || event.target.closest?.('.diagram-connection')) return;
     event.preventDefault();
     this.pan = {
       id: event.pointerId,

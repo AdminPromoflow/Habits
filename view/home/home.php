@@ -9,7 +9,7 @@
       <button type="button" class="btn primary" id="create-diagram" data-action="create-diagram" {{createDisabled}}>{{plus}}{{createLabel}}</button>
     </div>
     <div class="diagram-toolbar" id="diagram-toolbar">{{diagramToolbar}}</div>
-    <div class="mindmap-stage" id="mindmap-stage" aria-label="{{diagramLabel}}">{{content}}</div>
+    <div class="mindmap-stage" id="mindmap-stage" tabindex="-1" aria-label="{{diagramLabel}}">{{content}}</div>
   </section>
 </template>
 
@@ -127,7 +127,7 @@
 
 <template id="view-diagram-tree">
   <div class="diagram-scene" id="diagram-scene">
-    <svg class="diagram-connections" id="diagram-connections" aria-hidden="true"></svg>
+    <svg class="diagram-connections" id="diagram-connections"></svg>
     {{nodes}}
   </div>
 </template>

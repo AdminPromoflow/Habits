@@ -418,6 +418,7 @@ return [
     'diagram_add_child' => 'Add child idea',
     'diagram_add_child_hint' => 'Click to add a child. Press and drag onto another node to connect them.',
     'diagram_connection_limit' => 'You have reached the limit of 1000 additional connections.',
+    'diagram_connection_label' => 'Connection from {from} to {to}. Delete or Backspace removes only the line.',
     'diagram_add_sibling' => 'Add sibling idea with the same properties',
     'diagram_node_width' => 'Node width',
     'diagram_node_width_hint' => 'Press and drag to change the width. You can also use the left and right arrow keys.',
