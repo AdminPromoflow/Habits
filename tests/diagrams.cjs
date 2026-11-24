@@ -676,7 +676,7 @@ test('children persist their parent and inherit layout without changing the root
   assert.equal(home.hasChanges(), false);
 });
 
-test('a child layout override survives root changes, save, and reload', async () => {
+test('applying a root layout replaces child overrides and persists the result after reload', async () => {
   const { home, state } = savedEditor();
   home.makeRequest = async (action, data) => ({
     id: data.id, name: data.name, nodes: JSON.parse(JSON.stringify(data.nodes)), version: data.version + 1,
@@ -691,8 +691,11 @@ test('a child layout override survives root changes, save, and reload', async ()
   await new Promise(setImmediate);
   const restored = editor({ draft: false, state: JSON.parse(JSON.stringify(state)) });
   restored.home.render();
-  assert.deepEqual(JSON.parse(JSON.stringify(restored.home.nodes.find((node) => node.id === childKey).layout)), childStyle);
+  assert.equal(restored.home.nodes.find((node) => node.id === childKey).layout, null);
   assert.deepEqual(JSON.parse(JSON.stringify(restored.home.nodes.find((node) => node.id === 'root').layout)), rootStyle);
+  home.applyLayout(childKey, childStyle);
+  await new Promise(setImmediate);
+  assert.deepEqual(JSON.parse(JSON.stringify(home.active.nodes.find((node) => node.id === childKey).layout)), childStyle);
   home.applyLayout(childKey, null);
   await new Promise(setImmediate);
   assert.equal(home.active.nodes.find((node) => node.id === childKey).layout, null);
@@ -860,20 +863,77 @@ test('moving a branch carries its manually positioned descendants without changi
   assert.equal(home.hasChanges(), false);
 });
 
-test('changing a branch layout clears only its manual positions and preserves nested style choices', async () => {
+test('applying a branch layout replaces descendant styles and positions without changing ancestors or siblings', async () => {
   const { home } = branchDragEditor();
-  const originalNested = JSON.parse(JSON.stringify(home.nodes.find((node) => node.id === 'leaf').layout));
+  home.nodes.push({ id: 'deep', parent_id: 'leaf', text: 'Más profundo', layout: { mode: 'matrix' }, x: 400, y: 150 });
+  const outsideBefore = JSON.parse(JSON.stringify(home.nodes.filter((node) => ['root', 'sibling'].includes(node.id))));
   const layout = { mode: 'list', direction: 'auto', vertical: 'bottom', horizontal: 'ltr' };
-  home.applyLayout('branch', layout);
+  home.applyLayout('branch', layout, 'branch');
   await new Promise(setImmediate);
-  for (const id of ['branch', 'leaf', 'inherited']) {
+  for (const id of ['branch', 'leaf', 'inherited', 'deep']) {
     const node = home.nodes.find((node) => node.id === id);
     assert.equal(node.x, null);
     assert.equal(node.y, null);
+    if (id !== 'branch') assert.equal(node.layout, null);
   }
-  assert.deepEqual(JSON.parse(JSON.stringify(home.nodes.find((node) => node.id === 'leaf').layout)), originalNested);
-  assert.equal(home.nodes.find((node) => node.id === 'sibling').x, -80);
-  assert.equal(home.nodes.find((node) => node.id === 'root').x, 0);
+  assert.deepEqual(JSON.parse(JSON.stringify(home.nodes.find((node) => node.id === 'branch').layout)), layout);
+  assert.deepEqual(JSON.parse(JSON.stringify(home.nodes.filter((node) => ['root', 'sibling'].includes(node.id)))), outsideBefore);
+  assert.equal(home.hasChanges(), false);
+});
+
+test('applying to the whole diagram from a child replaces all styles and positions in one saved update', async () => {
+  const { home, state } = branchDragEditor();
+  const layout = { mode: 'horizontal', direction: 'right', vertical: 'auto', horizontal: 'auto' };
+  let requests = 0;
+  let snapshot;
+  home.makeRequest = async (action, data) => {
+    requests++;
+    snapshot = JSON.parse(JSON.stringify(data));
+    return { id: data.id, name: data.name, nodes: snapshot.nodes, version: data.version + 1 };
+  };
+  home.applyLayout('leaf', layout, 'diagram');
+  await new Promise(setImmediate);
+  assert.equal(requests, 1);
+  assert.equal(snapshot.name, 'Idea guardada');
+  for (const node of snapshot.nodes) {
+    assert.equal(node.x, null);
+    assert.equal(node.y, null);
+    if (node.id === 'root') assert.deepEqual(node.layout, layout);
+    else assert.equal(node.layout, null);
+  }
+  assert.equal(home.hasChanges(), false);
+  const restored = editor({ draft: false, state: JSON.parse(JSON.stringify(state)) });
+  restored.home.render();
+  assert.deepEqual(JSON.parse(JSON.stringify(restored.home.nodes)), snapshot.nodes);
+});
+
+test('restoring inheritance in a branch clears every descendant override and leaves other branches intact', async () => {
+  const { home } = branchDragEditor();
+  const rootBefore = JSON.parse(JSON.stringify(home.nodes.find((node) => node.id === 'root')));
+  const siblingBefore = JSON.parse(JSON.stringify(home.nodes.find((node) => node.id === 'sibling')));
+  home.nodes.find((node) => node.id === 'branch').layout = { mode: 'list' };
+  home.applyLayout('branch', null, 'branch');
+  await new Promise(setImmediate);
+  for (const id of ['branch', 'leaf', 'inherited']) {
+    const node = home.active.nodes.find((node) => node.id === id);
+    assert.equal(node.layout, null);
+    assert.equal(node.x, null);
+    assert.equal(node.y, null);
+  }
+  assert.deepEqual(JSON.parse(JSON.stringify(home.active.nodes.find((node) => node.id === 'root'))), rootBefore);
+  assert.deepEqual(JSON.parse(JSON.stringify(home.active.nodes.find((node) => node.id === 'sibling'))), siblingBefore);
+  assert.equal(home.hasChanges(), false);
+});
+
+test('restoring the diagram default from a child removes all styles and manual positions', async () => {
+  const { home } = branchDragEditor();
+  home.applyLayout('leaf', null, 'diagram');
+  await new Promise(setImmediate);
+  for (const node of home.active.nodes) {
+    assert.equal(node.layout, null);
+    assert.equal(node.x, null);
+    assert.equal(node.y, null);
+  }
   assert.equal(home.hasChanges(), false);
 });
 

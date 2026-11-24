@@ -12,6 +12,7 @@ class DiagramLayoutPanel {
     this.returnFocus = document.activeElement;
     this.inherited = { ...inherited };
     this.isRoot = isRoot;
+    this.scope = 'branch';
     this.mode = layout?.mode || 'inherit';
     this.choices = {};
     if (layout) this.choices[layout.mode] = { ...DiagramLayout.defaults(layout.mode), ...layout };
@@ -32,7 +33,12 @@ class DiagramLayoutPanel {
           ${['inherit', 'free', 'horizontal', 'vertical', 'list', 'topdown', 'linear', 'radial', 'matrix'].map((mode) => this.modeCard(mode)).join('')}
         </div>
         <div class="diagram-layout-directions" id="diagram-layout-directions"></div>
-        <p class="diagram-layout-scope" id="diagram-layout-scope">${esc(t('diagram_layout_scope'))}</p>
+        <fieldset class="diagram-layout-apply-scope" aria-describedby="diagram-layout-scope">
+          <legend>${esc(t('diagram_layout_scope_label'))}</legend>
+          <label><input type="radio" name="diagram-layout-scope" data-layout-scope value="diagram"><span>${esc(t('diagram_layout_scope_diagram'))}</span></label>
+          <label><input type="radio" name="diagram-layout-scope" data-layout-scope value="branch" checked><span>${esc(t('diagram_layout_scope_branch'))}</span></label>
+          <p class="diagram-layout-scope" id="diagram-layout-scope">${esc(t('diagram_layout_scope_branch_help'))}</p>
+        </fieldset>
       </div>
       <footer class="diagram-layout-footer">
         <button type="button" class="btn secondary" data-layout-close>${esc(t('cancel'))}</button>
@@ -50,8 +56,9 @@ class DiagramLayoutPanel {
         this.close();
       } else if (event.target.closest('#diagram-layout-apply')) {
         const choice = this.mode === 'inherit' ? null : { ...this.selectedSettings() };
+        const scope = this.scope;
         this.close();
-        this.onApply(choice);
+        this.onApply(choice, scope);
       } else if (event.target === dialog) {
         const box = dialog.getBoundingClientRect();
         if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) this.close();
@@ -62,6 +69,11 @@ class DiagramLayoutPanel {
       const input = event.target;
       if (input.matches('input[data-layout-setting]') && input.checked && this.mode !== 'inherit') {
         this.selectedSettings()[input.dataset.layoutSetting] = input.value;
+      } else if (input.matches('input[data-layout-scope]') && input.checked) {
+        this.scope = input.value;
+        this.dialog.querySelector('#diagram-layout-scope').textContent = t(`diagram_layout_scope_${this.scope}_help`);
+        // The whole diagram inherits the root default, not the selected node's parent.
+        this.dialog.querySelector('[data-layout-mode="inherit"]').outerHTML = this.modeCard('inherit');
       }
     });
     dialog.addEventListener('keydown', (event) => event.stopPropagation());
@@ -79,11 +91,13 @@ class DiagramLayoutPanel {
   modeCard(mode) {
     const selected = mode === this.mode;
     const disabled = mode === 'radial';
+    const fromRoot = this.isRoot || this.scope === 'diagram';
+    const inherited = fromRoot ? DiagramLayout.defaults('horizontal') : this.inherited;
     const label = mode === 'inherit'
-      ? t(this.isRoot ? 'diagram_layout_default' : 'diagram_layout_inherit')
+      ? t(fromRoot ? 'diagram_layout_default' : 'diagram_layout_inherit')
       : t(`diagram_layout_${mode}`);
     const preview = mode === 'inherit'
-      ? `<span class="diagram-layout-inherited">${esc(label)}<small>(${esc(t(`diagram_layout_${this.inherited.mode}`))})</small></span>`
+      ? `<span class="diagram-layout-inherited">${esc(label)}<small>(${esc(t(`diagram_layout_${inherited.mode}`))})</small></span>`
       : `<span class="diagram-layout-preview" aria-hidden="true">${DiagramLayout.preview(mode)}</span><span class="diagram-layout-label">${esc(label)}</span>`;
     return `<button type="button" class="diagram-layout-card${selected ? ' is-selected' : ''}" data-layout-mode="${mode}" aria-pressed="${selected}"${disabled ? ` disabled title="${esc(t('diagram_layout_unavailable'))}"` : ''}>${preview}<span class="diagram-layout-tick" aria-hidden="true">✓</span></button>`;
   }

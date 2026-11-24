@@ -171,14 +171,16 @@ dialog.diagram-layout-dialog {
   border: 0;
 }
 
-.diagram-layout-direction-group legend {
+.diagram-layout-direction-group legend,
+.diagram-layout-apply-scope legend {
   margin-bottom: 9px;
   padding: 0;
   font-size: 0.9375rem;
   font-weight: 500;
 }
 
-.diagram-layout-direction-group label {
+.diagram-layout-direction-group label,
+.diagram-layout-apply-scope label {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -188,7 +190,8 @@ dialog.diagram-layout-dialog {
   cursor: pointer;
 }
 
-.diagram-layout-direction-group input[type='radio'] {
+.diagram-layout-direction-group input[type='radio'],
+.diagram-layout-apply-scope input[type='radio'] {
   width: 17px;
   height: 17px;
   min-height: 0;
@@ -196,10 +199,24 @@ dialog.diagram-layout-dialog {
   accent-color: #8e78b8;
 }
 
-.diagram-layout-scope {
+.diagram-layout-apply-scope {
+  min-width: 0;
   margin: 19px 0 0;
-  color: #79717f;
-  font-size: 0.75rem;
+  padding: 14px 16px;
+  border: 1px solid #d2cbdc;
+  border-radius: 9px;
+  background: #f7f5fa;
+}
+
+.diagram-layout-apply-scope legend {
+  margin: 0;
+  padding: 0 5px;
+}
+
+.diagram-layout-scope {
+  margin: 8px 0 0;
+  color: #696171;
+  font-size: 0.875rem;
   line-height: 1.55;
 }
 

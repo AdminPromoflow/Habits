@@ -417,9 +417,9 @@ class HomePage extends PageController {
     this.layoutOpen = true;
     this.syncNodeState();
     this.layoutPanel = new DiagramLayoutPanel({
-      onApply: (layout) => {
+      onApply: (layout, scope) => {
         if (this.generation !== generation) return;
-        this.applyLayout(key, layout);
+        this.applyLayout(key, layout, scope);
       },
       onClose: () => {
         this.layoutOpen = false;
@@ -435,12 +435,17 @@ class HomePage extends PageController {
     });
   }
 
-  applyLayout(key, layout) {
-    const node = this.ensureTree().find((item) => item.id === key);
+  applyLayout(key, layout, scope = 'branch') {
+    const nodes = this.ensureTree();
+    if (!nodes.some((item) => item.id === key)) return;
+    const node = scope === 'diagram'
+      ? nodes.find((item) => !item.parent_id)
+      : nodes.find((item) => item.id === key);
     if (!node) return;
+    const affected = scope === 'diagram' ? nodes : this.branchNodes(key);
+    // Every node in the chosen scope uses the new layout through inheritance.
+    for (const item of affected) { item.layout = null; item.x = null; item.y = null; }
     node.layout = layout ? { ...layout } : null;
-    // Choosing a distribution arranges this branch again; nested styles remain.
-    for (const item of this.branchNodes(key)) { item.x = null; item.y = null; }
     this.positionTree();
     void this.save();
   }
