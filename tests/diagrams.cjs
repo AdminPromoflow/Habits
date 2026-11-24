@@ -218,6 +218,7 @@ test('the more action toggles its panel without editing or saving the diagram', 
   assert.equal(home.editing, false);
   assert.equal(field.readOnly, true);
   assert.equal(menu.hidden, false);
+  assert.equal(home.viewport.revealed, menu, 'opening the menu reveals clipped top-row tools');
   assert.equal(controls.hidden, false);
   assert.equal(more.getAttribute('aria-expanded'), 'true');
 
@@ -1759,4 +1760,120 @@ test('rapid checkbox changes queue the latest state and preserve sibling task st
   assert.equal(home.active.nodes[1].checkbox, false);
   assert.equal(home.active.version, 3);
   assert.equal(home.hasChanges(), false);
+});
+
+test('copy and paste clone a complete branch with new IDs, labels, image and width', async () => {
+  const { home } = savedEditor();
+  home.makeRequest = async (action, data) => ({ ...JSON.parse(JSON.stringify(data)), version: data.version + 1 });
+  await home.addChild();
+  const sourceId = home.selectedKey;
+  home.name = 'Source';
+  Object.assign(home.nodes.find(n => n.id === sourceId), { image: 'data:image/png;base64,fixture', labels: [{ text: 'Inside', position: 'inside' }, { text: 'Outside', position: 'outside' }], width: 310, checkbox: true });
+  await home.save();
+  await home.addChild();
+  home.name = 'Grandchild';
+  await home.save();
+  home.selectNode(sourceId);
+  await home.handleAction('copy-diagram-node');
+  home.selectNode('root');
+  await home.handleAction('paste-diagram-node');
+  const pasted = home.nodes.find(n => n.id === home.selectedKey);
+  assert.notEqual(pasted.id, sourceId);
+  assert.equal(pasted.parent_id, 'root');
+  assert.equal(pasted.width, 310);
+  assert.equal(pasted.checkbox, true);
+  assert.equal(pasted.image, 'data:image/png;base64,fixture');
+  assert.equal(pasted.labels.length, 2);
+  assert.equal(home.nodes.find(n => n.parent_id === pasted.id).text, 'Grandchild');
+  pasted.labels[0].text = 'Changed';
+  assert.equal(home.nodes.find(n => n.id === sourceId).labels[0].text, 'Inside');
+  assert.equal(home.nodes.length, 5);
+});
+
+test('cut removes the selected branch and paste restores its contents under a new parent', async () => {
+  const { home } = savedEditor();
+  home.makeRequest = async (action, data) => ({ ...JSON.parse(JSON.stringify(data)), version: data.version + 1 });
+  await home.addChild(); home.name = 'Move me'; await home.save();
+  const source = home.selectedKey;
+  await home.addChild(); home.name = 'Nested'; await home.save();
+  home.selectNode(source);
+  await home.handleAction('cut-diagram-node');
+  assert.equal(home.nodes.length, 1);
+  assert.equal(home.active.nodes.length, 1);
+  await home.handleAction('paste-diagram-node');
+  assert.equal(home.nodes.length, 3);
+  assert.equal(home.nodes.find(n => n.id === home.selectedKey).text, 'Move me');
+  assert.equal(home.hasChanges(), false);
+});
+
+test('deleting a child keeps its siblings and flushes an earlier in-flight save', async () => {
+  const { home } = savedEditor();
+  home.makeRequest = async (action, data) => ({ ...JSON.parse(JSON.stringify(data)), version: data.version + 1 });
+  await home.addChild(); home.name = 'Delete me'; await home.save();
+  const removed = home.selectedKey;
+  home.selectNode('root');
+  await home.addChild(); home.name = 'Keep me'; await home.save();
+  const kept = home.selectedKey;
+  let complete;
+  home.makeRequest = (action, data) => new Promise(resolve => { complete = () => resolve({ ...JSON.parse(JSON.stringify(data)), version: data.version + 1 }); });
+  home.name = 'Keep newest';
+  const saving = home.save();
+  home.selectNode(removed);
+  const deleting = home.handleAction('delete-diagram-node');
+  home.makeRequest = async (action, data) => ({ ...JSON.parse(JSON.stringify(data)), version: data.version + 1 });
+  complete(); await saving; await deleting;
+  assert.equal(home.nodes.some(n => n.id === removed), false);
+  assert.equal(home.active.nodes.find(n => n.id === kept).text, 'Keep newest');
+  assert.equal(home.hasChanges(), false);
+});
+
+test('image and label edits participate in versioned saving and survive reload', async () => {
+  const { home, state } = savedEditor();
+  home.makeRequest = async (action, data) => ({ ...JSON.parse(JSON.stringify(data)), version: data.version + 1 });
+  home.nodes[0].image = 'data:image/png;base64,test';
+  home.nodes[0].labels = [{ text: 'Label', position: 'outside' }];
+  assert.equal(home.hasChanges(), true);
+  await home.save();
+  const restored = editor({ draft: false, state: JSON.parse(JSON.stringify(state)) });
+  restored.home.render();
+  assert.equal(restored.home.nodes[0].image, 'data:image/png;base64,test');
+  assert.equal(restored.home.nodes[0].labels[0].position, 'outside');
+  assert.equal(restored.home.hasChanges(), false);
+});
+
+test('paste refuses node and image limits without altering the existing tree', async () => {
+  const { home } = savedEditor();
+  const branch = Array.from({ length: 200 }, (_, i) => ({ id: String(i), parent_id: i ? '0' : null, text: 'Copied' }));
+  home.nodeTools.setClipboard(branch, '0');
+  await home.nodeTools.paste();
+  assert.equal(home.nodes.length, 1);
+  assert.equal(home.error, 'diagram_node_limit');
+  home.nodeTools.setClipboard([{ id: 'copy', parent_id: null, text: 'Image', image: 'x'.repeat(2097153) }], 'copy');
+  await home.nodeTools.paste();
+  assert.equal(home.nodes.length, 1);
+  assert.equal(home.error, 'error_diagram_image_limit');
+});
+
+test('cutting the root deletes the diagram and retains its clipboard for another diagram', async () => {
+  const { home, state } = savedEditor();
+  const requests = [];
+  home.makeRequest = async (action, data) => { requests.push({ action, data }); return { id: data.id }; };
+  await home.handleAction('cut-diagram-node');
+  assert.equal(requests[0].action, 'deleteDiagram');
+  assert.equal(requests[0].data.version, 1);
+  assert.equal(home.active, null);
+  assert.equal(state.data.diagrams.length, 0);
+  assert.equal(home.nodeTools.clipboard().nodes[0].text, 'Idea guardada');
+});
+
+test('a failed root deletion keeps the diagram and account changes cannot reuse its clipboard', async () => {
+  const { home, state } = savedEditor();
+  state.user.id = 7;
+  home.makeRequest = async () => { throw new Error('Conflict'); };
+  await home.handleAction('cut-diagram-node');
+  assert.equal(home.active.id, 51);
+  assert.equal(home.error, 'Conflict');
+  assert.ok(home.nodeTools.clipboard());
+  state.user.id = 8;
+  assert.equal(home.nodeTools.clipboard(), null);
 });

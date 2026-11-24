@@ -4,6 +4,8 @@ La migración `database/migrations/006_diagram_nodes.sql` añade `diagram_nodes`
 
 La migración `database/migrations/007_diagram_node_width.sql` añade el ancho individual `node_width`, con valor nulo para conservar el ancho predeterminado de los cuadros existentes. El ancho personalizado admite de 100 a 600 píxeles, con dos decimales. Debe aplicarse antes de habilitar el código que guarda anchos.
 
+La migración `008_diagram_node_content.sql` añade `image_data` y `labels_json` a cada nodo. En la API son `image` (imagen raster codificada o `null`) y `labels` (lista de texto y posición `inside`/`outside`). Omitir los campos conserva el contenido guardado; `null` y `[]` lo eliminan explícitamente. Las imágenes están limitadas y se validan por su contenido y tipo real en el servidor. El guardado mantiene las mismas comprobaciones de propietario, CSRF y versión. `deleteDiagram` aplica esos controles antes de desvincular y eliminar el árbol.
+
 ## Aplicación al subir la actualización
 
 La migración `009_diagram_node_checkbox.sql` añade `checkbox_state`: `NULL` sin casilla, `0` sin marcar y `1` marcada. En la API se llama `checkbox` y admite `null`, `false` o `true`. Omitirlo conserva el estado anterior; enviarlo como `null` quita la casilla. Los cuadros existentes empiezan sin casilla. Aplicar las migraciones pendientes en orden, incluida la 008 de contenido de nodos y la 009, antes de habilitar los archivos actualizados.

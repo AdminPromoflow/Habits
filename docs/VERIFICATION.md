@@ -1,5 +1,13 @@
 # Verificación realizada
 
+## Error de base de datos y revisión en Safari — 23 de noviembre de 2026
+
+- Hostinger respondía a consultas, pero faltaban `image_data`, `labels_json` y `checkbox_state` en `diagram_nodes`, así como los registros de las migraciones 008 y 009. El guardado actual requiere esos campos; el mensaje genérico no significaba que MySQL estuviera detenido.
+- Se aplicaron ambas migraciones mediante Chrome/phpMyAdmin y después se registraron sus checksums. La comprobación final confirmó tres columnas nuevas, dos migraciones con checksum correcto, un diagrama y nueve nodos, conservando los recuentos anteriores. No se subieron archivos ni se reemplazaron tablas o registros.
+- Safari mostró «Diagram saved» en el diagrama existente. La recarga mediante el botón de Safari recuperó sus nueve ideas y la casilla marcada de la raíz, sin mensaje de base de datos. La comprobación se centró en lectura, guardado y recuperación del diagrama existente.
+- MySQL local `mi_rutina` respondió y ya tenía las tres columnas y las migraciones 008/009 con los mismos checksums; no necesitó cambios.
+- Evidencia: `tests/.runtime/hostinger-migrations-008-009.png` y `tests/.runtime/safari-database-repaired.png`.
+
 ## Nombre propio, hijos vacíos y distribución radial — 23 de noviembre de 2026
 
 - Título independiente en un recuadro fijo arriba a la izquierda: doble clic o Enter/F2 para editar, cursor al final, Enter o pérdida de foco para guardar, Escape para cancelar y nombre vacío para conservar el anterior. Cambiar de diagrama guarda primero el título pendiente. La API conserva el texto raíz, hijos, estilos y anchos al renombrar.

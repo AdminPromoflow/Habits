@@ -61,13 +61,15 @@ Los enlaces duran 30 minutos y solo pueden usarse una vez. Pedir un enlace no ca
 
 Para la selección voluntaria de categorías, aplica `004_category_choices.sql` antes de desplegar esa versión. Conserva inscripciones de categorías globales que ya tengan hábitos/rutinas; las categorías privadas propias permanecen disponibles. El catálogo global se conserva en Hostinger, mientras que cada usuario elige en Ajustes cuáles añadir. En Mis hábitos se muestran las categorías con hábitos, y cada una abre su tablero semanal.
 
-Para el editor de diagramas, aplica las migraciones pendientes hasta `007_diagram_node_width.sql` antes de desplegar los archivos nuevos. La 005 crea `diagrams`, la 006 añade los nodos y la 007 sus anchos individuales. Si falta una tabla o columna requerida, la consulta o el guardado devuelve `error_database`. El migrador registra el nombre y el SHA-256 de cada archivo en `schema_migrations`.
+Para el editor de diagramas, aplica todas las migraciones pendientes antes de desplegar los archivos nuevos. Actualmente llegan hasta `009_diagram_node_checkbox.sql`: la 005 crea `diagrams`, la 006 añade los nodos, la 007 sus anchos individuales, la 008 imágenes/etiquetas y la 009 casillas. Si falta una tabla o columna requerida, la consulta o el guardado devuelve `error_database`, aunque MySQL esté funcionando. El migrador registra el nombre y el SHA-256 de cada archivo en `schema_migrations`.
 
 Sube los archivos de aplicación, incluidos `.htaccess`, `assets`, `app`, `controller`, `model`, `view` y `translations`. Los archivos `config/local.php` y el contenido de `storage` no se versionan. No despliegues `tests/.runtime`, archivos SQL privados ni la carpeta `.git` a una ruta pública.
 
 Comprueba que la estrategia de despliegue de Hostinger conserva archivos no versionados. Si reemplaza todo `public_html/MyRemarkableMind`, conserva la configuración y las sesiones fuera de la carpeta reemplazada y proporciona sus rutas/valores mediante variables `RUTINA_DB_*`, `RUTINA_APP_URL`, `RUTINA_SESSION_PATH` y `RUTINA_SECURE_COOKIES=1`.
 
 ## Reparación de diagramas del 23 de noviembre de 2026
+
+En la revisión posterior desde Safari se confirmó que Hostinger no tenía `image_data`, `labels_json` ni `checkbox_state`. Se aplicaron las migraciones 008 y 009 mediante Chrome/phpMyAdmin y se registraron los checksums de los archivos locales. Se conservaron el diagrama y sus nueve nodos. Safari mostró «Diagram saved» y recuperó los nueve cuadros después de recargar; la instalación local ya tenía ambas migraciones. No se subieron archivos del proyecto.
 
 Se comprobó mediante Chrome y phpMyAdmin que producción tenía 21 tablas y las migraciones `001`–`004`, pero no `diagrams`. Se aplicó únicamente `005_diagrams.sql` y se registró su checksum `485f348de5d73507f7b262655be8bea654df2537890c47fb72a7f33da00184cb` en `schema_migrations`.
 
