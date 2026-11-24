@@ -1,0 +1,21 @@
+CREATE TABLE mindspace_shares (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    owner_user_id BIGINT UNSIGNED NOT NULL,
+    recipient_user_id BIGINT UNSIGNED NULL,
+    recipient_email VARCHAR(190) NOT NULL,
+    space_id BIGINT UNSIGNED NULL,
+    item_id BIGINT UNSIGNED NULL,
+    status ENUM('pending','accepted','declined','revoked') NOT NULL DEFAULT 'pending',
+    invitation_message VARCHAR(1000) NOT NULL DEFAULT '',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    responded_at TIMESTAMP NULL,
+    UNIQUE KEY uq_ms_share_space (owner_user_id,recipient_email,space_id),
+    UNIQUE KEY uq_ms_share_item (owner_user_id,recipient_email,item_id),
+    KEY ix_ms_share_recipient (recipient_user_id,status),
+    CONSTRAINT fk_ms_share_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_ms_share_recipient FOREIGN KEY (recipient_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_ms_share_space FOREIGN KEY (space_id) REFERENCES mindspaces(id) ON DELETE CASCADE,
+    CONSTRAINT fk_ms_share_item FOREIGN KEY (item_id) REFERENCES mindspace_items(id) ON DELETE CASCADE,
+    CONSTRAINT chk_ms_share_target CHECK ((space_id IS NULL) <> (item_id IS NULL)),
+    CONSTRAINT chk_ms_share_other CHECK (recipient_user_id IS NULL OR recipient_user_id <> owner_user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

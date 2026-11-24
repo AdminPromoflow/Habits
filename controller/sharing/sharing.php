@@ -11,6 +11,11 @@ final class SharingController
         return match ($action) {
             'group' => $model->group($data),
             'share' => $model->share($data),
+            'shareMindSpace' => (new MindSpaceShares($this->db, $this->user))->invite($data),
+            'respondMindSpaceShare' => (new MindSpaceShares($this->db, $this->user))->respond($data),
+            'revokeMindSpaceShare' => (new MindSpaceShares($this->db, $this->user))->revoke($data),
+            'leaveMindSpaceShare' => (new MindSpaceShares($this->db, $this->user))->revoke($data, true),
+            'sharedMindSpace' => (new MindSpaceShares($this->db, $this->user))->preview($data),
             'respond' => $model->respond($data),
             'changeShare' => $model->changeShare($data),
             'leaveShare' => $model->leaveShare($data),

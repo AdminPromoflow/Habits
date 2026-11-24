@@ -3,18 +3,18 @@ declare(strict_types=1);
 
 final class DiagramsModel extends BaseModel
 {
-    public function list(): array
+    public function list(?int $id = null): array
     {
         $mindspace = (new MindSpacesModel($this->db, $this->user))->available();
         $diagrams = $this->db->all(
             'SELECT d.id,d.name,d.version,d.created_at,d.updated_at,d.connections_json,' . ($mindspace ? 'i.id' : 'NULL') . ' AS mindspace_item_id FROM diagrams d ' .
             ($mindspace ? 'LEFT JOIN mindspace_items i ON i.diagram_id=d.id ' : '') .
-            'WHERE d.owner_user_id=? ORDER BY d.updated_at DESC,d.id DESC',
-            [$this->uid()],
+            'WHERE d.owner_user_id=?' . ($id === null ? '' : ' AND d.id=?') . ' ORDER BY d.updated_at DESC,d.id DESC',
+            $id === null ? [$this->uid()] : [$this->uid(), $id],
         );
         $nodes = $this->db->all(
-            'SELECT n.* FROM diagram_nodes n JOIN diagrams d ON d.id=n.diagram_id WHERE d.owner_user_id=? ORDER BY n.diagram_id,n.sort_order',
-            [$this->uid()],
+            'SELECT n.* FROM diagram_nodes n JOIN diagrams d ON d.id=n.diagram_id WHERE d.owner_user_id=?' . ($id === null ? '' : ' AND d.id=?') . ' ORDER BY n.diagram_id,n.sort_order',
+            $id === null ? [$this->uid()] : [$this->uid(), $id],
         );
         $byDiagram = [];
         foreach ($nodes as $node) $byDiagram[$node['diagram_id']][] = self::nodeResponse($node);

@@ -4,7 +4,7 @@ declare(strict_types=1);
 /** Shared HTTP, CSRF, authentication and JSON boundary for every AJAX endpoint. */
 final class Request
 {
-    private const READ_ACTIONS = ['bootstrap', 'data', 'group', 'admin', 'timezones', 'diagrams', 'mindspace'];
+    private const READ_ACTIONS = ['bootstrap', 'data', 'group', 'admin', 'timezones', 'diagrams', 'mindspace', 'sharedMindSpace'];
     private const PUBLIC_ACTIONS = [
         'bootstrap',
         'login',
@@ -50,7 +50,7 @@ final class Request
                 fail('error_forbidden', 403);
             }
 
-            if ($action === 'share') {
+            if (in_array($action, ['share', 'shareMindSpace'], true)) {
                 $auth->rate('share:' . $user['id'], 20, 3600);
             }
             if ($action === 'requestCategory') {

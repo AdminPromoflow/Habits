@@ -102,9 +102,11 @@ function sharingPage() {
       )
       .join('');
   }
+  content += mindSpaceShareCards(S.sharingTab);
   const owners = [
     ...new Map(
-      S.data.habits.map((h) => [h.owner_user_id, [h.owner_user_id, h.owner_name]])
+      [...S.data.habits, ...(S.data.mindspace_shares?.incoming || []), ...(S.data.mindspace_shares?.outgoing || [])]
+        .map((h) => [h.owner_user_id, [h.owner_user_id, h.owner_name]])
     ).values(),
   ];
   const cats = [
@@ -121,7 +123,7 @@ function sharingPage() {
     tabs: tabs
       .map(
         (v) =>
-          `<button role="tab" aria-selected="${S.sharingTab === v}" data-action="sharing-tab" data-tab="${v}" class="${S.sharingTab === v ? 'active' : ''}">${t(v)}${v === 'invitations' && S.data.incoming.some((r) => r.status === 'pending') ? '<span class="tab-dot"></span>' : ''}</button>`
+          `<button role="tab" aria-selected="${S.sharingTab === v}" data-action="sharing-tab" data-tab="${v}" class="${S.sharingTab === v ? 'active' : ''}">${t(v)}${v === 'invitations' && [...S.data.incoming, ...(S.data.mindspace_shares?.incoming || [])].some((r) => r.status === 'pending') ? '<span class="tab-dot"></span>' : ''}</button>`
       )
       .join(''),
     searchIcon: icon('search'),
@@ -156,7 +158,7 @@ function shareForm(habitId = null, categoryId = null) {
   const mine = S.data.habits.filter((h) => h.permission === 'owner' && h.status === 'active');
   openModal(
     'new_invitation',
-    `<form data-form="share"><fieldset class="scope-field"><legend>${t('share_scope')}</legend><label><input type="radio" name="scope" value="habits" ${categoryId ? '' : 'checked'}>${t('selected_habits')}</label><label><input type="radio" name="scope" value="category" ${categoryId ? 'checked' : ''}>${t('entire_category')}</label></fieldset><div id="share-habits-fields" ${categoryId ? 'hidden' : ''}><div class="habit-selection">${mine.map((h) => `<label><input type="checkbox" name="habit_ids" value="${h.id}" ${Number(h.id) === Number(habitId) ? 'checked' : ''}><span>${esc(h.name)}<small>${esc(habitCategory(h))}</small></span></label>`).join('') || `<p>${t('no_results')}</p>`}</div></div><div id="share-category-fields" ${categoryId ? '' : 'hidden'}>${selectField(
+    `${S.data.mindspace?.spaces?.length ? `<button type="button" class="btn secondary ms-share-picker" data-action="ms-share-picker">${icon('folder')}${esc(t('ms_share_item'))}</button>` : ''}<form data-form="share"><fieldset class="scope-field"><legend>${t('share_scope')}</legend><label><input type="radio" name="scope" value="habits" ${categoryId ? '' : 'checked'}>${t('selected_habits')}</label><label><input type="radio" name="scope" value="category" ${categoryId ? 'checked' : ''}>${t('entire_category')}</label></fieldset><div id="share-habits-fields" ${categoryId ? 'hidden' : ''}><div class="habit-selection">${mine.map((h) => `<label><input type="checkbox" name="habit_ids" value="${h.id}" ${Number(h.id) === Number(habitId) ? 'checked' : ''}><span>${esc(h.name)}<small>${esc(habitCategory(h))}</small></span></label>`).join('') || `<p>${t('no_results')}</p>`}</div></div><div id="share-category-fields" ${categoryId ? '' : 'hidden'}>${selectField(
       'category_id',
       'category',
       S.data.categories.map((c) => [c.id, categoryName(c)]),
@@ -208,6 +210,79 @@ async function groupModal(id) {
   );
 }
 
+function mindSpaceShareForm(target = 'space', id = null) {
+  const space = pageControllers.home.mindspace;
+  const choices = space.spaces().flatMap(root => [
+    [`space:${root.id}`, root.name],
+    ...space.items(root.id).map(item => [`item:${item.id}`, `${root.name} / ${[...space.pathTo(item.parent_id, root.id).map(folder => folder.name), item.name].join(' / ')}`]),
+  ]);
+  openModal('ms_share_item', `<form data-form="shareMindSpace">
+    ${selectField('resource', 'ms_share_resource', choices, id ? `${target}:${id}` : choices[0]?.[0])}
+    <p class="field-help">${esc(t('ms_share_scope_hint'))}</p>
+    ${field('email', 'recipient_email', 'email', '', {required:true, maxlength:190, autocomplete:'off'})}
+    <p class="field-help">${esc(t('email_privacy'))}</p>
+    <p class="ms-share-readonly">${icon('lock')}${esc(t('ms_share_readonly'))}</p>
+    ${textarea('invitation_message', 'message')}${formFooter('send_invitation')}
+  </form>`);
+}
+
+function mindSpaceShareCards(tab) {
+  if (!['by_me','with_me','invitations'].includes(tab)) return '';
+  const mine = tab === 'by_me', f = S.shareFilter;
+  const rows = S.data.mindspace_shares?.[mine ? 'outgoing' : 'incoming'] || [];
+  return rows.filter(row => (tab !== 'with_me' || row.status === 'accepted') && !f.category
+    && (!f.permission || f.permission === 'viewer') && (!f.status || f.status === row.status)
+    && (!f.owner || f.owner === String(row.owner_user_id))
+    && (!f.search || `${row.resource_name || ''} ${row.owner_name} ${row.recipient_email}`.toLowerCase().includes(f.search.toLowerCase())))
+    .map(row => {
+      const actions = mine ? `<button class="btn secondary" data-action="ms-share-preview" data-id="${row.id}">${esc(t('view_all'))}</button>
+        ${['pending','accepted'].includes(row.status) ? `<button class="text-btn danger" data-action="ms-share-revoke" data-id="${row.id}">${esc(t('revoke'))}</button>` : ''}`
+        : row.status === 'pending' ? `<button class="btn primary" data-action="ms-share-accept" data-id="${row.id}">${esc(t('accept'))}</button><button class="btn secondary" data-action="ms-share-decline" data-id="${row.id}">${esc(t('decline'))}</button>`
+        : row.status === 'accepted' ? `<button class="btn secondary" data-action="ms-share-preview" data-id="${row.id}">${esc(t('view_all'))}</button><button class="text-btn" data-action="ms-share-leave" data-id="${row.id}">${esc(t('leave'))}</button>` : '';
+      const kind = row.kind === 'space' ? 'MindSpace' : t(`ms_kind_${row.kind}`);
+      return `<article class="card share-card ms-share-card"><div class="share-card-top"><span class="share-symbol">${pageControllers.home.mindspace.kindIcon(row.kind === 'space' ? 'folder' : row.kind)}</span>${badge(row.status)}</div>
+        <span class="eyebrow">${esc(kind)}</span><h3>${esc(row.resource_name || t('revoked'))}</h3><p>${esc(mine ? row.recipient_email : t('invited_by', {name:row.owner_name}))}</p>
+        <div class="share-meta">${badge('viewer')}<span>${esc(t('ms_share_readonly_short'))}</span></div>
+        ${row.invitation_message ? `<p class="invitation-message">${esc(row.invitation_message)}</p>` : ''}
+        ${actions ? `<div class="share-card-actions">${actions}</div>` : ''}</article>`;
+    }).join('');
+}
+
+async function mindSpaceSharePreview(id, itemId = null) {
+  const userId = S.user?.id;
+  const result = await api('sharedMindSpace', null, {id, ...(itemId ? {item_id:itemId} : {})});
+  if (S.user?.id !== userId) return;
+  const item = result.selected;
+  let content = '';
+  if (!item || item.kind === 'folder') {
+    const children = result.items.filter(child => child.parent_id === (item?.id || null));
+    content = `<div class="ms-shared-files">${children.map(child => `<button type="button" class="btn secondary" data-action="ms-share-preview" data-id="${id}" data-item="${child.id}">${pageControllers.home.mindspace.kindIcon(child.kind)}<span>${esc(child.name)}</span></button>`).join('') || `<p>${esc(t('ms_folder_empty'))}</p>`}</div>`;
+  } else if (item.kind === 'diagram') {
+    const {html, plan} = pageControllers.home.links.preview(item.diagram);
+    content = `<div class="diagram-link-preview ms-shared-diagram">${html.replace('<svg ', `<svg width="${plan.width}" height="${plan.height}" `).replace(/ tabindex="0"| role="button"| aria-pressed="false"| data-link-target="[^"]*"/g, '')}</div>`;
+  } else if (item.kind === 'habits') {
+    content = `<div class="ms-shared-habits">${item.habits.map(habit => `<article><h3>${esc(habit.name)}</h3>${habit.description ? `<p>${esc(habit.description)}</p>` : ''}<p>${esc(t('goal'))}: ${esc(habit.goal)} ${esc(habit.unit)}</p></article>`).join('') || `<p>${esc(t('ms_link_empty'))}</p>`}</div><p class="field-help">${esc(t('ms_share_habits_privacy'))}</p>`;
+  } else {
+    content = `<div class="diagram-link-preview ms-shared-content">${MindSpaceLinkTargets.preview(item)}</div>`;
+  }
+  const path = [], seen = new Set();
+  let parent = item?.parent_id;
+  while (parent && !seen.has(parent)) {
+    seen.add(parent);
+    const folder = result.items.find(entry => entry.id === parent);
+    if (!folder) break;
+    if (folder.id !== result.root_id) path.unshift(folder);
+    parent = folder.parent_id;
+  }
+  openModal('ms_share_preview', `<nav class="mindspace-folder-path" aria-label="${esc(t('ms_folder_path'))}"><button type="button" data-action="ms-share-preview" data-id="${id}">${esc(result.name)}</button>
+    ${path.map(folder => `<span aria-hidden="true">/</span><button type="button" data-action="ms-share-preview" data-id="${id}" data-item="${folder.id}">${esc(folder.name)}</button>`).join('')}</nav>
+    <h3>${esc(item?.name || result.name)}</h3><p class="field-help">${esc(t('ms_share_readonly'))}</p>${content}`, true);
+  // Preview controls expose text and values without acting as editor inputs.
+  document.querySelectorAll('.ms-shared-content [data-link-target]').forEach(control => {
+    control.removeAttribute('aria-pressed'); control.setAttribute('tabindex', '-1'); control.setAttribute('aria-disabled', 'true');
+  });
+}
+
 class SharingPage extends PageController {
   constructor() {
     super([
@@ -221,11 +296,33 @@ class SharingPage extends PageController {
       'revoke',
       'leave',
       'group',
+      'ms-share-picker',
+      'ms-share-preview',
+      'ms-share-accept',
+      'ms-share-decline',
+      'ms-share-revoke',
+      'ms-share-leave',
     ]);
   }
 
   async handleAction(action, el, id) {
     switch (action) {
+      case 'ms-share-picker':
+        mindSpaceShareForm();
+        break;
+      case 'ms-share-preview':
+        await mindSpaceSharePreview(id, el.dataset.item ? Number(el.dataset.item) : null);
+        break;
+      case 'ms-share-accept':
+      case 'ms-share-decline':
+        await mutate('respondMindSpaceShare', {id, status:action === 'ms-share-accept' ? 'accepted' : 'declined'});
+        break;
+      case 'ms-share-revoke':
+        confirmAction('revoke_confirm', () => mutate('revokeMindSpaceShare', {id}));
+        break;
+      case 'ms-share-leave':
+        confirmAction('leave_confirm', () => mutate('leaveMindSpaceShare', {id}));
+        break;
       case 'new-share':
         shareForm();
         break;

@@ -25,7 +25,7 @@ function shell() {
   const admin = S.mode === 'admin';
   const nav = admin ? adminNav : personalNav;
   const unread = S.data.notifications.filter((n) => !Number(n.is_read)).length;
-  const pending = S.data.incoming.filter((n) => n.status === 'pending').length;
+  const pending = [...S.data.incoming, ...(S.data.mindspace_shares?.incoming || [])].filter((n) => n.status === 'pending').length;
   // Resolve the selected document before highlighting its MindSpace in navigation.
   const content = admin ? adminPage() : personalPage();
   return renderTemplate('layout', {
@@ -88,6 +88,10 @@ function personalPage() {
 async function navigate(view) {
   if (S.view === 'home' && view !== 'home' && pageControllers.home.mindspace.enabled() && !await pageControllers.home.mindspace.flush()) return;
   if (S.mode === 'personal' && view === 'categories') view = 'settings';
+  if (view === 'sharing') {
+    S.sharingTab = 'all'; S.sharePerson = null;
+    S.shareFilter = { permission: '', category: '', owner: '', status: '', search: '' };
+  }
   if (view === 'habits') {
     S.filter = { category: '', routine: '', status: 'active', search: '' };
     S.categoryId = null;

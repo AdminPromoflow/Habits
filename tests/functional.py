@@ -270,6 +270,8 @@ try:
  test_mindspace(ms_owner, ms_other, guest, check)
  from item_links_acceptance import run as test_item_links
  test_item_links(ms_owner, ms_other, guest, check)
+ from mindspace_sharing_acceptance import run as test_mindspace_sharing
+ test_mindspace_sharing(ms_owner, ms_other, eve, guest, check)
  subprocess.run([PHP,'tests/constraints.php'],cwd=ROOT,env=env,check=True)
  (ROOT/'tests/.runtime/environment.json').write_text(json.dumps({'database':DB,'base_url':BASE,'env':{k:v for k,v in env.items() if k.startswith('RUTINA_')}},indent=2))
  check(True,'All tests ran against a dedicated MySQL database, without touching Aleina’s real data')

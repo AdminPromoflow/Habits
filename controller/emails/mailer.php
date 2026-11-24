@@ -24,6 +24,16 @@ final class Mailer
             "\n\n" .
             $dict['reset_email_ignore'] .
             "\n";
+        return $this->send($email, $dict['reset_email_subject'], $body);
+    }
+    public function mindspaceInvitation(string $email, string $language): bool
+    {
+        $dict = require PROJECT_ROOT . '/translations/' . (in_array($language, ['en', 'es'], true) ? $language : 'en') . '.php';
+        $body = $dict['ms_share_email_body'] . "\n\n" . rtrim(config('app_url'), '/') . "/\n";
+        return $this->send($email, $dict['ms_share_email_subject'], $body);
+    }
+    private function send(string $email, string $subject, string $body): bool
+    {
         if (!$this->ready()) {
             return false;
         }
@@ -36,7 +46,7 @@ final class Mailer
             $written = file_put_contents(
                 $path,
                 json_encode(
-                    ['to' => $email, 'subject' => $dict['reset_email_subject'], 'body' => $body],
+                    ['to' => $email, 'subject' => $subject, 'body' => $body],
                     JSON_THROW_ON_ERROR,
                 ),
                 LOCK_EX,
@@ -67,7 +77,7 @@ final class Mailer
         $headers['From'] = 'MI RUTINA <' . $from . '>';
         return mail(
             $email,
-            '=?UTF-8?B?' . base64_encode($dict['reset_email_subject']) . '?=',
+            '=?UTF-8?B?' . base64_encode($subject) . '?=',
             $body,
             $headers,
         );

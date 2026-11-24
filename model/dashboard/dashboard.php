@@ -17,6 +17,7 @@ final class DashboardModel extends BaseModel
             : [];
         return [
             'mindspace' => (new MindSpacesModel($this->db, $this->user))->available() ? (new MindSpacesModel($this->db, $this->user))->get() : null,
+            'mindspace_shares' => (new MindSpaceShares($this->db, $this->user))->catalog(),
             'diagrams' => (new DiagramsModel($this->db, $this->user))->list(),
             'today' => $this->today(),
             'habits' => $habits,
@@ -50,11 +51,11 @@ final class DashboardModel extends BaseModel
                 [$this->uid()],
             ),
             'outgoing' => $this->db->all(
-                'SELECT r.id,r.recipient_email,r.permission,r.progress_visibility,r.include_future,r.status,r.invitation_message,r.created_at,r.habit_id,r.category_id,COALESCE(h.name,c.name) AS resource_name,c.translation_key AS category_key FROM invitation_receipts r LEFT JOIN habits h ON h.id=r.habit_id LEFT JOIN habit_categories c ON c.id=r.category_id WHERE r.owner_user_id=? ORDER BY r.id DESC',
+                "SELECT r.id,r.recipient_email,r.permission,r.progress_visibility,r.include_future,r.status,r.invitation_message,r.created_at,r.habit_id,r.category_id,COALESCE(h.name,c.name) AS resource_name,c.translation_key AS category_key,CASE WHEN r.status='accepted' THEN recipient.name ELSE NULL END AS recipient_name FROM invitation_receipts r LEFT JOIN habits h ON h.id=r.habit_id LEFT JOIN habit_categories c ON c.id=r.category_id LEFT JOIN habit_shares s ON s.id=r.share_id LEFT JOIN users recipient ON recipient.id=s.recipient_user_id WHERE r.owner_user_id=? ORDER BY r.id DESC",
                 [$this->uid()],
             ),
             'incoming' => $this->db->all(
-                "SELECT s.id,s.owner_user_id,s.permission,s.progress_visibility,s.include_future,s.status,s.invitation_message,s.created_at,s.habit_id,s.category_id,u.name AS owner_name,CASE WHEN s.status IN ('pending','accepted') THEN COALESCE(h.name,c.name) ELSE NULL END AS resource_name,c.translation_key AS category_key FROM habit_shares s JOIN users u ON u.id=s.owner_user_id LEFT JOIN habits h ON h.id=s.habit_id LEFT JOIN habit_categories c ON c.id=s.category_id WHERE s.recipient_user_id=? AND u.status='active' ORDER BY s.id DESC",
+                "SELECT s.id,s.owner_user_id,s.permission,s.progress_visibility,s.include_future,s.status,s.invitation_message,s.created_at,s.habit_id,s.category_id,u.name AS owner_name,u.email AS owner_email,CASE WHEN s.status IN ('pending','accepted') THEN COALESCE(h.name,c.name) ELSE NULL END AS resource_name,c.translation_key AS category_key FROM habit_shares s JOIN users u ON u.id=s.owner_user_id LEFT JOIN habits h ON h.id=s.habit_id LEFT JOIN habit_categories c ON c.id=s.category_id WHERE s.recipient_user_id=? AND u.status='active' ORDER BY s.id DESC",
                 [$this->uid()],
             ),
         ];

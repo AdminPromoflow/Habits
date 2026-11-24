@@ -11,6 +11,7 @@ spl_autoload_register(static function (string $class): void {
         'CategoriesModel' => 'model/categories/categories.php',
         'RoutinesModel' => 'model/routines/routines.php',
         'SharingModel' => 'model/sharing/sharing.php',
+        'MindSpaceShares' => 'model/sharing/mindspace-shares.php',
         'ProfileModel' => 'model/users/profile.php',
         'AdminModel' => 'model/admin/admin.php',
         'DashboardModel' => 'model/dashboard/dashboard.php',

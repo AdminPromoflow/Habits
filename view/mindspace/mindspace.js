@@ -3,7 +3,7 @@
 class MindSpace extends PageController {
   constructor(home) {
     super(['ms-new','ms-new-kind','ms-open','ms-folder','ms-rename','ms-move','ms-retry',
-      'ms-link-return','ms-link-returns','ms-sidebar-toggle','ms-sidebar-add','ms-space-open','ms-space-new','ms-entry-menu','ms-space-rename','ms-delete','ms-space-delete',
+      'ms-link-return','ms-link-returns','ms-sidebar-toggle','ms-sidebar-add','ms-space-open','ms-space-new','ms-entry-menu','ms-space-rename','ms-share','ms-delete','ms-space-delete',
       'ms-card-new','ms-card-edit','ms-column-new','ms-sprint','ms-habits-select','ms-habit-new','ms-sheet-row','ms-sheet-column','ms-sheet-export']);
     this.home = home;
     this.editor = new MindSpaceEditors(this);
@@ -203,6 +203,7 @@ class MindSpace extends PageController {
       + (isSpace ? '<hr role="separator">' + option('ms-space-new', t('ms_new_space'), '', icon('plus')) : '')
       + '</div></div><hr role="separator">'
       + option(isSpace ? 'ms-space-rename' : 'ms-rename', t('ms_rename'), `data-id="${id}"`)
+      + option('ms-share', t('ms_share'), `data-target="${isSpace ? 'space' : 'item'}" data-id="${id}"`)
       + option(isSpace ? 'ms-space-delete' : 'ms-delete', t('delete'), `data-id="${id}"`, '', 'is-danger');
     document.body.append(menu); this.menuTrigger = button;
     button.setAttribute('aria-expanded', 'true'); button.setAttribute('aria-controls', menu.id);
@@ -541,6 +542,11 @@ class MindSpace extends PageController {
     document.querySelectorAll('.ms-drop-target').forEach(el => el.classList.remove('ms-drop-target'));
   }
   async handleAction(action, button) {
+    if (action === 'ms-share') {
+      if (!await this.flush()) return;
+      this.closeMenu();
+      return mindSpaceShareForm(button.dataset.target, Number(button.dataset.id));
+    }
     if (action === 'ms-link-return') return this.returnToLink(button);
     if (action === 'ms-link-returns') return this.chooseLinkReturn(button);
     if (action === 'ms-sidebar-toggle') return this.toggleSidebar();

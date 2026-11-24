@@ -247,6 +247,10 @@ document.addEventListener('submit', async (event) => {
       }
       delete d.scope;
     }
+    if (action === 'shareMindSpace') {
+      const [target, id] = String(d.resource || '').split(':');
+      d.target = target; d.id = Number(id); delete d.resource;
+    }
     if (['register', 'login', 'setup'].includes(action)) {
       if (action === 'register') d.language = S.language;
       if (action === 'setup') d.token = S.setupToken;
@@ -256,6 +260,11 @@ document.addEventListener('submit', async (event) => {
       history.replaceState(null, '', location.pathname);
       S.view = 'home';
       await bootstrap();
+    } else if (action === 'shareMindSpace') {
+      await api(action, d);
+      S.mode = 'personal'; S.view = 'sharing'; S.sharingTab = 'invitations'; S.sharePerson = d.email.trim().toLowerCase();
+      S.shareFilter = { permission: '', category: '', owner: '', status: '', search: '' };
+      await refresh(); closeModal(); toast(t('invitation_sent'));
     } else if (action === 'forgotPassword') {
       await api(action, { ...d, language: S.language });
       S.recoverySent = true;
