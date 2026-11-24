@@ -229,6 +229,7 @@ class HomePage extends PageController {
     this.plan = null;
     this.drag = null;
     this.resizing = null;
+    this.resizeGuideKey = null;
     this.active = null;
     this.draft = null;
     this.name = '';
@@ -796,7 +797,9 @@ class HomePage extends PageController {
   renderAlignmentGuides() {
     const layer = document.getElementById('diagram-alignment-guides');
     if (!layer) return;
-    if (!this.drag?.moving || !this.plan) {
+    const drag = this.drag?.moving ? this.drag : null;
+    const key = drag?.key || (this.resizing?.moving ? this.resizing.key : this.resizeGuideKey);
+    if (!key || !this.plan) {
       layer.innerHTML = '';
       return;
     }
@@ -804,14 +807,17 @@ class HomePage extends PageController {
     const scene = document.getElementById('diagram-scene');
     const frame = scene?.getBoundingClientRect?.();
     const scale = this.viewport.scale;
+    const parents = new Map(this.ensureTree().map(node => [node.id, node.parent_id]));
     const boxes = this.plan.nodes.map((position) => {
       const rect = this.element('node', position.id)?.getBoundingClientRect?.();
-      return frame && rect?.width && rect?.height ? {
+      const box = frame && rect?.width && rect?.height ? {
         id: position.id, x: (rect.left - frame.left) / scale, y: (rect.top - frame.top) / scale,
         width: rect.width / scale, height: rect.height / scale,
       } : position;
+      return { ...box, parent_id: parents.get(position.id) };
     });
-    const guides = DiagramAlignment.guides(boxes, this.drag.key, this.drag.movingIds, scale);
+    const guides = DiagramAlignment.guides(boxes, key, drag?.movingIds, scale);
+    const spacing = drag ? DiagramAlignment.spacing(boxes, key, drag.movingIds, scale) : [];
     layer.setAttribute('width', this.plan.width);
     layer.setAttribute('height', this.plan.height);
     layer.innerHTML = guides.map(({ axis, position, start, end, kind }) => {
@@ -819,7 +825,26 @@ class HomePage extends PageController {
         ? `x1="${position}" y1="${start}" x2="${position}" y2="${end}"`
         : `x1="${start}" y1="${position}" x2="${end}" y2="${position}"`;
       return `<line ${points} class="is-${kind}" />`;
-    }).join('');
+    }).join('') + spacing.map(gap => this.spacingGuideContent(gap, scale)).join('');
+  }
+
+  spacingGuideContent({ axis, position, start, end, gap, matched, from, to }, scale) {
+    const tick = 4 / scale;
+    const middle = (start + end) / 2;
+    const line = (x1, y1, x2, y2) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" />`;
+    const horizontal = axis === 'x';
+    const lines = horizontal
+      ? line(start, position, end, position) + line(start, position - tick, start, position + tick) +
+        line(end, position - tick, end, position + tick)
+      : line(position, start, position, end) + line(position - tick, start, position + tick, start) +
+        line(position - tick, end, position + tick, end);
+    const x = horizontal ? middle : position - 7 / scale;
+    const y = horizontal ? position - 7 / scale : middle;
+    const label = `${matched ? '≈ ' : ''}${Math.round(gap * 10) / 10} px`;
+    return `<g class="diagram-spacing-guide${matched ? ' is-equal' : ''}" data-gap="${gap}"
+      data-from="${esc(from)}" data-to="${esc(to)}">${lines}<text x="${x}" y="${y}"
+      text-anchor="${horizontal ? 'middle' : 'end'}" dominant-baseline="${horizontal ? 'auto' : 'middle'}"
+      style="font-size:${11 / scale}px;stroke-width:${3 / scale}px">${label}</text></g>`;
   }
 
   syncViewport(keepView = false) {
@@ -1023,8 +1048,10 @@ class HomePage extends PageController {
 
   finishNodeResize(save = true) {
     const resize = this.resizing;
-    if (!resize) return;
     this.resizing = null;
+    this.resizeGuideKey = null;
+    this.renderAlignmentGuides();
+    if (!resize) return;
     resize.root.classList.remove('is-resizing');
     if (resize.handle.hasPointerCapture?.(resize.pointerId)) resize.handle.releasePointerCapture(resize.pointerId);
     if (resize.changed && save) {
@@ -1047,10 +1074,11 @@ class HomePage extends PageController {
       handle.focus({ preventScroll: true });
       handle.setPointerCapture(event.pointerId);
       const node = this.ensureTree().find((item) => item.id === key);
+      this.resizeGuideKey = null;
       this.resizing = {
         key, handle, root: this.element('root', key), pointerId: event.pointerId,
         startX: event.clientX, width: this.element('node', key)?.offsetWidth || this.nodeWidth(node),
-        originalWidth: node.width ?? null, scale: this.viewport.scale, changed: false,
+        originalWidth: node.width ?? null, scale: this.viewport.scale, changed: false, moving: false,
       };
       this.resizing.root.classList.add('is-resizing');
     });
@@ -1060,6 +1088,7 @@ class HomePage extends PageController {
       const delta = event.clientX - resize.startX;
       if (!resize.changed && Math.abs(delta) < 3) return;
       event.preventDefault();
+      resize.moving = true;
       this.setNodeWidth(resize.key, resize.width + delta / resize.scale);
       resize.changed = this.nodes.find((node) => node.id === resize.key).width !== resize.originalWidth;
     });
@@ -1082,7 +1111,19 @@ class HomePage extends PageController {
       const next = { ArrowLeft: width - step, ArrowRight: width + step, Home: 100, End: 600 }[event.key];
       if (next === undefined) return;
       event.preventDefault();
+      this.resizeGuideKey = key;
       if (this.setNodeWidth(key, next)) void this.save();
+      this.renderAlignmentGuides();
+    });
+    document.addEventListener('keyup', (event) => {
+      if (!this.resizeGuideKey || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      this.resizeGuideKey = null;
+      this.renderAlignmentGuides();
+    });
+    document.addEventListener('focusout', (event) => {
+      if (!this.resizeGuideKey || !event.target.closest?.('.diagram-handle-arrows')) return;
+      this.resizeGuideKey = null;
+      this.renderAlignmentGuides();
     });
   }
 

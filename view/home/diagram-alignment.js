@@ -69,5 +69,62 @@ const DiagramAlignment = (() => {
     return result;
   }
 
-  return { guides };
+  function spacing(boxes, movingId, excludedIds = new Set(), scale = 1) {
+    if (!Array.isArray(boxes)) return [];
+    const moving = boxes.find(box => box?.id === movingId);
+    if (!valid(moving)) return [];
+    const zoom = Number.isFinite(scale) && scale > 0 ? scale : 1;
+    const tolerance = TOLERANCE / zoom;
+    const siblings = boxes.filter(box => valid(box) && box.parent_id === moving.parent_id &&
+      (box.id === movingId || !excludedIds.has(box.id)));
+    const result = [];
+
+    for (const axis of ['x', 'y']) {
+      const size = axis === 'x' ? 'width' : 'height';
+      const across = axis === 'x' ? 'y' : 'x';
+      const acrossSize = axis === 'x' ? 'height' : 'width';
+      const previous = new Map(), next = new Map();
+      const nearer = (candidate, current) => !current || candidate.gap < current.gap - EPSILON ||
+        (Math.abs(candidate.gap - current.gap) < EPSILON && candidate.offset < current.offset);
+      for (const first of siblings) {
+        for (const second of siblings) {
+          if (first === second) continue;
+          const gap = second[axis] - first[axis] - first[size];
+          if (gap <= EPSILON) continue;
+          const overlap = Math.min(first[across] + first[acrossSize], second[across] + second[acrossSize]) -
+            Math.max(first[across], second[across]);
+          // Keep diagonally separated boxes out of row/column measurements.
+          if (overlap < Math.min(first[acrossSize], second[acrossSize]) / 4) continue;
+          const candidate = { first, second, gap,
+            offset: Math.abs(first[across] + first[acrossSize] / 2 - second[across] - second[acrossSize] / 2) };
+          if (nearer(candidate, next.get(first.id))) next.set(first.id, candidate);
+          if (nearer(candidate, previous.get(second.id))) previous.set(second.id, candidate);
+        }
+      }
+      // Mutual neighbors prevent references from skipping an intervening sibling.
+      const pairs = [...next.values()].filter(pair => previous.get(pair.second.id)?.first.id === pair.first.id);
+      const incident = pairs.filter(pair => pair.first.id === movingId || pair.second.id === movingId);
+      const shown = new Set(incident), matched = new Set();
+      for (const pair of incident) {
+        const references = pairs.filter(other => other !== pair && Math.abs(other.gap - pair.gap) <= tolerance + EPSILON);
+        references.sort((a, b) => Math.abs(a.gap - pair.gap) - Math.abs(b.gap - pair.gap) ||
+          Math.hypot(a.first.x - moving.x, a.first.y - moving.y) - Math.hypot(b.first.x - moving.x, b.first.y - moving.y));
+        const reference = references[0];
+        if (reference) {
+          matched.add(pair);
+          matched.add(reference);
+          shown.add(reference);
+        }
+      }
+      for (const pair of shown) {
+        result.push({ axis,
+          position: Math.min(pair.first[across], pair.second[across]) - 18 / zoom,
+          start: pair.first[axis] + pair.first[size], end: pair.second[axis], gap: pair.gap,
+          matched: matched.has(pair), from: pair.first.id, to: pair.second.id });
+      }
+    }
+    return result;
+  }
+
+  return { guides, spacing };
 })();

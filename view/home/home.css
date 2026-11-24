@@ -610,8 +610,11 @@ button.diagram-handle-arrows { cursor: ew-resize; touch-action: none; }
 .diagram-scene > .diagram-root.is-selected { z-index: 3; }
 .diagram-scene .diagram-node { width: 220px; }
 .diagram-alignment-guides { position: absolute; inset: 0; z-index: 4; overflow: visible; pointer-events: none; }
-.diagram-alignment-guides line { stroke: #d64c92; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.diagram-alignment-guides line { stroke: #df4652; stroke-width: 1; vector-effect: non-scaling-stroke; }
 .diagram-alignment-guides .is-center { stroke-dasharray: 5 4; }
+.diagram-spacing-guide text { fill: #df4652; stroke: var(--surface, white); paint-order: stroke; stroke-linejoin: round; font-family: inherit; font-weight: 500; }
+.diagram-spacing-guide.is-equal line { stroke-width: 2; }
+.diagram-spacing-guide.is-equal text { font-weight: 700; }
 .diagram-connections { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
 .diagram-connections path { fill: none; stroke: var(--lavender); stroke-width: 2; }
 .diagram-connection { cursor: pointer; outline: none; }

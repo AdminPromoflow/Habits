@@ -1,5 +1,12 @@
 # Verificación realizada
 
+## Guías de ancho y separaciones entre hermanos — 24 de noviembre de 2026
+
+- Las guías rojas de bordes y centros también aparecen al arrastrar el control de ancho o ajustarlo con el teclado. Se limpian al soltar, perder el foco/captura o cambiar de cuenta.
+- Al mover un cuadro, se miden los espacios positivos de borde a borde respecto a sus hermanos consecutivos en la misma fila o columna. Las separaciones próximas a otras del mismo grupo se resaltan con medidas y «≈», con tolerancia de 4 px en pantalla. Se incluyen raíces hermanas, se excluyen otras familias y descendientes arrastrados, y no se modifica la posición del cursor.
+- 189 pruebas de geometría, editor y cámara aprobadas: tamaños diferentes, distancias en ambos ejes, zoom, vecinos intermedios, superposición, grupos independientes, coincidencias y limpieza. Sintaxis JavaScript y diferencias verificadas.
+- Navegador local sobre base aislada: tres líneas rojas visibles durante el ajuste de ancho 220 → 210, ninguna después de soltar; ajuste con ratón de vuelta a 220. Arrastre de un hermano entre otros dos con separación visible de 64 px a cada lado, guardado correcto y sin errores de consola. Captura del ajuste: `tests/.runtime/resize-alignment-guides.png`. Sin cambios de base de datos ni publicación.
+
 ## Flecha en el padre y selector de diagramas hermanos — 24 de noviembre de 2026
 
 - El cuadro que enlaza a un diagrama completo vuelve a mostrar su flechita. El tooltip identifica el diagrama completo, sin presentarlo como topic inexistente. El destino no recibe flechas de regreso por este tipo de enlace y usa la ruta superior.

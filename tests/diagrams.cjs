@@ -393,6 +393,7 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
     handleKey: (key, target = widthHandle, modifiers = {}) => dispatch('keydown', target, {
       key, shiftKey: false, isComposing: false, ...modifiers,
     }),
+    releaseKey: (key, target = widthHandle) => dispatch('keyup', target, { key }),
   };
 }
 
@@ -1320,6 +1321,108 @@ test('account reset cancels an unfinished drag without saving it to the next acc
   assert.equal(home.drag, null);
   assert.equal(root.hasPointerCapture(1), false);
   assert.equal(home.active, null);
+});
+
+test('width alignment guides follow the resized edge and clear on every pointer ending', () => {
+  for (const ending of ['pointerup', 'pointercancel', 'lostpointercapture', 'blur', 'reset']) {
+    const { home, widthHandle, click, pointer, addNodeElement, addAlignmentLayer, windowListeners } = savedEditor();
+    const layer = addAlignmentLayer();
+    home.nodes = [
+      { id: 'root', parent_id: null, text: home.name, x: 0, y: 0, width: 220 },
+      { id: 'peer', parent_id: null, text: 'Peer', x: 0, y: 200, width: 260 },
+    ];
+    addNodeElement('peer', 'Peer');
+    home.positionTree();
+    let saves = 0;
+    home.save = () => { saves++; };
+    click();
+    pointer('pointerdown', widthHandle);
+    pointer('pointermove', widthHandle, { clientX: 102 });
+    assert.equal(layer.innerHTML, '', 'pressing without a width change shows no guides');
+    pointer('pointermove', widthHandle, { clientX: 140, pointerId: 2 });
+    assert.equal(layer.innerHTML, '', 'unrelated pointers cannot activate guides');
+    pointer('pointermove', widthHandle, { clientX: 140 });
+    const peer = home.plan.nodes.find(item => item.id === 'peer');
+    const edge = peer.x + peer.width;
+    assert.match(layer.innerHTML, new RegExp(`x1="${edge}"[^>]+x2="${edge}"`));
+    assert.doesNotMatch(layer.innerHTML, /diagram-spacing-guide/, 'gap measurements are reserved for moving nodes');
+    assert.equal(home.nodes[0].width, 260);
+    assert.equal(saves, 0);
+    pointer('pointermove', widthHandle, { clientX: 160 });
+    assert.doesNotMatch(layer.innerHTML, new RegExp(`x1="${edge}"[^>]+x2="${edge}"`), 'a formerly aligned edge clears immediately');
+    pointer('pointermove', widthHandle, { clientX: 140 });
+    if (ending === 'blur') windowListeners.get('blur')();
+    else if (ending === 'reset') home.reset();
+    else pointer(ending, widthHandle);
+    assert.equal(layer.innerHTML, '', ending);
+    assert.equal(saves, ending === 'reset' ? 0 : 1, ending);
+  }
+});
+
+test('keyboard width adjustments show alignment until key release or loss of focus', () => {
+  for (const ending of ['keyup', 'focusout', 'blur', 'reset']) {
+    const { home, widthHandle, click, handleKey, releaseKey, addNodeElement, addAlignmentLayer, windowListeners } = savedEditor();
+    const layer = addAlignmentLayer();
+    home.nodes = [
+      { id: 'root', parent_id: null, text: home.name, x: 0, y: 0, width: 220 },
+      { id: 'peer', parent_id: null, text: 'Peer', x: 0, y: 200, width: 230 },
+    ];
+    addNodeElement('peer', 'Peer');
+    home.positionTree();
+    let saves = 0;
+    home.save = () => { saves++; };
+    click();
+    widthHandle.focus();
+    handleKey('ArrowRight');
+    assert.equal(home.nodes[0].width, 230);
+    assert.match(layer.innerHTML, /class="is-center"/);
+    assert.equal(saves, 1);
+    if (ending === 'keyup') releaseKey('ArrowRight');
+    else if (ending === 'focusout') widthHandle.blur();
+    else if (ending === 'blur') windowListeners.get('blur')();
+    else home.reset();
+    assert.equal(layer.innerHTML, '', ending);
+    assert.equal(saves, 1, 'clearing a visual guide does not save again');
+  }
+});
+
+test('moving a sibling measures the current gap and highlights matching sibling gaps', () => {
+  for (const parentId of [null, 'root']) {
+    const fixture = savedEditor();
+    const { home, click, pointer, addNodeElement, addAlignmentLayer } = fixture;
+    const layer = addAlignmentLayer();
+    const movingId = parentId === null ? 'root' : 'moving';
+    home.nodes = [
+      ...(parentId ? [{ id: 'root', parent_id: null, text: home.name, x: -500, y: -500 }] : []),
+      { id: movingId, parent_id: parentId, text: parentId ? 'Moving' : home.name, x: 0, y: 0, width: 100 },
+      { id: 'peer', parent_id: parentId, text: 'Peer', x: 180, y: 0, width: 100 },
+      { id: 'last', parent_id: parentId, text: 'Last', x: 340, y: 0, width: 100 },
+    ];
+    const nodes = new Map([['root', fixture.node]]);
+    for (const item of home.nodes.filter(item => item.id !== 'root')) nodes.set(item.id, addNodeElement(item.id, item.text).node);
+    const moving = nodes.get(movingId);
+    home.positionTree();
+    let saves = 0;
+    home.save = () => { saves++; };
+    click(moving);
+    pointer('pointerdown', moving);
+    pointer('pointermove', moving, { clientX: 120 });
+    const dimensions = [...layer.innerHTML.matchAll(/<g\b[^>]*class="diagram-spacing-guide[^>]*>/g)].map(match => match[0]);
+    assert.equal(dimensions.length, 2, 'both equal adjacent gaps are shown');
+    assert.ok(dimensions.every(markup => markup.includes('is-equal') && markup.includes('data-gap="60"')));
+    assert.match(layer.innerHTML, /60 px/);
+    assert.equal(home.nodes.find(item => item.id === movingId).x, 20, 'measurement never snaps the node');
+    assert.equal(saves, 0, 'moving only updates the view');
+    pointer('pointermove', moving, { clientX: 140 });
+    assert.match(layer.innerHTML, /data-gap="40"/);
+    assert.doesNotMatch(layer.innerHTML, /is-equal/);
+    assert.doesNotMatch(layer.innerHTML, /data-from="peer" data-to="last"/, 'unmatched reference gap is removed');
+    pointer('pointermove', moving, { clientX: 150, clientY: 350 });
+    assert.doesNotMatch(layer.innerHTML, /diagram-spacing-guide/, 'diagonal boxes do not retain a misleading gap');
+    pointer('pointerup', moving);
+    assert.equal(layer.innerHTML, '');
+    assert.equal(saves, 1);
+  }
 });
 
 test('resizing one selected node accounts for zoom, preserves its branch, and persists after reload', async () => {
