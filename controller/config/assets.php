@@ -31,6 +31,7 @@ return [
         'view/home/diagram-layout-panel.js',
         'view/home/diagram-viewport.js',
         'view/home/diagram-node-tools.js',
+        'view/home/diagram-links.js',
         'view/home/diagram-connections.js',
         'view/home/home.js',
         'view/habits/habits.js',

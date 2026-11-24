@@ -102,7 +102,7 @@ class DiagramViewport {
       try {
         const view = key ? JSON.parse(localStorage.getItem(key) || 'null') : null;
         if (view && Number.isFinite(view.x) && Number.isFinite(view.y) &&
-            Number.isFinite(view.scale) && view.scale >= 0.2 && view.scale <= 3) {
+            Number.isFinite(view.scale) && view.scale >= (view.overview === true ? 0.000001 : 0.2) && view.scale <= 3) {
           this.x = view.x;
           this.y = view.y;
           this.scale = view.scale;
@@ -114,7 +114,8 @@ class DiagramViewport {
 
   saveView() {
     if (!this.persistenceKey) return;
-    const serialized = JSON.stringify({ x: this.x, y: this.y, scale: this.scale });
+    const serialized = JSON.stringify({ x: this.x, y: this.y, scale: this.scale,
+      ...(this.scale < 0.2 ? { overview: true } : {}) });
     if (serialized === this.lastSavedView) return;
     try {
       // Save each changed view immediately: even a reload during a gesture is safe.
@@ -257,7 +258,7 @@ class DiagramViewport {
   }
 
   zoomAt(scale, point) {
-    const next = Math.max(0.2, Math.min(3, scale));
+    const next = Math.max(Math.min(0.2, this.scale), Math.min(3, scale));
     if (!Number.isFinite(next)) return;
     const ratio = next / this.scale;
     const cx = point.x - this.stage.clientWidth / 2;
@@ -292,7 +293,7 @@ class DiagramViewport {
     }
     if (!Number.isFinite(event.scale) || event.scale <= 0) return;
     const point = this.gesturePoint(event, gesture.point);
-    const scale = Math.max(0.2, Math.min(3, gesture.scale * event.scale));
+    const scale = Math.max(Math.min(0.2, gesture.scale), Math.min(3, gesture.scale * event.scale));
     this.x = point.x - this.stage.clientWidth / 2 - gesture.worldX * scale;
     this.y = point.y - this.stage.clientHeight / 2 - gesture.worldY * scale;
     this.scale = scale;
@@ -330,5 +331,25 @@ class DiagramViewport {
     this.x += shift(box.left, box.width, left, this.stage.clientWidth, marginX);
     this.y += shift(box.top, box.height, top, this.stage.clientHeight, marginY);
     this.render();
+  }
+
+  focusElement(element, { overview = false } = {}) {
+    if (!element || !this.stage || !this.content) return false;
+    this.cancelInteraction();
+    const frame = this.stage.getBoundingClientRect();
+    const box = element.getBoundingClientRect();
+    if (!box.width || !box.height) return false;
+    const centerX = frame.left + (this.stage.clientLeft || 0) + this.stage.clientWidth / 2;
+    const centerY = frame.top + (this.stage.clientTop || 0) + this.stage.clientHeight / 2;
+    const worldX = (box.left + box.width / 2 - centerX - this.x) / this.scale;
+    const worldY = (box.top + box.height / 2 - centerY - this.y) / this.scale;
+    const room = overview ? 0.86 : 0.65;
+    const fit = Math.min(this.stage.clientWidth * room / (box.width / this.scale),
+      this.stage.clientHeight * room / (box.height / this.scale));
+    this.scale = Math.max(overview ? 0.000001 : 0.2, Math.min(overview ? 1 : 1.6, fit));
+    this.x = -worldX * this.scale;
+    this.y = -worldY * this.scale;
+    this.render();
+    return true;
   }
 }

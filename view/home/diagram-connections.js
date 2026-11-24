@@ -255,6 +255,9 @@ class DiagramConnections {
     this.renderTools();
     if (action === 'label') document.getElementById('diagram-connection-label-input')?.focus({ preventScroll: true });
     if (this.menuOpen) this.home.viewport.reveal(document.getElementById('diagram-connection-menu'));
+    else if (action === 'save-label' || action.startsWith('arrows-')) {
+      this.elements().find(line => this.same(line.dataset, this.selected))?.focus({ preventScroll: true });
+    }
   }
 
   point(event) {

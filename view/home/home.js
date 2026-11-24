@@ -4,8 +4,10 @@ class HomePage extends PageController {
   constructor() {
     super(['create-diagram', 'retry-diagram', 'toggle-diagram-menu', 'diagram-layout', 'add-diagram-child', 'add-diagram-sibling',
       'diagram-checkbox-menu', 'diagram-checkbox-state', 'toggle-diagram-picker', 'select-diagram',
-      'copy-diagram-node', 'cut-diagram-node', 'paste-diagram-node', 'delete-diagram-node', 'image-diagram-node', 'labels-diagram-node']);
+      'copy-diagram-node', 'cut-diagram-node', 'paste-diagram-node', 'delete-diagram-node', 'image-diagram-node', 'labels-diagram-node',
+      'link-diagram-node', 'open-diagram-link']);
     this.nodeTools = new DiagramNodeTools(this);
+    this.links = new DiagramLinks(this);
     this.generation = 0;
     this.viewport = new DiagramViewport({
       canInteract: () => !this.drag && !this.resizing && !this.connectionTool?.drag && !this.connectionTool?.editingRoute && !this.layoutOpen && !this.titleEditing,
@@ -393,6 +395,7 @@ class HomePage extends PageController {
 
   rememberDiagram() {
     const url = new URL(location.href);
+    if (url.searchParams.get('diagram') !== String(this.active?.id)) url.searchParams.delete('topic');
     if (this.active) url.searchParams.set('diagram', this.active.id);
     else url.searchParams.delete('diagram');
     if (url.href !== location.href) history.replaceState(null, '', url.href);
@@ -412,7 +415,7 @@ class HomePage extends PageController {
     return true;
   }
 
-  async openDiagram(id) {
+  async openDiagram(id, topic = undefined) {
     if (this.switching || !S.data.diagrams?.some((item) => String(item.id) === String(id))) return;
     this.closeDiagramPicker();
     this.switching = true;
@@ -422,6 +425,8 @@ class HomePage extends PageController {
       if (!await this.finishBeforeSwitch()) return;
       const url = new URL(location.href);
       url.searchParams.set('diagram', id);
+      url.searchParams.delete('topic');
+      if (topic !== undefined) url.searchParams.set('topic', topic ?? 'overview');
       // A document navigation reloads the editor and reads the selected tree afresh.
       location.assign(url.href);
     } finally {
@@ -442,6 +447,7 @@ class HomePage extends PageController {
     return renderTemplate('diagram-node', {
       ...menuFields,
       ...this.nodeTools.content(node),
+      topicLink: this.links.badge(node),
       pasteDisabled: this.nodeTools.clipboard() ? '' : 'disabled',
       checkboxNoneLabel: esc(t('diagram_checkbox_none')),
       checkboxToggleLabel: esc(t('diagram_checkbox_toggle')),
@@ -474,6 +480,7 @@ class HomePage extends PageController {
     this.syncNodeState();
     for (const node of this.ensureTree()) this.resizeNode(this.element('name', node.id), false);
     this.positionTree();
+    this.links.arrive();
     if (this.error) this.showStatus(this.error, true);
   }
 
@@ -572,6 +579,7 @@ class HomePage extends PageController {
       checkbox: node.checkbox ?? null,
       image: node.image ?? null,
       labels: node.labels || [],
+      link: node.link || null,
     })).sort((a, b) => a.id.localeCompare(b.id)));
   }
 
@@ -1042,6 +1050,8 @@ class HomePage extends PageController {
     if (action === 'delete-diagram-node') return this.nodeTools.remove();
     if (action === 'image-diagram-node') return this.nodeTools.openImage();
     if (action === 'labels-diagram-node') return this.nodeTools.openLabels();
+    if (action === 'link-diagram-node') return this.links.open();
+    if (action === 'open-diagram-link') return this.links.follow(this.ensureTree().find(node => node.id === this.selectedKey)?.link);
     if (action === 'diagram-layout') return this.openLayout();
     if (action === 'add-diagram-child') return this.addChild();
     if (action === 'add-diagram-sibling') return this.addSibling();
@@ -1113,6 +1123,7 @@ class HomePage extends PageController {
       this.saving ||
       this.switching ||
       this.pickerOpen ||
+      this.links.busy ||
       this.nodeTools.busy ||
       this.connectionTool.drag ||
       this.connectionTool.selected ||

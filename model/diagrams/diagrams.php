@@ -186,6 +186,17 @@ final class DiagramsModel extends BaseModel
                 ];
             }
             $node = ['id' => $id, 'parent_id' => $parent, 'text' => $text, 'layout' => $layout];
+            if (array_key_exists('link', $item)) {
+                $link = $item['link'];
+                if ($link !== null) {
+                    if (!is_array($link) || !is_int($link['diagram_id'] ?? null) || $link['diagram_id'] < 1
+                        || !array_key_exists('node_id', $link)
+                        || ($link['node_id'] !== null && (!is_string($link['node_id'])
+                            || !preg_match('/^(root|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/D', $link['node_id'])))) fail('error_validation');
+                    $link = ['diagram_id' => $link['diagram_id'], 'node_id' => $link['node_id']];
+                }
+                $node['link'] = $link;
+            }
             foreach (['x','y'] as $axis) {
                 $value = $item[$axis] ?? null;
                 if ($value !== null && ((!is_int($value) && !is_float($value)) || !is_finite((float) $value) || abs($value) > 1000000)) fail('error_validation');
@@ -245,12 +256,30 @@ final class DiagramsModel extends BaseModel
     private function replaceNodes(int $id, array $nodes): void
     {
         $existingContent = [];
-        foreach ($this->db->all('SELECT node_key,node_width,image_data,labels_json,checkbox_state FROM diagram_nodes WHERE diagram_id=?', [$id]) as $existing) {
+        foreach ($this->db->all('SELECT node_key,node_width,image_data,labels_json,checkbox_state,link_json FROM diagram_nodes WHERE diagram_id=?', [$id]) as $existing) {
             $existingContent[$existing['node_key']] = $existing;
         }
         $imageBytes = 0;
+        $targets = [];
         foreach ($nodes as &$node) {
             $existing = $existingContent[$node['id']] ?? [];
+            $previousLink = json_decode($existing['link_json'] ?? 'null', true, 8, JSON_THROW_ON_ERROR);
+            if (!array_key_exists('link', $node)) $node['link'] = $previousLink;
+            // A removed destination must not prevent unrelated edits to an
+            // existing source. New/changed links must point to owned targets.
+            if ($node['link'] !== null && $node['link'] !== $previousLink) {
+                $targetId = $node['link']['diagram_id'];
+                if ($targetId === $id) {
+                    $targetKeys = array_column($nodes, 'id');
+                } else {
+                    if (!array_key_exists($targetId, $targets)) {
+                        $owned = $this->db->one('SELECT id FROM diagrams WHERE id=? AND owner_user_id=?', [$targetId, $this->uid()]);
+                        $targets[$targetId] = $owned ? array_column($this->db->all('SELECT node_key FROM diagram_nodes WHERE diagram_id=?', [$targetId]), 'node_key') : null;
+                    }
+                    $targetKeys = $targets[$targetId];
+                }
+                if ($targetKeys === null || ($node['link']['node_id'] !== null && !in_array($node['link']['node_id'], $targetKeys, true))) fail('error_diagram_link_missing');
+            }
             if (!array_key_exists('width', $node)) $node['width'] = $existing['node_width'] ?? null;
             if (!array_key_exists('image', $node)) $node['image'] = $existing['image_data'] ?? null;
             if (!array_key_exists('checkbox', $node)) $node['checkbox'] = $existing['checkbox_state'] ?? null;
@@ -265,8 +294,8 @@ final class DiagramsModel extends BaseModel
         foreach ($nodes as $position => $node) {
             $layout = $node['layout'];
             $this->db->run(
-                'INSERT INTO diagram_nodes(diagram_id,node_key,parent_key,text,sort_order,layout_mode,layout_direction,layout_vertical,layout_horizontal,position_x,position_y,node_width,image_data,labels_json,checkbox_state) VALUES (?,?,NULL,?,?,?,?,?,?,?,?,?,?,?,?)',
-                [$id, $node['id'], $node['text'], $position, $layout['mode'] ?? null, $layout['direction'] ?? null, $layout['vertical'] ?? null, $layout['horizontal'] ?? null, $node['x'], $node['y'], $node['width'], $node['image'], json_encode($node['labels'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE), $node['checkbox'] === null ? null : (int) $node['checkbox']],
+                'INSERT INTO diagram_nodes(diagram_id,node_key,parent_key,text,sort_order,layout_mode,layout_direction,layout_vertical,layout_horizontal,position_x,position_y,node_width,image_data,labels_json,checkbox_state,link_json) VALUES (?,?,NULL,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                [$id, $node['id'], $node['text'], $position, $layout['mode'] ?? null, $layout['direction'] ?? null, $layout['vertical'] ?? null, $layout['horizontal'] ?? null, $node['x'], $node['y'], $node['width'], $node['image'], json_encode($node['labels'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE), $node['checkbox'] === null ? null : (int) $node['checkbox'], $node['link'] === null ? null : json_encode($node['link'], JSON_THROW_ON_ERROR)],
             );
         }
         foreach ($nodes as $node) {
@@ -288,6 +317,8 @@ final class DiagramsModel extends BaseModel
             'image' => $node['image_data'],
             'checkbox' => $node['checkbox_state'] === null ? null : (bool) $node['checkbox_state'],
             'labels' => json_decode($node['labels_json'] ?? '[]', true, 8, JSON_THROW_ON_ERROR),
+            // Keep the legacy representation for topics without a link.
+            ...($node['link_json'] === null ? [] : ['link' => json_decode($node['link_json'], true, 8, JSON_THROW_ON_ERROR)]),
         ];
     }
 }

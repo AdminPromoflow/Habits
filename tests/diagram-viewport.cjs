@@ -3,6 +3,37 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const { test } = require('node:test');
 
+test('linked topic focus centers its midpoint regardless of the previous pan and zoom', () => {
+  const { camera, surface, element } = harness();
+  camera.x = 125; camera.y = -70; camera.scale = 0.5;
+  const target = element();
+  // World midpoint relative to the camera anchor: (600, -200).
+  target.getBoundingClientRect = () => ({ left: 100 + 400 + camera.x + (600 - 110) * camera.scale,
+    top: 50 + 250 + camera.y + (-200 - 24) * camera.scale, width: 220 * camera.scale, height: 48 * camera.scale });
+  camera.focusElement(target);
+  const rect = target.getBoundingClientRect(), frame = surface.getBoundingClientRect();
+  assert.equal(rect.left + rect.width / 2, frame.left + surface.clientWidth / 2);
+  assert.equal(rect.top + rect.height / 2, frame.top + surface.clientHeight / 2);
+  assert.equal(camera.scale, 1.6);
+});
+
+test('whole-diagram link fits large diagrams and retains that overview on reload', () => {
+  const { camera, element, storage } = harness();
+  camera.setPersistenceKey('overview');
+  const diagram = element();
+  diagram.getBoundingClientRect = () => ({ left: 100, top: 50, width: 12000, height: 8000 });
+  camera.focusElement(diagram, { overview: true });
+  assert.ok(camera.scale < 0.2);
+  assert.ok(camera.scale * 12000 <= 800);
+  assert.ok(camera.scale * 8000 <= 500);
+  const restored = harness({ storage });
+  restored.camera.setPersistenceKey('overview');
+  assert.equal(restored.camera.scale, camera.scale);
+  const before = camera.scale;
+  camera.zoomAt(before * 1.1, { x: 400, y: 250 });
+  assert.equal(camera.scale, before * 1.1);
+});
+
 function harness({ storage = new Map(), storageError = false } = {}) {
   let now = 1000;
   let allowed = true;

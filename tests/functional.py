@@ -91,6 +91,8 @@ try:
  test_diagram_nodes(owner, bob, guest, diagram['id'], check)
  from diagram_connections_acceptance import run as test_diagram_connections
  test_diagram_connections(owner, bob, guest, check)
+ from diagram_links_acceptance import run as test_diagram_links
+ test_diagram_links(owner, bob, guest, check)
  owner.request('saveDiagram',{'name':'Wrong endpoint','client_key':str(uuid.uuid4())},404,module='habits')
  owner.request('diagrams',{},405,module='diagrams')
  check(True,'Module endpoints reject unrelated actions and incorrect HTTP methods')

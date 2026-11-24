@@ -16,6 +16,8 @@ La migración `011_diagram_connections.sql` añade `diagrams.connections_json` p
 
 La migración `011_diagram_connections.sql` añade `diagrams.connections_json`. La API expone `connections`, una lista de pares `{from, to}` de nodos existentes del mismo diagrama. Son conexiones adicionales independientes de la jerarquía; se validan con el mismo propietario, versión y transacción que los nodos. Omitir el campo conserva las conexiones válidas y retira aquellas cuyos cuadros se borraron o ahora son padre e hijo directo; `[]` elimina todas las conexiones adicionales. Los diagramas existentes empiezan sin conexiones adicionales. Debe aplicarse antes de habilitar los archivos actualizados.
 
+La edición de conectores reutiliza esa misma columna, sin migración adicional. El JSON admite el formato antiguo de lista y el nuevo objeto `{extra, hidden, styles}`. La API mantiene `connections` y añade `hidden_connections` (líneas de padre e hijo eliminadas visualmente) y `connection_styles` (pares `from`/`to`, `points`, `label` y `arrows`). Las posiciones de los quiebres se guardan en coordenadas del diagrama, antes del desplazamiento de presentación; los extremos se ajustan a los cuadros actuales. Cada recorrido admite hasta 64 puntos ortogonales, la etiqueta hasta 120 caracteres y las flechas `none`, `start`, `end` o `both`. El servidor valida que las líneas pertenezcan al diagrama. Omitir campos conserva su estado y descarta referencias que dejaron de existir; listas vacías restablecen el campo. Los archivos de modelo y editor deben actualizarse juntos.
+
 Antes de habilitar los archivos nuevos de `model/diagrams/` y `view/home/`, ejecutar desde la carpeta del proyecto en el servidor:
 
 ```sh

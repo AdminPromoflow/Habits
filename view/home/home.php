@@ -63,6 +63,7 @@
 {{name}}</textarea>
       {{insideLabels}}
     </div>
+    {{topicLink}}
     <span id="diagram-interaction-hint{{suffix}}" class="sr-only">{{hint}}</span>
     <div class="diagram-controls" id="diagram-controls{{suffix}}" hidden>
       <button type="button" class="diagram-handle diagram-handle-more" id="diagram-more{{suffix}}"
@@ -95,7 +96,7 @@
         <button type="button" role="menuitem" disabled aria-label="{{formatLabel}}" title="{{formatLabel}}">{{formatIcon}}</button>
       </div>
       <div class="diagram-menu-row" role="presentation">
-        <button type="button" role="menuitem" disabled aria-label="{{linkLabel}}" title="{{linkLabel}}">{{linkIcon}}</button>
+        <button type="button" role="menuitem" data-action="link-diagram-node" aria-label="{{linkLabel}}" title="{{linkLabel}}">{{linkIcon}}</button>
         <button type="button" role="menuitem" id="diagram-checkbox-tool{{suffix}}" data-action="diagram-checkbox-menu"
           aria-haspopup="menu" aria-expanded="false" aria-controls="diagram-checkbox-menu{{suffix}}"
           aria-label="{{checkboxLabel}}" title="{{checkboxLabel}}">{{checkboxIcon}}</button>

@@ -232,6 +232,26 @@
 }
 
 .diagram-node-body { position: relative; }
+.diagram-topic-link { position: absolute; right: -16px; bottom: -16px; width: 32px; height: 32px; display: grid; place-items: center; border: 2px solid var(--lavender); border-radius: 50%; background: var(--surface); color: var(--purple-dark); cursor: pointer; z-index: 1; box-shadow: 0 2px 8px #34204720; }
+.diagram-topic-link svg { width: 17px; height: 17px; }
+.diagram-topic-link:hover, .diagram-topic-link:focus-visible { outline: 3px solid var(--lavender); outline-offset: 2px; }
+.diagram-link-scope { display: flex; flex-wrap: wrap; gap: 12px 24px; border: 0; margin: 16px 0; padding: 0; }
+.diagram-link-scope legend { font-weight: 600; margin-bottom: 8px; }
+.diagram-link-scope label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+.diagram-link-scope input { accent-color: var(--purple); }
+.diagram-link-preview-tools { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 16px; font-size: .875rem; }
+.diagram-link-preview-tools > div { display: flex; gap: 4px; }
+.diagram-link-preview-tools .btn { min-width: 36px; padding: 6px 10px; }
+.diagram-link-preview { height: 320px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 12px; margin: 8px 0 16px; }
+.diagram-link-preview > svg { display: block; max-width: none; margin: auto; overflow: visible; }
+.diagram-link-preview-edges { fill: none; stroke: var(--lavender); stroke-width: 2; }
+.diagram-link-preview [data-link-target] { cursor: pointer; outline: none; }
+.diagram-link-preview rect { fill: var(--lavender-wash); stroke: var(--lavender); stroke-width: 2; }
+.diagram-link-preview text { fill: var(--ink); font: 18px system-ui, sans-serif; pointer-events: none; }
+.diagram-link-preview [aria-pressed="true"] rect, .diagram-link-preview [data-link-target]:focus rect { stroke: var(--purple-dark); stroke-width: 5; }
+.diagram-link-preview [data-link-target]:hover rect { stroke: var(--purple); }
+.diagram-link-topic-field[hidden] { display: none; }
+.diagram-link-selection { border-radius: 10px; padding: 10px 12px; background: var(--lavender-wash); overflow-wrap: anywhere; font-size: .9rem; }
 .diagram-node-image { display: block; grid-column: 1 / -1; width: 100%; max-height: 240px; object-fit: contain; border-radius: 8px; margin-bottom: 10px; pointer-events: none; }
 .diagram-node-labels { display: flex; grid-column: 1 / -1; flex-wrap: wrap; justify-content: center; gap: 5px; width: 100%; margin-top: 8px; }
 .diagram-node-labels-outside { max-width: 100%; margin-top: 42px; padding: 0 4px 4px; }

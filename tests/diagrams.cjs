@@ -4,6 +4,84 @@ const { randomUUID } = require('node:crypto');
 const vm = require('node:vm');
 const { test } = require('node:test');
 
+test('topic links are included in dirty detection, saved snapshots and their visible open button', async () => {
+  const { home } = savedEditor();
+  home.nodes[0].link = { diagram_id: 52, node_id: 'root' };
+  assert.equal(home.hasChanges(), true);
+  assert.match(JSON.parse(home.nodeContent(home.nodes[0])).topicLink, /data-action="open-diagram-link"/);
+  let sent;
+  home.makeRequest = async (action, data) => { sent = data; return { ...data, version: 2 }; };
+  await home.save();
+  assert.equal(sent.nodes[0].link.diagram_id, 52);
+  assert.equal(home.hasChanges(), false);
+  home.nodes[0].link = null;
+  assert.equal(home.hasChanges(), true);
+  assert.equal(JSON.parse(home.nodeContent(home.nodes[0])).topicLink, '');
+});
+
+test('links navigate to a topic or the overview with the source saved first', async () => {
+  for (const nodeId of ['root', null]) {
+    const { home, state, navigations } = savedEditor();
+    const target = { id: 52, name: 'Target', version: 1, nodes: [{ id: 'root', parent_id: null, text: 'Target' }] };
+    home.name = 'Pending source edit';
+    const calls = [];
+    home.makeRequest = async (action, data) => {
+      calls.push(action);
+      return action === 'saveDiagram' ? { ...data, version: data.version + 1 } : [...state.data.diagrams, target];
+    };
+    await home.links.follow({ diagram_id: 52, node_id: nodeId });
+    assert.deepEqual(calls, ['saveDiagram', 'diagrams']);
+    assert.equal(home.active.nodes[0].text, 'Pending source edit');
+    assert.equal(new URL(navigations[0]).searchParams.get('topic'), nodeId || 'overview');
+  }
+});
+
+test('same-diagram links focus and select the destination without a document navigation', async () => {
+  const { home, node, navigations } = savedEditor();
+  home.active.nodes = home.snapshot();
+  home.makeRequest = async () => [JSON.parse(JSON.stringify(home.active))];
+  await home.links.follow({ diagram_id: 51, node_id: 'root' });
+  assert.equal(navigations.length, 0);
+  assert.equal(home.viewport.focused, node);
+  assert.equal(home.selected, true);
+  await home.links.follow({ diagram_id: 51, node_id: null });
+  assert.equal(home.viewport.focusOptions.overview, true);
+  assert.equal(home.selected, false);
+});
+
+test('missing link destinations and failed source saves do not navigate', async () => {
+  for (const failSave of [false, true]) {
+    const { home, navigations } = savedEditor();
+    if (failSave) home.name = 'Unsaved';
+    home.makeRequest = async () => { if (failSave) throw new Error('Offline'); return []; };
+    await home.links.follow({ diagram_id: 52, node_id: 'root' });
+    assert.equal(navigations.length, 0);
+    assert.equal(home.active.id, 51);
+    assert.equal(home.error, failSave ? 'Offline' : 'error_diagram_link_missing');
+  }
+});
+
+test('a linked arrival overrides the remembered camera once and clears its URL instruction', () => {
+  const { home, location, node } = editor({ draft: false, url: 'http://localhost/?diagram=51&topic=root',
+    state: { user: { name: 'Aleina' }, data: { diagrams: [{ id: 51, name: 'Target', version: 1 }] } } });
+  home.render(); home.mount();
+  assert.equal(home.viewport.focused, node);
+  assert.equal(home.selectedKey, 'root');
+  assert.equal(new URL(location.href).searchParams.has('topic'), false);
+  home.viewport.focused = null; home.mount();
+  assert.equal(home.viewport.focused, null);
+});
+
+test('preview includes every selectable topic and respects hidden connections', () => {
+  const { home } = savedEditor();
+  const diagram = { nodes: [{ id: 'root', parent_id: null, text: 'One' }, { id: 'child', parent_id: 'root', text: 'Two' }],
+    hidden_connections: [{ from: 'root', to: 'child' }] };
+  const preview = home.links.preview(diagram);
+  assert.equal(preview.plan.nodes.length, 2);
+  assert.match(preview.html, /data-link-target="child"/);
+  assert.doesNotMatch(preview.html, /<path /);
+});
+
 function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diagrams: [] } }, url = 'http://localhost/MyRemarkableMind/' } = {}) {
   const timers = new Map();
   const documentListeners = new Map();
@@ -139,6 +217,7 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
       mount(stage, content, anchor) { this.stage = stage; this.content = content; this.anchor = anchor; }
       setPersistenceKey(key, options) { this.persistenceKey = key; this.persistenceOptions = options; }
       reveal(target) { this.revealed = target; }
+      focusElement(target, options) { this.focused = target; this.focusOptions = options; return true; }
       isInteracting() { return this.interacting; }
     },
     window: { addEventListener: (name, callback) => listen(windowListeners, name, callback) },
@@ -153,6 +232,7 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
     clearTimeout: (id) => timers.delete(id),
   });
   vm.runInContext(fs.readFileSync('view/home/diagram-node-tools.js', 'utf8'), context);
+  vm.runInContext(fs.readFileSync('view/home/diagram-links.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('view/home/diagram-layout.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('view/home/diagram-routing.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('view/home/diagram-connections.js', 'utf8'), context);
