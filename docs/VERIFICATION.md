@@ -1,5 +1,13 @@
 # Verificación realizada
 
+## Cuadros vacíos y conexiones simétricas — 23 de noviembre de 2026
+
+- Los cuadros admiten texto vacío, incluso la idea principal. Los hijos y hermanos nuevos entran en el guardado automático; salir del campo o pulsar Enter los conserva. Se pueden crear hijos, copiar y pegar desde ideas vacías. Escape sigue permitiendo cancelar un borrador todavía no enviado y restaura correctamente un texto vacío ya guardado.
+- Migración `010_empty_diagram_nodes.sql` aplicada localmente: elimina solo la restricción que prohibía texto vacío. Conserva el título independiente, los límites de longitud, las relaciones y el control de versión. Debe aplicarse también en cualquier servidor que reciba estos archivos.
+- Conexiones horizontales y verticales con salida desde el centro del lado del padre y un punto de ramificación compartido a mitad del espacio hacia los hijos. Las ramas inferiores de grupos altos ya no cambian a una salida inferior ni rodean todo el grupo. Se mantienen las esquinas redondeadas y las rutas que evitan otros cuadros.
+- 160 pruebas JavaScript, 147 comprobaciones HTTP y 7 de esquema/fuentes aprobadas. Incluyen texto vacío y saltos de línea, persistencia después de recargar, guardados pendientes, hermanos vacíos con propiedades, conexión simétrica hacia los cuatro lados y reproducción de la geometría de la captura.
+- Navegador en base aislada: crear cuatro hijos sin texto, hacer clic fuera, aplicar Horizontal/Derecha y recargar; se conservan los cinco cuadros, con las cuatro conexiones centradas y sin errores de consola. Captura: `tests/.runtime/empty-nodes-symmetric-connections.jpg`.
+
 ## Asterisco para ideas hermanas — 23 de noviembre de 2026
 
 - El asterisco es un botón accesible que crea una sola idea al mismo nivel, sin copiar hijos. Copia por valor estilo/direcciones, ancho, imagen, etiquetas y casilla; genera un identificador nuevo, deja el texto vacío y recalcula la posición. El foco y el cursor quedan en el campo nuevo. Escape descarta un borrador vacío y vuelve al cuadro de origen.

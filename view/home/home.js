@@ -382,7 +382,7 @@ class HomePage extends PageController {
       widthHint: esc(t('diagram_node_width_hint')),
       width: this.nodeWidth(node),
       label: t('diagram_name'),
-      placeholder: node.id === 'root' ? t('diagram_name') : '',
+      placeholder: '',
       hint: t('diagram_interaction_hint'),
       nodeLabel: esc(`${t('diagram_name')}: ${node.text}`),
       menuLabel: t('diagram_options'),

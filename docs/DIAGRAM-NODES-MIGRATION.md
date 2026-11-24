@@ -10,6 +10,8 @@ La migración `008_diagram_node_content.sql` añade `image_data` y `labels_json`
 
 La migración `009_diagram_node_checkbox.sql` añade `checkbox_state`: `NULL` sin casilla, `0` sin marcar y `1` marcada. En la API se llama `checkbox` y admite `null`, `false` o `true`. Omitirlo conserva el estado anterior; enviarlo como `null` quita la casilla. Los cuadros existentes empiezan sin casilla. Aplicar las migraciones pendientes en orden, incluida la 008 de contenido de nodos y la 009, antes de habilitar los archivos actualizados.
 
+La migración `010_empty_diagram_nodes.sql` elimina únicamente la restricción `chk_diagram_node_text` que impedía guardar ideas vacías. Conserva los datos, las relaciones y los límites de longitud. El título del diagrama sigue siendo obligatorio. La migración selecciona la sintaxis correspondiente a MySQL o MariaDB y puede reintentarse si la restricción ya se eliminó. Debe aplicarse antes de habilitar el guardado de cuadros vacíos.
+
 Antes de habilitar los archivos nuevos de `model/diagrams/` y `view/home/`, ejecutar desde la carpeta del proyecto en el servidor:
 
 ```sh
