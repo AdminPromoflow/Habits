@@ -3,10 +3,14 @@
 // Shared by the link picker, its tooltip and the destination editor.
 class MindSpaceLinkTargets {
   static type(item) { return {spreadsheet:'cell', kanban:'card', scrum:'card', habits:'habit'}[item?.kind] || null; }
-  static statuses(item) { return item?.kind === 'scrum' ? ['backlog','todo','doing','done'] : item?.kind === 'kanban' ? ['todo','doing','done'] : []; }
+  static columns(item) {
+    if (!['kanban','scrum'].includes(item?.kind)) return [];
+    return Array.isArray(item.content?.columns) ? item.content.columns : ['backlog','todo','doing','done'].map(id => ({id, name:t(`ms_status_${id}`)}));
+  }
+  static statuses(item) { return this.columns(item).map(column => column.id); }
   static types(item) { return this.statuses(item).length ? ['card','column'] : this.type(item) ? [this.type(item)] : []; }
   static choices(item, habits = S.data?.habits || [], type = this.type(item)) {
-    if (type === 'column') return this.statuses(item).map(id => ({id, label:t(`ms_status_${id}`)}));
+    if (type === 'column') return this.columns(item).map(({id, name}) => ({id, label:name}));
     if (['kanban','scrum'].includes(item?.kind)) return (item.content.cards || []).map(card => ({id:card.id, label:card.title}));
     if (item?.kind === 'habits') return habits.filter(habit => habit.permission === 'owner' && item.content.habit_ids.includes(habit.id)).map(habit => ({id:String(habit.id), label:habit.name}));
     return [];
@@ -38,9 +42,9 @@ class MindSpaceLinkTargets {
         }).join('')}</tr>`).join('')}</tbody></table>`;
     }
     if (this.statuses(item).length) {
-      return `<div class="ms-link-board">${this.statuses(item).map(status => {
-        const cards = item.content.cards.filter(card => card.status === status), name = t(`ms_status_${status}`);
-        return `<section class="ms-link-column" aria-label="${esc(name)}"><button type="button" class="ms-link-column-select" data-link-type="column" data-link-target="${status}" aria-pressed="false" aria-label="${esc(`${t('ms_link_column')}: ${name}`)}"><strong>${esc(name)}</strong><span>${cards.length}</span></button>
+      return `<div class="ms-link-board">${this.columns(item).map(({id:status, name}) => {
+        const cards = item.content.cards.filter(card => card.status === status);
+        return `<section class="ms-link-column" aria-label="${esc(name)}"><button type="button" class="ms-link-column-select" data-link-type="column" data-link-target="${esc(status)}" aria-pressed="false" aria-label="${esc(`${t('ms_link_column')}: ${name}`)}"><strong>${esc(name)}</strong><span>${cards.length}</span></button>
           <div class="ms-link-choices">${cards.length ? cards.map(card => `<button type="button" data-link-type="card" data-link-target="${esc(card.id)}" aria-pressed="false"><strong>${esc(card.title)}</strong>${card.description ? `<small>${esc(card.description)}</small>` : ''}</button>`).join('') : `<p class="ms-link-column-empty">${esc(t('ms_link_column_empty'))}</p>`}</div></section>`;
       }).join('')}</div>`;
     }

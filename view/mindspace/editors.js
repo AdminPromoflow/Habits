@@ -32,29 +32,51 @@ class MindSpaceEditors {
     if (panel) panel.innerHTML = this.render();
     this.space.status();
   }
-  statuses() { return MindSpaceLinkTargets.statuses(this.space.active); }
+  columns() { return MindSpaceLinkTargets.columns({...this.space.active, content:this.space.draft}); }
+  statuses() { return this.columns().map(column => column.id); }
+  columnName(id) { return this.columns().find(column => column.id === id)?.name || id; }
   board() {
-    const draft = this.space.draft, scrum = this.space.active.kind === 'scrum', sprint = draft.sprint || {};
+    const draft = this.space.draft, sprint = draft.sprint || {};
     const returns = this.space.targetReturnLinks(), columnReturns = this.space.targetReturnLinks('column');
-    return `<div class="ms-board-editor">${scrum ? `<div class="ms-sprint"><div><h3>${esc(sprint.name || t('ms_sprint'))}</h3><p>${esc(sprint.goal || t('ms_sprint_hint'))}</p>
-      ${sprint.start || sprint.end ? `<small>${esc(sprint.start || '')} — ${esc(sprint.end || '')}</small>` : ''}</div><button class="btn secondary" data-action="ms-sprint">${esc(t('ms_edit_sprint'))}</button></div>` : ''}
+    return `<div class="ms-board-editor"><div class="ms-sprint"><div>${sprint.name ? `<h3>${esc(sprint.name)}</h3>` : ''}${sprint.goal ? `<p>${esc(sprint.goal)}</p>` : ''}
+      ${sprint.start || sprint.end ? `<small>${esc(sprint.start || '')} — ${esc(sprint.end || '')}</small>` : ''}</div><button class="btn secondary" data-action="ms-sprint">${esc(t('ms_edit_sprint'))}</button></div>
       <div class="ms-board">${this.statuses().map(status => {
         const cards = draft.cards.filter(card => card.status === status);
-        return `<section class="ms-column" data-ms-column="${status}" aria-label="${esc(t(`ms_status_${status}`))}"><header><h3>${esc(t(`ms_status_${status}`))}</h3><span>${cards.length}</span>${columnReturns.get(status) || ''}</header>
+        return `<section class="ms-column" data-ms-column="${esc(status)}" aria-label="${esc(this.columnName(status))}"><header><h3>${esc(this.columnName(status))}</h3><span>${cards.length}</span>${columnReturns.get(status) || ''}</header>
           ${cards.map(card => `<article class="ms-card" draggable="true" data-ms-card="${card.id}"><button type="button" class="ms-card-title" data-action="ms-card-edit" data-id="${card.id}">${esc(card.title)}</button>
-            ${card.description ? `<p>${esc(card.description)}</p>` : ''}${scrum ? `<small>${esc(t('ms_points'))}: ${card.points}</small>` : ''}
-            <label class="sr-only" for="ms-card-${card.id}">${esc(t('ms_card_status'))}: ${esc(card.title)}</label><select id="ms-card-${card.id}" data-ms-card-status="${card.id}">${this.statuses().map(value => `<option value="${value}" ${value === status ? 'selected' : ''}>${esc(t(`ms_status_${value}`))}</option>`).join('')}</select>${returns.get(card.id) || ''}</article>`).join('')}
-          <button type="button" class="ms-add-card" data-action="ms-card-new" data-status="${status}">${icon('plus')}${esc(t('ms_add_card'))}</button></section>`;
-      }).join('')}</div></div>`;
+            ${card.description ? `<p>${esc(card.description)}</p>` : ''}${card.points ? `<small>${esc(t('ms_points'))}: ${card.points}</small>` : ''}
+            <label class="sr-only" for="ms-card-${card.id}">${esc(t('ms_card_status'))}: ${esc(card.title)}</label><select id="ms-card-${card.id}" data-ms-card-status="${card.id}">${this.statuses().map(value => `<option value="${esc(value)}" ${value === status ? 'selected' : ''}>${esc(this.columnName(value))}</option>`).join('')}</select>${returns.get(card.id) || ''}</article>`).join('')}
+          <button type="button" class="ms-add-card" data-action="ms-card-new" data-status="${esc(status)}">${icon('plus')}${esc(t('ms_add_card'))}</button></section>`;
+      }).join('')}</div><div class="ms-board-footer"><button type="button" class="ms-add-column" data-action="ms-column-new" aria-label="${esc(t('ms_add_column'))}" title="${esc(t('ms_add_column'))}" ${this.columns().length >= 50 ? 'disabled' : ''}>${icon('plus')}</button></div></div>`;
+  }
+  async newColumn() {
+    const space = this.space;
+    if (!await space.flush()) return;
+    if (this.columns().length >= 50) throw new Error(t('ms_column_limit'));
+    openModal('ms_add_column', `<form id="ms-column-form"><label class="field"><span>${esc(t('ms_column_name'))}</span><input name="name" required maxlength="80" autocomplete="off"></label>${formFooter('create')}</form>`);
+    const form = document.getElementById('ms-column-form');
+    form.addEventListener('submit', event => { event.preventDefault(); void space.submit(form, async values => {
+      const name = String(values.get('name')).trim(), columns = this.columns();
+      if (!name) throw new Error(t('error_validation'));
+      if (columns.length >= 50) throw new Error(t('ms_column_limit'));
+      if (columns.some(column => column.name.toLowerCase() === name.toLowerCase())) throw new Error(t('ms_column_exists'));
+      const id = crypto.randomUUID();
+      space.draft.columns = [...columns, {id, name}];
+      space.changed(); closeModal(); this.refresh();
+      const column = document.querySelector(`[data-ms-column="${id}"]`);
+      column?.scrollIntoView({block:'nearest', inline:'end'});
+      column?.querySelector('.ms-add-card')?.focus({preventScroll:true});
+      await space.save();
+    }); });
   }
   async cardForm(id, status) {
     const space = this.space;
     if (!await space.flush()) return;
-    const card = space.draft.cards.find(item => item.id === id) || { id:crypto.randomUUID(), title:'', description:'', status:status || 'todo', points:0 };
+    const card = space.draft.cards.find(item => item.id === id) || { id:crypto.randomUUID(), title:'', description:'', status:status || 'backlog', points:0 };
     openModal(id ? 'ms_edit_card' : 'ms_add_card', `<form id="ms-card-form"><label class="field"><span>${esc(t('name'))}</span><input name="title" required maxlength="190" value="${esc(card.title)}"></label>
       <label class="field"><span>${esc(t('description'))}</span><textarea name="description" maxlength="5000">${esc(card.description)}</textarea></label>
-      <div class="form-grid"><label class="field"><span>${esc(t('ms_card_status'))}</span><select name="status">${this.statuses().map(value => `<option value="${value}" ${value === card.status ? 'selected' : ''}>${esc(t(`ms_status_${value}`))}</option>`).join('')}</select></label>
-      ${space.active.kind === 'scrum' ? `<label class="field"><span>${esc(t('ms_points'))}</span><input type="number" name="points" value="${card.points}" min="0" max="999" step="1"></label>` : ''}</div>${formFooter()}</form>`);
+      <div class="form-grid"><label class="field"><span>${esc(t('ms_card_status'))}</span><select name="status">${this.statuses().map(value => `<option value="${esc(value)}" ${value === card.status ? 'selected' : ''}>${esc(this.columnName(value))}</option>`).join('')}</select></label>
+      <label class="field"><span>${esc(t('ms_points'))}</span><input type="number" name="points" value="${card.points}" min="0" max="999" step="1"></label></div>${formFooter()}</form>`);
     const form = document.getElementById('ms-card-form');
     form.addEventListener('submit', event => { event.preventDefault(); void space.submit(form, async values => {
       const updated = { ...card, title:String(values.get('title')).trim(), description:String(values.get('description')), status:String(values.get('status')), points:Number(values.get('points') || 0) };
@@ -187,6 +209,7 @@ class MindSpaceEditors {
     anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   async action(action, button) {
+    if (action === 'ms-column-new') return this.newColumn();
     if (action === 'ms-card-new') return this.cardForm(null, button.dataset.status);
     if (action === 'ms-card-edit') return this.cardForm(button.dataset.id);
     if (action === 'ms-sprint') return this.sprintForm();

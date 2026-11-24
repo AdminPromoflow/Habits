@@ -15,4 +15,22 @@ $sum=0;foreach($source['habits'] as $h){$h['start_date']=$source['start_date'];$
 if($sum!==232)throw new RuntimeException('PDF schedule expected 232 occurrences.');$checks++;
 $en=require __DIR__.'/../translations/en.php';$es=require __DIR__.'/../translations/es.php';
 if(array_keys($en)!==array_keys($es))throw new RuntimeException('Translation dictionaries differ.');$checks++;
+// Exercise actual pre-unification rows, not just the compatibility API alias.
+$db->pdo->beginTransaction();
+try {
+    $model=new MindSpacesModel($db,['id'=>$a]);
+    foreach (['kanban','scrum'] as $index=>$kind) {
+        $legacy=['cards'=>[['id'=>'20000000-0000-4000-8000-000000000001','title'=>'Existing card','description'=>'Keep me','status'=>$kind==='scrum'?'backlog':'doing','points'=>3]],
+            'sprint'=>['name'=>'Existing sprint','goal'=>'Keep this too','start'=>null,'end'=>null]];
+        $item=$model->create(['kind'=>$kind,'name'=>'Legacy board','client_key'=>'10000000-0000-4000-8000-00000000000'.($index+1)]);
+        $db->run('UPDATE mindspace_items SET kind=?,content_json=? WHERE id=?',[$kind,json_encode($legacy),$item['id']]);
+        $read=array_values(array_filter($model->get()['items'],fn($row)=>$row['id']===$item['id']))[0];
+        if($read['kind']!=='kanban'||$read['content']['cards']!==$legacy['cards']||$read['content']['sprint']!==$legacy['sprint']
+            ||array_column($read['content']['columns'],'name')!==['Pending','To Do','In Progress','Done']) throw new RuntimeException('Legacy board lost content.');
+        $model->validateLink(['item_id'=>$item['id'],'target'=>['type'=>'column','id'=>'backlog']]);
+        $saved=$model->save(['id'=>$item['id'],'version'=>$item['version'],'content'=>$legacy]);
+        if($saved['content']!=$read['content']||$db->one('SELECT kind FROM mindspace_items WHERE id=?',[$item['id']])['kind']!=='kanban') throw new RuntimeException('Legacy save did not preserve the unified board.');
+        $checks++;
+    }
+} finally { $db->pdo->rollBack(); }
 echo "$checks schema and source checks passed.\n";

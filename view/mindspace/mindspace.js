@@ -4,7 +4,7 @@ class MindSpace extends PageController {
   constructor(home) {
     super(['ms-new','ms-new-kind','ms-open','ms-folder','ms-rename','ms-move','ms-retry',
       'ms-link-return','ms-link-returns','ms-sidebar-toggle','ms-sidebar-add','ms-space-open','ms-space-new','ms-entry-menu','ms-space-rename','ms-delete','ms-space-delete',
-      'ms-card-new','ms-card-edit','ms-sprint','ms-habits-select','ms-habit-new','ms-sheet-row','ms-sheet-column','ms-sheet-export']);
+      'ms-card-new','ms-card-edit','ms-column-new','ms-sprint','ms-habits-select','ms-habit-new','ms-sheet-row','ms-sheet-column','ms-sheet-export']);
     this.home = home;
     this.editor = new MindSpaceEditors(this);
     this.reset();
@@ -26,6 +26,7 @@ class MindSpace extends PageController {
       if (!event.target.closest?.('#ms-context-menu,[data-action="ms-entry-menu"]')) this.closeMenu();
     });
     document.addEventListener('keydown', event => this.menuKeydown(event));
+    document.defaultView?.addEventListener('resize', () => this.closeMenu());
     document.addEventListener('scroll', event => {
       if (!event.target.closest?.('#ms-context-menu')) this.closeMenu();
     }, true);
@@ -75,7 +76,7 @@ class MindSpace extends PageController {
   }
   spaceName(spaceId = this.spaceId()) { return this.spaces().find(space => space.id === spaceId)?.name || 'MindSpace'; }
   items(spaceId = this.spaceId()) { return this.allItems().filter(item => (item.mindspace_id || S.data?.mindspace?.id) === spaceId); }
-  kindIcon(kind) { return icon({ folder:'folder', diagram:'branch', spreadsheet:'table', kanban:'overview', scrum:'briefcase', habits:'habits', notes:'book' }[kind] || 'book'); }
+  kindIcon(kind) { return icon({ folder:'folder', diagram:'branch', spreadsheet:'table', kanban:'overview', scrum:'overview', habits:'habits', notes:'book' }[kind] || 'book'); }
   kindLabel(kind) { return t(`ms_kind_${kind}`); }
   folderId() { return this.active?.kind === 'folder' ? this.active.id : this.active?.parent_id || null; }
   isDiagram() { return this.enabled() && this.active?.kind === 'diagram'; }
@@ -188,33 +189,75 @@ class MindSpace extends PageController {
     const isSpace = button.dataset.target === 'space', id = Number(button.dataset.id);
     const target = (isSpace ? this.spaces() : this.allItems()).find(item => item.id === id);
     if (!target) return;
-    const container = isSpace || target.kind === 'folder';
     const spaceId = isSpace ? id : target.mindspace_id || this.spaceId();
-    const context = `data-space="${spaceId}" data-parent="${isSpace ? 0 : id}"`;
-    const option = (action, label, attrs = '', symbol = '', extra = '') => `<button type="button" role="menuitem" data-action="${action}" ${attrs} class="${extra}">${symbol}<span>${esc(label)}</span></button>`;
+    const parent = isSpace ? 0 : target.kind === 'folder' ? id : target.parent_id || 0;
+    const context = `data-space="${spaceId}" data-parent="${parent}"`;
+    const option = (action, label, attrs = '', symbol = '', extra = '') => `<button type="button" role="menuitem" tabindex="-1" data-action="${action}" ${attrs} class="${extra}">${symbol}<span>${esc(label)}</span></button>`;
     const menu = document.createElement('div');
     menu.id = 'ms-context-menu'; menu.className = 'ms-context-menu'; menu.setAttribute('role', 'menu');
     menu.setAttribute('aria-label', t('ms_options_for', {name:target.name}));
-    menu.innerHTML = `<p class="ms-context-title">${esc(target.name)}</p>` + (container ? this.kinds().map(kind => option('ms-new-kind', t('ms_create_kind', {kind:this.kindLabel(kind)}), `${context} data-kind="${kind}"`, this.kindIcon(kind))).join('') : '')
-      + (isSpace ? option('ms-space-new', t('ms_new_space'), '', icon('plus')) : '')
-      + (container ? '<hr role="separator">' : '')
+    menu.innerHTML = `<p class="ms-context-title">${esc(target.name)}</p><div class="ms-context-new" role="none">
+      <button type="button" role="menuitem" tabindex="-1" id="ms-context-new" aria-haspopup="menu" aria-expanded="false" aria-controls="ms-context-submenu">${icon('plus')}<span>${esc(t('ms_menu_new'))}</span><span class="ms-context-chevron" aria-hidden="true">›</span></button>
+      <div id="ms-context-submenu" class="ms-context-submenu" role="menu" aria-labelledby="ms-context-new" hidden>`
+      + this.kinds().map(kind => option('ms-new-kind', t('ms_create_kind', {kind:this.kindLabel(kind)}), `${context} data-kind="${kind}"`, this.kindIcon(kind))).join('')
+      + (isSpace ? '<hr role="separator">' + option('ms-space-new', t('ms_new_space'), '', icon('plus')) : '')
+      + '</div></div><hr role="separator">'
       + option(isSpace ? 'ms-space-rename' : 'ms-rename', t('ms_rename'), `data-id="${id}"`)
       + option(isSpace ? 'ms-space-delete' : 'ms-delete', t('delete'), `data-id="${id}"`, '', 'is-danger');
     document.body.append(menu); this.menuTrigger = button;
     button.setAttribute('aria-expanded', 'true'); button.setAttribute('aria-controls', menu.id);
-    const rect = button.getBoundingClientRect();
+    const branch = menu.querySelector('.ms-context-new'), newButton = menu.querySelector('#ms-context-new');
+    branch.addEventListener('mouseenter', () => this.newSubmenu(true));
+    branch.addEventListener('mouseleave', () => this.newSubmenu(false));
+    newButton.addEventListener('click', () => this.newSubmenu(true, true));
+    menu.addEventListener('focusin', event => {
+      if (!branch.contains(event.target)) this.newSubmenu(false);
+    });
+    this.positionMenu();
+    newButton.focus();
+  }
+  positionMenu() {
+    const menu = document.getElementById('ms-context-menu');
+    if (!menu || !this.menuTrigger) return;
+    const rect = this.menuTrigger.getBoundingClientRect();
     menu.style.left = `${Math.max(8, Math.min(rect.right + 6, window.innerWidth - menu.offsetWidth - 8))}px`;
     menu.style.top = `${Math.max(8, Math.min(rect.top, window.innerHeight - menu.offsetHeight - 8))}px`;
-    menu.querySelector('button')?.focus();
+  }
+  newSubmenu(open, focusFirst = false) {
+    const submenu = document.getElementById('ms-context-submenu'), button = document.getElementById('ms-context-new');
+    if (!submenu || !button) return;
+    if (!open && submenu.contains(document.activeElement)) button.focus();
+    submenu.hidden = !open;
+    button.setAttribute('aria-expanded', String(open));
+    this.positionMenu();
+    if (!open) return;
+    const menu = document.getElementById('ms-context-menu'), rect = menu.getBoundingClientRect();
+    const left = rect.right + submenu.offsetWidth <= window.innerWidth - 8 ? rect.right - 1 : rect.left - submenu.offsetWidth + 1;
+    submenu.style.left = `${Math.max(8, Math.min(left, window.innerWidth - submenu.offsetWidth - 8))}px`;
+    submenu.style.top = `${Math.max(8, Math.min(button.getBoundingClientRect().top - 6, window.innerHeight - submenu.offsetHeight - 8))}px`;
+    if (focusFirst) submenu.querySelector('[role="menuitem"]')?.focus();
   }
   menuKeydown(event) {
     const menu = document.getElementById('ms-context-menu');
     if (!menu) return;
-    if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); this.closeMenu(true); return; }
+    const submenu = document.getElementById('ms-context-submenu'), newButton = document.getElementById('ms-context-new');
+    if (event.key === 'Escape') {
+      event.preventDefault(); event.stopPropagation();
+      if (submenu && !submenu.hidden) { this.newSubmenu(false); newButton.focus(); }
+      else this.closeMenu(true);
+      return;
+    }
     if (event.key === 'Tab') { this.closeMenu(true); return; }
+    if (event.key === 'ArrowRight' && event.target === newButton) {
+      event.preventDefault(); this.newSubmenu(true, true); return;
+    }
+    if (event.key === 'ArrowLeft' && submenu?.contains(event.target)) {
+      event.preventDefault(); this.newSubmenu(false); newButton.focus(); return;
+    }
     if (!menu.contains(event.target) || !['ArrowDown','ArrowUp','Home','End'].includes(event.key)) return;
     event.preventDefault();
-    const options = [...menu.querySelectorAll('[role="menuitem"]')], index = options.indexOf(event.target);
+    const currentMenu = event.target.closest('[role="menu"]');
+    const options = [...currentMenu.querySelectorAll('[role="menuitem"]')].filter(option => option.closest('[role="menu"]') === currentMenu), index = options.indexOf(event.target);
     options[event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1 : (index + (event.key === 'ArrowUp' ? -1 : 1) + options.length) % options.length]?.focus();
   }
 
@@ -378,7 +421,7 @@ class MindSpace extends PageController {
     finally { button.disabled = false; this.busy = false; }
   }
 
-  kinds() { return ['folder','diagram','spreadsheet','kanban','scrum','habits','notes']; }
+  kinds() { return ['folder','diagram','spreadsheet','kanban','habits','notes']; }
   creationContext(button) {
     return {spaceId:Number(button.dataset.space) || this.spaceId(), parent:button.dataset.parent !== undefined ? Number(button.dataset.parent) || null : this.folderId()};
   }

@@ -58,9 +58,32 @@ def run(owner, stranger, guest, check):
  check(current(sheet['id'])['version']==sheet['version'], 'Spreadsheet size and cell limits reject invalid writes atomically')
  for kind in ['kanban','scrum']:
   board=create(kind,kind,root['id'])
-  content={'cards':[{'id':str(uuid.uuid4()),'title':'Planificar','description':'Primera tarea','status':'todo','points':3}], 'sprint':{'name':'Sprint 1','goal':'Entregar','start':'2026-11-24','end':'2026-11-30'}}
+  assert board['kind']=='kanban' and [c['name'] for c in board['content']['columns']]==['Pending','To Do','In Progress','Done']
+  content={'cards':[{'id':str(uuid.uuid4()),'title':'Planificar','description':'Primera tarea','status':'todo','points':3}], 'columns':board['content']['columns'], 'sprint':{'name':'Sprint 1','goal':'Entregar','start':'2026-11-24','end':'2026-11-30'}}
   board=save(board,content); content['cards'][0]['status']='done'; board=save(board,content)
   check(current(board['id'])['content']==content, kind+' cards, status changes and sprint details persist')
+ custom={'id':str(uuid.uuid4()),'name':'Review'}
+ content['columns']=content['columns']+[custom]
+ content['cards'][0]['status']=custom['id']
+ prior_version=board['version'];board=save(board,content)
+ check(current(board['id'])['content']==content and board['kind']=='kanban', 'Unified boards persist custom columns, cards in those columns and sprint metadata')
+ legacy={'cards':content['cards'],'sprint':content['sprint']}
+ board=save(board,legacy)
+ check(current(board['id'])['content']['columns']==content['columns'], 'Clients omitting columns cannot erase custom columns')
+ call('saveMindSpaceItem',{'id':board['id'],'version':prior_version,'content':content},409)
+ call('saveMindSpaceItem',{'id':board['id'],'version':board['version'],'content':content},404,client=stranger)
+ invalid_columns=[None,[],content['columns'][1:],content['columns']+[custom],content['columns']+[{'id':str(uuid.uuid4()),'name':'review'}],
+  content['columns']+[{'id':'not-a-uuid','name':'Invalid'}],content['columns']+[{'id':str(uuid.uuid4()),'name':' '}],
+  content['columns']+[{'id':str(uuid.uuid4()),'name':'x'*81}],content['columns']+[{'id':str(uuid.uuid4()),'name':'pending'}],
+  content['columns']+[{'id':str(uuid.uuid4()),'name':f'Extra {i}'} for i in range(46)]]
+ for columns in invalid_columns:
+  call('saveMindSpaceItem',{'id':board['id'],'version':board['version'],'content':dict(content,columns=columns)},422)
+ call('saveMindSpaceItem',{'id':board['id'],'version':board['version'],'content':dict(content,cards=[dict(content['cards'][0],status=str(uuid.uuid4()))])},422)
+ check(current(board['id'])==board, 'Invalid columns, unknown card states, stale writes and other users cannot corrupt a board')
+ alias_key=str(uuid.uuid4())
+ alias=call('createMindSpaceItem',{'kind':'scrum','name':'Unified retry','client_key':alias_key})
+ alias_retry=call('createMindSpaceItem',{'kind':'kanban','name':'Unified retry','client_key':alias_key})
+ check(alias==alias_retry and alias['kind']=='kanban', 'Legacy Scrum creation and unified Kanban creation share one idempotent board type')
  habits=create('habits','Hábitos del proyecto',root['id'])
  habits=call('addMindSpaceHabit',{'id':habits['id'],'version':habits['version'],'habit':{'name':'Leer','category_id':0,'goal':1,'unit':'sesión'}})
  habit_id=habits['content']['habit_ids'][0]

@@ -3,6 +3,38 @@ declare(strict_types=1);
 
 final class MindSpacesModel extends BaseModel
 {
+    private static function boardKind(string $kind): string { return $kind === 'scrum' ? 'kanban' : $kind; }
+
+    private static function defaultColumns(): array
+    {
+        // Keep the saved backlog ID so existing cards and diagram links remain valid.
+        return [['id' => 'backlog', 'name' => 'Pending'], ['id' => 'todo', 'name' => 'To Do'],
+            ['id' => 'doing', 'name' => 'In Progress'], ['id' => 'done', 'name' => 'Done']];
+    }
+
+    private static function boardColumns(mixed $columns): array
+    {
+        if (!is_array($columns) || !array_is_list($columns) || count($columns) < 4 || count($columns) > 50) fail('error_validation');
+        $defaults = self::defaultColumns(); $clean = []; $ids = []; $names = [];
+        foreach ($columns as $index => $column) {
+            if (!is_array($column)) fail('error_validation');
+            $id = $column['id'] ?? null;
+            if (!is_string($id) || isset($ids[$id])) fail('error_validation');
+            if ($index < 4) {
+                if ($id !== $defaults[$index]['id']) fail('error_validation');
+                $name = $defaults[$index]['name'];
+            } else {
+                if (!preg_match('/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/D', $id)) fail('error_validation');
+                $name = Validate::text($column, 'name', 80);
+            }
+            $key = mb_strtolower($name);
+            if (isset($names[$key])) fail('ms_column_exists');
+            $ids[$id] = true; $names[$key] = true;
+            $clean[] = ['id' => $id, 'name' => $name];
+        }
+        return $clean;
+    }
+
     public function available(): bool
     {
         // Keep the existing editor usable until both MindSpace migrations are installed.
@@ -111,7 +143,7 @@ final class MindSpacesModel extends BaseModel
         } elseif (in_array($item['kind'], ['kanban', 'scrum'], true) && $target['type'] === 'card') {
             $valid = in_array($target['id'], array_column($content['cards'], 'id'), true);
         } elseif (in_array($item['kind'], ['kanban', 'scrum'], true) && $target['type'] === 'column') {
-            $valid = in_array($target['id'], $item['kind'] === 'scrum' ? ['backlog','todo','doing','done'] : ['todo','doing','done'], true);
+            $valid = in_array($target['id'], array_column($content['columns'] ?? self::defaultColumns(), 'id'), true);
         } elseif ($item['kind'] === 'habits' && $target['type'] === 'habit') {
             $valid = in_array((int) $target['id'], $content['habit_ids'], true)
                 && $this->db->one('SELECT id FROM habits WHERE id=? AND owner_user_id=?', [(int) $target['id'], $this->uid()]);
@@ -164,6 +196,8 @@ final class MindSpacesModel extends BaseModel
     private static function response(array $item): array
     {
         $item['content'] = json_decode($item['content_json'], true, 32, JSON_THROW_ON_ERROR);
+        $item['kind'] = self::boardKind($item['kind']);
+        if ($item['kind'] === 'kanban') $item['content']['columns'] ??= self::defaultColumns();
         if ($item['kind'] === 'spreadsheet') $item['content']['cells'] = (object) $item['content']['cells'];
         unset($item['content_json'], $item['client_key']);
         return $item;
@@ -173,12 +207,13 @@ final class MindSpacesModel extends BaseModel
     {
         $space = $this->space(true, $data['mindspace_id'] ?? null);
         $kind = Validate::choice($data['kind'] ?? '', ['folder','diagram','spreadsheet','kanban','scrum','habits','notes']);
+        $kind = self::boardKind($kind);
         $name = Validate::text($data, 'name', 120);
         $key = Validate::text($data, 'client_key', 36);
         if (!preg_match('/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/D', $key)) fail('error_validation');
         $existing = $this->db->one('SELECT id,kind FROM mindspace_items WHERE mindspace_id=? AND client_key=?', [$space['id'], $key]);
         if ($existing) {
-            if ($existing['kind'] !== $kind) fail('error_validation');
+            if (self::boardKind($existing['kind']) !== $kind) fail('error_validation');
             return self::response($this->item((int) $existing['id']));
         }
         $parent = $this->parent($data['parent_id'] ?? null, null, (int) $space['id']);
@@ -195,7 +230,7 @@ final class MindSpacesModel extends BaseModel
             'notes' => ['text' => ''],
             'spreadsheet' => ['rows' => 30, 'columns' => 10, 'cells' => new stdClass()],
             'habits' => ['habit_ids' => []],
-            default => ['cards' => [], 'sprint' => ['name' => '', 'goal' => '', 'start' => null, 'end' => null]],
+            default => ['cards' => [], 'columns' => self::defaultColumns(), 'sprint' => ['name' => '', 'goal' => '', 'start' => null, 'end' => null]],
         };
         $this->db->run('INSERT INTO mindspace_items(mindspace_id,parent_id,kind,name,content_json,client_key,sort_order) VALUES (?,?,?,?,?,?,?)',
             [$space['id'], $parent, $kind, $name, json_encode($content, JSON_THROW_ON_ERROR), $key, $this->nextOrder((int) $space['id'])]);
@@ -212,10 +247,10 @@ final class MindSpacesModel extends BaseModel
             (new DiagramsModel($this->db, $this->user))->save(['id' => $item['diagram_id'], 'name' => $name, 'version' => (int) ($data['diagram_version'] ?? 0)]);
             $content = $item['content_json'];
         } else {
-            $content = array_key_exists('content', $data) ? json_encode($this->content($item['kind'], $data['content']), JSON_THROW_ON_ERROR) : $item['content_json'];
+            $content = array_key_exists('content', $data) ? json_encode($this->content($item['kind'], $data['content'], json_decode($item['content_json'], true, 32, JSON_THROW_ON_ERROR)), JSON_THROW_ON_ERROR) : $item['content_json'];
         }
         if (strlen($content) > 1000000) fail('error_validation');
-        $this->db->run('UPDATE mindspace_items SET name=?,content_json=?,version=version+1,updated_at=UTC_TIMESTAMP() WHERE id=?', [$name, $content, $item['id']]);
+        $this->db->run('UPDATE mindspace_items SET name=?,kind=?,content_json=?,version=version+1,updated_at=UTC_TIMESTAMP() WHERE id=?', [$name, self::boardKind($item['kind']), $content, $item['id']]);
         return self::response($this->item((int) $item['id']));
     }
 
@@ -225,7 +260,7 @@ final class MindSpacesModel extends BaseModel
         return $value;
     }
 
-    private function content(string $kind, mixed $data): array
+    private function content(string $kind, mixed $data, array $existing = []): array
     {
         if (!is_array($data)) fail('error_validation');
         if ($kind === 'folder') return [];
@@ -253,6 +288,8 @@ final class MindSpacesModel extends BaseModel
         }
         $cards = $data['cards'] ?? null;
         if (!is_array($cards) || !array_is_list($cards) || count($cards) > 300) fail('error_validation');
+        // Clients that omit columns must not erase columns added in a newer editor.
+        $columns = self::boardColumns(array_key_exists('columns', $data) ? $data['columns'] : ($existing['columns'] ?? self::defaultColumns()));
         $clean = []; $seen = [];
         foreach ($cards as $card) {
             if (!is_array($card)) fail('error_validation');
@@ -262,14 +299,14 @@ final class MindSpacesModel extends BaseModel
             $points = $card['points'] ?? 0;
             if (!is_int($points) || $points < 0 || $points > 999) fail('error_validation');
             $clean[] = ['id' => $id, 'title' => Validate::text($card, 'title', 190), 'description' => self::text($card['description'] ?? '', 5000),
-                'status' => Validate::choice($card['status'] ?? '', $kind === 'scrum' ? ['backlog','todo','doing','done'] : ['todo','doing','done']), 'points' => $points];
+                'status' => Validate::choice($card['status'] ?? '', array_column($columns, 'id')), 'points' => $points];
         }
         $sprint = $data['sprint'] ?? [];
         if (!is_array($sprint)) fail('error_validation');
         $start = !empty($sprint['start']) ? Validate::date($sprint['start']) : null;
         $end = !empty($sprint['end']) ? Validate::date($sprint['end']) : null;
         if ($start && $end && $end < $start) fail('error_date');
-        return ['cards' => $clean, 'sprint' => ['name' => self::text($sprint['name'] ?? '', 120), 'goal' => self::text($sprint['goal'] ?? '', 5000), 'start' => $start, 'end' => $end]];
+        return ['cards' => $clean, 'columns' => $columns, 'sprint' => ['name' => self::text($sprint['name'] ?? '', 120), 'goal' => self::text($sprint['goal'] ?? '', 5000), 'start' => $start, 'end' => $end]];
     }
 
     public function addHabit(array $data): array

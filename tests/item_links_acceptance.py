@@ -48,7 +48,7 @@ def run(owner, other, guest, check):
         assert save(target)['nodes'][0]['link'] == current()['nodes'][0]['link'] == target
     check(True, 'Kanban and Scrum links keep the selected card ID')
 
-    for kind, statuses in [('kanban', ['todo', 'doing', 'done']), ('scrum', ['backlog', 'todo', 'doing', 'done'])]:
+    for kind, statuses in [('kanban', ['backlog', 'todo', 'doing', 'done']), ('scrum', ['backlog', 'todo', 'doing', 'done'])]:
         for status in statuses:
             target = link(targets[kind], 'column', status)
             assert save(target)['nodes'][0]['link'] == current()['nodes'][0]['link'] == target
@@ -61,6 +61,13 @@ def run(owner, other, guest, check):
     assert current()['nodes'][0]['link'] == target
     assert save(target)['nodes'][0]['link'] == target
     check(True, 'Moving cards between columns does not change a saved column destination')
+    custom_id = str(uuid.uuid4())
+    updated['columns'].append(dict(id=custom_id, name='Review'))
+    updated['cards'][0]['status'] = custom_id
+    targets['scrum'] = content(targets['scrum'], updated)
+    target = link(targets['scrum'], 'column', custom_id)
+    assert save(target)['nodes'][0]['link'] == current()['nodes'][0]['link'] == target
+    check(True, 'Links to custom board columns persist by stable ID alongside their cards')
 
     habits = targets['habits'] = owner.request('addMindSpaceHabit', dict(id=targets['habits']['id'],
         version=targets['habits']['version'], habit=dict(name='Link target habit', category_id=0,
@@ -81,7 +88,7 @@ def run(owner, other, guest, check):
         link(targets['kanban'], 'card', str(uuid.uuid4())), link(habits, 'habit', '987654321'),
         link(targets['folder'], 'unknown', 'anything'), link(private_board, 'column', 'todo'),
         link(sheet, 'column', 'todo'), link(targets['notes'], 'column', 'todo'),
-        link(targets['kanban'], 'column', 'backlog'), link(targets['scrum'], 'column', 'archived'),
+        link(targets['kanban'], 'column', custom_id), link(targets['scrum'], 'column', 'archived'),
         link(targets['scrum'], 'column', 'In progress'), link(targets['scrum'], 'column', 'todo<script>')]
     invalid += [link(sheet, 'cell', address) for address in ['A0', 'A01', 'a1', 'BA1', 'A201', 'A1:B3', 'A1<script>']]
     for value in invalid:

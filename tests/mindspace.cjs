@@ -60,7 +60,7 @@ test('board previews group cards under their status and keep empty columns selec
   assert.match(columns[2],/Working card/);assert.match(columns[2],/&lt;script>/);assert.doesNotMatch(columns[2],/<script>/);
   assert.match(columns[3],/Finished card/);
   for(const id of ['backlog','todo','doing','done']) assert.equal(LinkTargets.valid(board,{type:'column',id}),true);
-  assert.equal(LinkTargets.valid({...board,kind:'kanban'},{type:'column',id:'backlog'}),false);
+  assert.equal(LinkTargets.valid({...board,kind:'kanban'},{type:'column',id:'backlog'}),true);
   assert.equal(LinkTargets.valid(board,{type:'column',id:'In progress'}),false);
   assert.equal(LinkTargets.valid({kind:'notes',content:{text:''}},{type:'column',id:'todo'}),false);
   assert.equal(LinkTargets.label(board,{type:'column',id:'doing'}),'ms_status_doing');
@@ -235,6 +235,52 @@ test('column links focus the column and keep their return arrow separate from it
   assert.equal(focused,1);assert.equal(scrolled,1);assert.equal(tabindex,'-1');assert.equal(classes.has('ms-link-target'),true);
   await space.go(state.data.mindspace.items.find(item=>item.kind==='diagram'),undefined,{type:'topic',id:'root'});
   assert.equal(new URL(location.assigned).searchParams.has('column'),false);
+});
+
+test('creation offers one unified board and both legacy board kinds use four default columns',()=>{
+  const {space}=setup();
+  assert.equal(space.kinds().filter(kind=>['kanban','scrum'].includes(kind)).join(','),'kanban');
+  for(const kind of ['kanban','scrum']) {
+    assert.equal(LinkTargets.statuses({kind,content:{cards:[]}}).join(','),'backlog,todo,doing,done');
+  }
+});
+test('custom columns appear in the editor, card moves, link previews and return arrows',()=>{
+  const {space,state}=cellReturnFixture();
+  const id='12345678-1234-1234-1234-123456789abc';
+  space.active.kind='kanban';
+  space.draft={cards:[{id:'card',title:'Check the work',status:'todo',points:2}],sprint:{},
+    columns:[...LinkTargets.columns({kind:'kanban'}),{id,name:'Review'}]};
+  state.data.diagrams[0].nodes[0].link.target={type:'column',id};
+  space.editor.refresh=()=>{};
+  space.editor.moveCard('card',id);
+  assert.equal(space.draft.cards[0].status,id);
+  const html=space.editor.board();
+  assert.match(html,new RegExp(`data-ms-column="${id}"`));assert.match(html,/data-action="ms-column-new"/);
+  assert.match(html,new RegExp(`data-target-type="column" data-target-id="${id}"`));
+  const item={...space.active,content:space.draft};
+  assert.equal(LinkTargets.label(item,{type:'column',id}),'Review');
+  assert.match(LinkTargets.preview(item),/Review/);assert.match(LinkTargets.preview(item),/Check the work/);
+  assert.equal(LinkTargets.valid({...item,content:{...item.content,columns:item.content.columns.slice(0,4)}},{type:'column',id}),false);
+});
+test('adding a column saves its name and stable ID and rejects a duplicate name',async()=>{
+  const {space,context,home}=cellReturnFixture();
+  space.active.kind='kanban';space.draft={cards:[],sprint:{},columns:[...LinkTargets.columns({kind:'kanban'})]};
+  space.baseline=JSON.stringify(space.draft);
+  const form={addEventListener(type,handler){this[type]=handler;}};
+  context.document.getElementById=id=>id==='ms-column-form'?form:null;
+  context.document.querySelector=()=>null;
+  let modal,closed=false,pending,value='Review',sent;
+  context.openModal=(title,html)=>{modal={title,html};};context.closeModal=()=>{closed=true;};context.formFooter=()=>'';
+  context.crypto={randomUUID:()=> '12345678-1234-1234-1234-123456789abc'};
+  space.submit=(form,task)=>pending=task(new Map([['name',value]]));
+  space.editor.refresh=()=>{};
+  home.makeRequest=async(action,data)=>{sent=data;return {...space.active,content:data.content,version:space.active.version+1};};
+  await space.editor.newColumn();assert.equal(modal.title,'ms_add_column');
+  form.submit({preventDefault(){}});await pending;
+  assert.equal(sent.content.columns.length,5);assert.equal(sent.content.columns[4].name,'Review');
+  assert.equal(sent.content.columns[4].id,'12345678-1234-1234-1234-123456789abc');assert.equal(closed,true);assert.equal(space.dirty(),false);
+  value=' review ';await space.editor.newColumn();form.submit({preventDefault(){}});
+  await assert.rejects(pending,/ms_column_exists/);assert.equal(space.draft.columns.length,5);
 });
 
 function multiple(url='http://localhost/?space=200&folder=0') {
