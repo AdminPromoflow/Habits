@@ -1,5 +1,14 @@
 # Verificación realizada
 
+## Nombre propio, hijos vacíos y distribución radial — 23 de noviembre de 2026
+
+- Título independiente en un recuadro fijo arriba a la izquierda: doble clic o Enter/F2 para editar, cursor al final, Enter o pérdida de foco para guardar, Escape para cancelar y nombre vacío para conservar el anterior. Cambiar de diagrama guarda primero el título pendiente. La API conserva el texto raíz, hijos, estilos y anchos al renombrar.
+- El botón «+» crea una idea vacía con foco y cursor, sin texto predeterminado. Los borradores vacíos no se envían a la base; escribir activa el guardado y cancelar un borrador no elimina una idea ya enviada o guardada.
+- Radial habilitado en el selector, con distribución circular y las mismas opciones de alcance y persistencia que los demás estilos. Las ocho distribuciones están disponibles.
+- 122 pruebas JavaScript aprobadas en el estado integrado del proyecto; 136 comprobaciones HTTP y 7 de esquema/fuentes aprobadas en una base aislada. Incluyen independencia del título, concurrencia, cambio de cuenta, validación, guardado y relectura del árbol.
+- Navegador local: título guardado y recuperado al recargar, texto raíz intacto, Escape restaura el título, selección de otro diagrama conserva sus nombres; hijo vacío con foco y selección `[0,0]`, texto escrito y recuperado después; Radial conservado al recargar. Sin errores de consola en el recorrido final. Capturas: `tests/.runtime/diagram-title-and-blank-child.png` y `tests/.runtime/diagram-radial-enabled.png`.
+- Cambios guardados localmente; no se publicaron archivos. Estas tres funciones utilizan los campos existentes del modelo de diagramas.
+
 ## Múltiples diagramas y recarga al seleccionarlos — 23 de noviembre de 2026
 
 - Selector «Mis diagramas» y botón persistente «Crear diagrama», sin límite de cantidad impuesto por la interfaz. Cada creación conserva los árboles anteriores y reinicia el lienzo; las pulsaciones durante una creación en curso no la duplican.

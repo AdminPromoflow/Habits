@@ -37,7 +37,7 @@ No registrar la migración si falla alguna consulta anterior. Con el ejecutor CL
 - `(diagram_id, parent_key)` referencia otro nodo del mismo diagrama. La API valida una única raíz, todos los padres, ciclos, hasta 200 nodos y 30 niveles de descendencia.
 - `layout_mode` nulo significa heredar del ancestro más cercano que tenga un estilo propio. Una elección propia guarda modo y direcciones sin copiarlos en todos sus descendientes. El selector permite reemplazar estilos en toda la rama o en todo el diagrama.
 - `node_width` nulo usa el ancho predeterminado; un valor numérico guarda el ancho de ese cuadro, sin heredarlo a sus hijos. En la API se llama `width`. Omitir el campo conserva el ancho anterior del mismo nodo, mientras que enviar `null` lo restablece.
-- El texto raíz coincide con `diagrams.name`. Los clientes anteriores que guardan solo el nombre conservan hijos, estilos, posiciones y anchos.
+- `diagrams.name` es el título independiente del diagrama; `diagram_nodes.text` conserva el texto de cada idea, incluida la raíz. Crear sin nodos inicializa la raíz con el nombre una sola vez. Renombrar sin enviar nodos conserva todo el árbol. Esta separación utiliza las columnas existentes y no requiere una nueva migración.
 - Un guardado reemplaza la instantánea del árbol en la misma transacción y con el mismo control de versión del diagrama. Primero desvincula los padres antiguos, después reemplaza nodos y reconstruye sus relaciones; no modifica árboles de otras cuentas.
 - La restricción de padre es inmediata. Una futura operación de borrado de un diagrama o usuario con nodos deberá desvincular primero esas relaciones, como hace el guardado, antes de eliminar su árbol.
 
