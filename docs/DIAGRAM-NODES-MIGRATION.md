@@ -6,6 +6,8 @@ La migración `database/migrations/007_diagram_node_width.sql` añade el ancho i
 
 ## Aplicación al subir la actualización
 
+La migración `009_diagram_node_checkbox.sql` añade `checkbox_state`: `NULL` sin casilla, `0` sin marcar y `1` marcada. En la API se llama `checkbox` y admite `null`, `false` o `true`. Omitirlo conserva el estado anterior; enviarlo como `null` quita la casilla. Los cuadros existentes empiezan sin casilla. Aplicar las migraciones pendientes en orden, incluida la 008 de contenido de nodos y la 009, antes de habilitar los archivos actualizados.
+
 Antes de habilitar los archivos nuevos de `model/diagrams/` y `view/home/`, ejecutar desde la carpeta del proyecto en el servidor:
 
 ```sh

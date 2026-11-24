@@ -918,6 +918,7 @@ class HomePage extends PageController {
       this.menuOpen = true;
       this.checkboxMenuOpen = true;
       this.syncNodeState();
+      this.viewport.reveal(this.element('menu'));
       const value = this.ensureTree().find((item) => item.id === this.selectedKey)?.checkbox ?? null;
       this.element(`checkbox-${value === null ? 'none' : value ? 'checked' : 'unchecked'}`)?.focus({ preventScroll: true });
       return;
