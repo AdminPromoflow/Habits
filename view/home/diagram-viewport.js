@@ -136,7 +136,7 @@ class DiagramViewport {
   }
 
   ignoredTarget(target) {
-    return !!target.closest?.('.diagram-title, .diagram-menu, .diagram-controls, textarea:not([readonly]), button, input, select, a, [data-action], [contenteditable="true"]');
+    return !!target.closest?.('.diagram-title, .diagram-menu, .diagram-controls, .diagram-connection-tools, textarea:not([readonly]), button, input, select, a, [data-action], [contenteditable="true"]');
   }
 
   allowed(event) {

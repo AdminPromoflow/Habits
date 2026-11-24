@@ -17,8 +17,10 @@ class DiagramNodeTools {
     const keys = new Set(nodes.map((node) => node.id));
     const connections = this.home.connections.filter((edge) => keys.has(edge.from) && keys.has(edge.to));
     const hidden = this.home.hiddenConnections.filter((edge) => keys.has(edge.from) && keys.has(edge.to));
+    const styles = this.home.connectionStyles.filter(style => keys.has(style.from) && keys.has(style.to));
     this.memory = { userId: S.user?.id, nodes: JSON.parse(JSON.stringify(nodes)), root,
-      connections: connections.map((edge) => ({ ...edge })), hidden_connections: hidden.map(edge => ({ ...edge })) };
+      connections: connections.map((edge) => ({ ...edge })), hidden_connections: hidden.map(edge => ({ ...edge })),
+      connection_styles: JSON.parse(JSON.stringify(styles)) };
     try { sessionStorage.setItem('diagram-clipboard', JSON.stringify(this.memory)); } catch { /* In-memory fallback. */ }
   }
 
@@ -54,6 +56,8 @@ class DiagramNodeTools {
       .map((edge) => ({ from: keys.get(edge.from), to: keys.get(edge.to) }));
     const hidden = (clipboard.hidden_connections || []).filter(edge => keys.has(edge.from) && keys.has(edge.to))
       .map(edge => ({ from: keys.get(edge.from), to: keys.get(edge.to) }));
+    const styles = (clipboard.connection_styles || []).filter(edge => keys.has(edge.from) && keys.has(edge.to))
+      .map(edge => ({ ...edge, from: keys.get(edge.from), to: keys.get(edge.to), points: null }));
     if (home.connections.length + connections.length > 1000) { home.showStatus(t('diagram_connection_limit'), true); return; }
     const byId = new Map(combined.map((node) => [node.id, node]));
     for (const node of copies) {
@@ -70,6 +74,7 @@ class DiagramNodeTools {
     home.nodes = combined;
     home.connections.push(...connections);
     home.hiddenConnections.push(...hidden);
+    home.connectionStyles.push(...styles);
     home.selectedKey = keys.get(clipboard.root);
     home.name = copies.find((node) => node.id === home.selectedKey).text;
     home.editing = false;
@@ -112,6 +117,7 @@ class DiagramNodeTools {
         home.nodes = home.treeFor(home.active);
         home.connections = home.connectionsFor(home.active);
         home.hiddenConnections = home.connectionsFor(home.active, 'hidden_connections');
+        home.connectionStyles = home.stylesFor(home.active);
         home.name = home.nodes[0].text;
         home.rememberDiagram();
       } else {
@@ -119,14 +125,16 @@ class DiagramNodeTools {
         home.nodes = home.nodes.filter((item) => !removed.has(item.id));
         home.connections = home.connections.filter((edge) => !removed.has(edge.from) && !removed.has(edge.to));
         home.hiddenConnections = home.hiddenConnections.filter(edge => !removed.has(edge.from) && !removed.has(edge.to));
+        home.connectionStyles = home.connectionStyles.filter(edge => !removed.has(edge.from) && !removed.has(edge.to));
         for (const id of removed) { home.childDrafts.delete(id); home.submittedChildren.delete(id); home.draftOrigins.delete(id); }
         if (key === 'root') {
           // Keep the stable canvas anchor while preserving the other trees.
           const nextRoot = home.nodes.find((item) => item.parent_id === null);
           const previousKey = nextRoot.id;
           nextRoot.id = 'root';
-          for (const field of ['connections', 'hiddenConnections']) {
+          for (const field of ['connections', 'hiddenConnections', 'connectionStyles']) {
             home[field] = home[field].map(edge => ({
+              ...edge,
               from: edge.from === previousKey ? 'root' : edge.from,
               to: edge.to === previousKey ? 'root' : edge.to,
             }));

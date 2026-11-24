@@ -308,12 +308,14 @@ const DiagramLayout = (() => {
     const edges = nodes.filter((node) => node.parent_id != null).map((node) => {
       const from = byId.get(node.parent_id);
       const to = byId.get(node.id);
-      return { from: from.id, to: to.id, path: edgePath(from, to, raw, children.get(from.id)) };
+      const points = simplifyPoints(edgePoints(from, to, raw, children.get(from.id)));
+      return { from: from.id, to: to.id, points, path: roundedOrthogonal(points) };
     });
     for (const edge of connections) {
       const from = byId.get(edge.from), to = byId.get(edge.to);
       if (!from || !to || from === to) continue;
-      edges.push({ from: from.id, to: to.id, path: connectionPath(from, to, raw) });
+      const points = simplifyPoints(edgePoints(from, to, raw, [to]));
+      edges.push({ from: from.id, to: to.id, points, path: roundedOrthogonal(points) });
     }
     return {
       nodes: raw,
@@ -340,7 +342,7 @@ const DiagramLayout = (() => {
       Math.abs(by - ay) / ((from.height + to.height) / 2);
   }
 
-  function edgePath(from, to, nodes, siblings) {
+  function edgePoints(from, to, nodes, siblings) {
     const ax = from.x + from.width / 2;
     const ay = from.y + from.height / 2;
     const bx = to.x + to.width / 2;
@@ -366,7 +368,7 @@ const DiagramLayout = (() => {
         [startX, ay], [startX + sign * 4, ay], [startX + sign * 4, lane],
         [endX - sign * 4, lane], [endX - sign * 4, by], [endX, by],
       ]);
-      return roundedOrthogonal(clearRoute(direct, lanes, nodes, from, to));
+      return clearRoute(direct, lanes, nodes, from, to);
     }
     const sign = by >= ay ? 1 : -1;
     const startY = ay + sign * from.height / 2;
@@ -378,11 +380,11 @@ const DiagramLayout = (() => {
       [ax, startY], [ax, startY + sign * 4], [lane, startY + sign * 4],
       [lane, endY - sign * 4], [bx, endY - sign * 4], [bx, endY],
     ]);
-    return roundedOrthogonal(clearRoute(direct, lanes, nodes, from, to));
+    return clearRoute(direct, lanes, nodes, from, to);
   }
 
   function connectionPath(from, to, nodes = [from, to]) {
-    return edgePath(from, to, nodes, [to]);
+    return roundedOrthogonal(edgePoints(from, to, nodes, [to]));
   }
 
   function clearRoute(direct, alternatives, nodes, from, to) {
@@ -402,7 +404,7 @@ const DiagramLayout = (() => {
     return alternatives.filter(clear).sort((a, b) => length(a) - length(b))[0] || direct;
   }
 
-  function roundedOrthogonal(waypoints) {
+  function simplifyPoints(waypoints) {
     const points = [];
     for (const point of waypoints) {
       const previous = points[points.length - 1];
@@ -415,6 +417,11 @@ const DiagramLayout = (() => {
       }
       points.push(point);
     }
+    return points;
+  }
+
+  function roundedOrthogonal(waypoints) {
+    const points = simplifyPoints(waypoints);
     let path = `M${points[0][0]},${points[0][1]}`;
     for (let index = 1; index < points.length - 1; index++) {
       const previous = points[index - 1];
@@ -448,5 +455,6 @@ const DiagramLayout = (() => {
     return `<svg viewBox="0 0 ${plan.width} ${plan.height}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><g fill="none" stroke="#a8cede" stroke-width="3">${paths}</g><g stroke="#83bad1" stroke-width="2">${boxes}</g></svg>`;
   }
 
-  return Object.freeze({ modes: Object.freeze([...MODES]), defaults, effective, arrange, connectionPath, preview });
+  return Object.freeze({ modes: Object.freeze([...MODES]), defaults, effective, arrange, connectionPath, preview,
+    simplifyPoints, orthogonalPath: roundedOrthogonal });
 })();

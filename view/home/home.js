@@ -8,7 +8,7 @@ class HomePage extends PageController {
     this.nodeTools = new DiagramNodeTools(this);
     this.generation = 0;
     this.viewport = new DiagramViewport({
-      canInteract: () => !this.drag && !this.resizing && !this.connectionTool?.drag && !this.layoutOpen && !this.titleEditing,
+      canInteract: () => !this.drag && !this.resizing && !this.connectionTool?.drag && !this.connectionTool?.editingRoute && !this.layoutOpen && !this.titleEditing,
       onInteractionStart: () => {
         this.menuOpen = false;
         this.syncNodeState();
@@ -212,6 +212,7 @@ class HomePage extends PageController {
     this.nodes = null;
     this.connections = [];
     this.hiddenConnections = [];
+    this.connectionStyles = [];
     this.childDrafts = new Set();
     this.draftOrigins = new Map();
     this.submittedChildren = new Map();
@@ -247,6 +248,7 @@ class HomePage extends PageController {
       this.nodes = this.treeFor(this.active);
       this.connections = this.connectionsFor(this.active);
       this.hiddenConnections = this.connectionsFor(this.active, 'hidden_connections');
+      this.connectionStyles = this.stylesFor(this.active);
       this.name = this.nodes.find((node) => node.id === 'root')?.text || '';
       this.diagramTitle = this.active?.name || '';
       this.rememberDiagram();
@@ -501,6 +503,15 @@ class HomePage extends PageController {
     return JSON.stringify(connections.map((edge) => [edge.from, edge.to].sort().join(':')).sort());
   }
 
+  stylesFor(diagram) {
+    return JSON.parse(JSON.stringify(diagram?.connection_styles || []));
+  }
+
+  styleFingerprint(styles) {
+    return JSON.stringify(styles.map(style => JSON.stringify([style.from, style.to, style.points || null,
+      style.label || '', style.arrows || 'none'])).sort());
+  }
+
   ensureTree() {
     if (!this.nodes) this.nodes = this.treeFor(this.active);
     return this.nodes;
@@ -545,6 +556,7 @@ class HomePage extends PageController {
     return !!this.draft || this.titleName() !== this.active.name ||
       this.connectionFingerprint(this.connections) !== this.connectionFingerprint(this.connectionsFor(this.active)) ||
       this.connectionFingerprint(this.hiddenConnections) !== this.connectionFingerprint(this.connectionsFor(this.active, 'hidden_connections')) ||
+      this.styleFingerprint(this.connectionStyles) !== this.styleFingerprint(this.stylesFor(this.active)) ||
       this.fingerprint(nodes) !== this.fingerprint(this.treeFor(this.active));
   }
 
@@ -1104,6 +1116,7 @@ class HomePage extends PageController {
       this.nodeTools.busy ||
       this.connectionTool.drag ||
       this.connectionTool.selected ||
+      this.connectionTool.editingRoute ||
       this.error ||
       this.layoutOpen ||
       this.drag ||
@@ -1146,6 +1159,7 @@ class HomePage extends PageController {
       : { client_key: this.draft.client_key, name, nodes };
     data.connections = this.connections.map((edge) => ({ ...edge }));
     data.hidden_connections = this.hiddenConnections.map((edge) => ({ ...edge }));
+    data.connection_styles = this.stylesFor({ connection_styles: this.connectionStyles });
     this.saving = true;
     for (const node of nodes) {
       if (this.childDrafts.has(node.id)) this.submittedChildren.set(node.id, node.text);
@@ -1159,6 +1173,7 @@ class HomePage extends PageController {
       diagram.nodes ||= nodes.map((node) => ({ ...node }));
       diagram.connections ||= data.connections;
       diagram.hidden_connections ||= data.hidden_connections;
+      diagram.connection_styles ||= data.connection_styles;
       const created = !!this.draft;
       this.active = diagram;
       // Keep any pan/zoom made while the new diagram's first save was pending.

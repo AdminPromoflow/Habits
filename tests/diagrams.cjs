@@ -153,6 +153,8 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
     clearTimeout: (id) => timers.delete(id),
   });
   vm.runInContext(fs.readFileSync('view/home/diagram-node-tools.js', 'utf8'), context);
+  vm.runInContext(fs.readFileSync('view/home/diagram-layout.js', 'utf8'), context);
+  vm.runInContext(fs.readFileSync('view/home/diagram-routing.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('view/home/diagram-connections.js', 'utf8'), context);
   const HomePage = vm.runInContext(fs.readFileSync('view/home/home.js', 'utf8') + '\nHomePage;', context);
   const home = new HomePage();
@@ -2719,4 +2721,80 @@ test('copying and removing branches preserve or prune hidden parent lines along 
   await home.nodeTools.remove();
   assert.equal(home.hiddenConnections.length, 1);
   assert.equal(home.hiddenConnections[0].from, pasted);
+});
+
+function routeEditor(points = [[0,0],[200,0]]) {
+  const fixture = branchDragEditor();
+  const line = fixture.addConnectionElement('root', 'branch');
+  fixture.home.plan = { origin: {x:0,y:0}, edges: [{ from:'root', to:'branch', points, path:'M0,0 L200,0' }] };
+  fixture.home.positionTree = () => fixture.home.connectionTool.render(line.svg, fixture.home.plan.edges);
+  fixture.home.connectionTool.point = event => [event.clientX / fixture.home.viewport.scale, event.clientY / fixture.home.viewport.scale];
+  fixture.home.positionTree();
+  fixture.click(line.hit);
+  return {...fixture, ...line};
+}
+
+test('dragging a selected connector saves its bends without moving nodes and retains them after reload', async () => {
+  const {home,pointer,hit,group,state,stage} = routeEditor();
+  const nodes = JSON.parse(JSON.stringify(home.nodes));
+  home.viewport.scale = 2;
+  pointer('pointerdown',hit,{clientX:200,clientY:0});
+  pointer('pointermove',hit,{clientX:200,clientY:80});
+  assert.equal(stage.hasPointerCapture(1),true);
+  assert.equal(home.viewport.options.canInteract(),false);
+  pointer('pointerup',stage,{clientX:200,clientY:80});
+  await new Promise(setImmediate);
+  assert.equal(stage.hasPointerCapture(1),false);
+  assert.equal(home.connectionTool.editingRoute,null);
+  const points=home.active.connection_styles[0].points;
+  assert.ok(points.some(p=>p[1]===40),'drag respects diagram zoom');
+  assert.deepEqual(JSON.parse(JSON.stringify(home.nodes)),nodes);
+  assert.equal(home.hasChanges(),false);
+  const restored=editor({draft:false,state:JSON.parse(JSON.stringify(state))});
+  restored.home.render();
+  assert.deepEqual(JSON.parse(JSON.stringify(restored.home.connectionStyles)),JSON.parse(JSON.stringify(home.connectionStyles)));
+});
+
+test('route Escape and pointer cancellation discard previews and release pointer capture without saving', () => {
+  for(const end of ['Escape','pointercancel']) {
+    const {home,pointer,hit,handleKey,stage}=routeEditor();
+    let calls=0;home.makeRequest=async()=>{calls++;};
+    pointer('pointerdown',hit,{clientX:100,clientY:0});
+    pointer('pointermove',hit,{clientX:100,clientY:30});
+    if(end==='Escape')handleKey('Escape',hit);else pointer(end,stage);
+    assert.equal(home.connectionTool.editingRoute,null);
+    assert.equal(stage.hasPointerCapture(1),false);
+    assert.equal(home.connectionStyles.length,0);
+    assert.equal(calls,0);
+  }
+});
+
+test('double-click inserts bends, and arrow settings and a label survive subsequent route edits', async () => {
+  const {home,hit,doubleClick}=routeEditor();
+  home.connectionTool.point=()=>[100,0];
+  doubleClick(hit);
+  await new Promise(setImmediate);
+  assert.ok(home.connectionStyles[0].points.length>2);
+  await home.connectionTool.setStyle({label:'Depende de <otra tarea>',arrows:'both'});
+  assert.equal(home.active.connection_styles[0].label,'Depende de <otra tarea>');
+  assert.equal(home.active.connection_styles[0].arrows,'both');
+  const points=JSON.parse(JSON.stringify(home.connectionStyles[0].points));
+  home.connectionTool.action('arrows-left');
+  await new Promise(setImmediate);
+  assert.equal(home.active.connection_styles[0].arrows,'start');
+  assert.deepEqual(JSON.parse(JSON.stringify(home.connectionStyles[0].points)),points);
+  home.connectionTool.action('arrows-right');
+  await new Promise(setImmediate);
+  assert.equal(home.active.connection_styles[0].arrows,'end');
+  home.connectionTool.action('arrows-both');
+  await new Promise(setImmediate);
+  assert.equal(home.active.connection_styles[0].arrows,'both');
+  home.connectionTool.action('arrows-none');
+  await new Promise(setImmediate);
+  assert.equal(home.active.connection_styles[0].arrows,'none');
+  home.connectionTool.action('delete');
+  await new Promise(setImmediate);
+  assert.equal(home.connectionStyles.length,0);
+  assert.equal(home.hiddenConnections.length,1);
+  assert.equal(home.nodes.length,5);
 });

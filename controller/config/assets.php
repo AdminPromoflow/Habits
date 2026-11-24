@@ -27,6 +27,7 @@ return [
         'view/global/modal.js',
         'view/auth/auth.js',
         'view/home/diagram-layout.js',
+        'view/home/diagram-routing.js',
         'view/home/diagram-layout-panel.js',
         'view/home/diagram-viewport.js',
         'view/home/diagram-node-tools.js',

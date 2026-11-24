@@ -86,5 +86,37 @@ def run(owner, other, guest, check):
     changed = copy.deepcopy(remaining['nodes'])
     next(n for n in changed if n['id'] == a)['parent_id'] = b
     check(save(nodes=changed)['hidden_connections'] == [], 'Reparenting removes obsolete hidden parent edges')
+    save(nodes=nodes, connections=links, hidden_connections=[])
+    styles = [dict(**{'from': 'root', 'to': a}, label='Depende de <otra tarea>', arrows='both',
+                   points=[[0, 0], [20.25, 0], [20.25, 40.5], [180, 40.5], [180, 0], [200, 0]]),
+              dict(**links[0], label='Conexión adicional', arrows='end', points=None)]
+    before = current()
+    styled = save(connection_styles=styles)
+    check(styled['connection_styles'] == styles and styled['nodes'] == before['nodes'] and styled['connections'] == links,
+          'Bends, literal labels and arrows persist for both tree and extra lines without altering nodes')
+    check(next(d for d in owner.boot()['data']['diagrams'] if d['id'] == initial['id']) == styled,
+          'Connection geometry, labels and arrows round-trip through bootstrap')
+    save(409, version=before['version'], connection_styles=[])
+    save(404, client=other, connection_styles=[])
+    save(401, client=guest, connection_styles=[])
+    check(current() == styled, 'Line formatting follows owner, authentication and stale-version protections')
+    malformed = [None, 'bad', [None], [styles[0], styles[0]], [dict(styles[0], to=foreign)],
+                 [dict(styles[0], label='x' * 121)], [dict(styles[0], arrows='invalid')]]
+    for points in [[], [[0, 0]], [[0, 0], [1, 1]], [[0, 0], ['x', 0]], [[0, 0], [1000001, 0]], [[0, 0, 0], [20, 0]], [[0, 0]] * 65]:
+        malformed.append([dict(styles[0], points=points)])
+    for bad in malformed:
+        save(422, name='Must roll back', connection_styles=bad)
+        assert current() == styled, 'Invalid connector style changed the diagram'
+    check(True, 'Invalid routes, labels, arrows, duplicate and foreign styles reject atomically')
+    check(save(nodes=nodes, connections=links)['connection_styles'] == styles,
+          'Older clients retain connection styles when editing nodes or extra lines')
+    for arrows in ['none', 'start', 'end', 'both']:
+        styles[0]['arrows'] = arrows
+        assert save(connection_styles=styles)['connection_styles'][0]['arrows'] == arrows
+    check(True, 'Every arrow-end combination persists independently of the label and geometry')
+    check(save(connections=[])['connection_styles'] == styles[:1],
+          'Deleting an extra line prunes its style without affecting other lines')
+    check(save(hidden_connections=[hidden[0]])['connection_styles'] == [],
+          'Deleting a parent line also removes its saved label, arrows and custom route')
     for diagram in [current(), foreign_diagram]:
         owner.request('deleteDiagram', dict(id=diagram['id'], version=diagram['version']), module='diagrams')

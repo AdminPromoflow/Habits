@@ -557,6 +557,18 @@ button.diagram-handle-arrows { cursor: ew-resize; touch-action: none; }
 .diagram-connection:hover .diagram-connection-line { stroke: var(--purple); stroke-width: 3; }
 .diagram-connection.is-selected .diagram-connection-line,
 .diagram-connection:focus-visible .diagram-connection-line { stroke: var(--purple-dark); stroke-width: 4; }
+.diagram-connections .diagram-arrow { stroke: var(--purple-dark); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.diagram-connection-label { fill: var(--ink); stroke: var(--surface, white); stroke-width: 6; stroke-linejoin: round; paint-order: stroke; font-family: inherit; font-size: 14px; text-anchor: middle; pointer-events: all; }
+.diagram-connection-tools { position: absolute; z-index: 5; transform: translate(-50%, -100%); padding-bottom: 12px; }
+.diagram-connection-tools .diagram-connection-more { position: relative; inset: auto; transform: none; font-size: 25px; line-height: 1; }
+.diagram-connection-menu { position: absolute; top: 34px; left: 0; width: 235px; padding: 8px; border: 1px solid var(--lavender); border-radius: 12px; background: var(--surface, white); box-shadow: 0 8px 25px #34304424; color: var(--ink); cursor: default; }
+.diagram-connection-menu button { display: block; width: 100%; padding: 9px 10px; border: 0; border-radius: 6px; background: none; color: inherit; text-align: left; font: inherit; font-size: 14px; cursor: pointer; }
+.diagram-connection-menu button:hover, .diagram-connection-menu button:focus-visible { background: #b8a4d430; }
+.diagram-connection-menu hr { border: 0; border-top: 1px solid #b8a4d440; margin: 5px 0; }
+.diagram-connection-menu label { display: block; padding: 5px 3px; font-size: 14px; }
+.diagram-connection-menu input { width: 100%; min-width: 0; margin: 4px 0; }
+.diagram-connection-label-actions { display: flex; }
+.mindmap-stage:focus { outline: none; }
 .diagram-root.is-selected:not(.is-editing) .diagram-node { cursor: grab; touch-action: none; }
 .diagram-root.is-dragging .diagram-node { cursor: grabbing; }
 

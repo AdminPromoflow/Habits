@@ -50,7 +50,7 @@ final class DiagramsModel extends BaseModel
         // The diagram title and the central idea are independent. A title-only
         // update preserves every node, including the root text and its styling.
         if ($writeNodes && $nodes !== null) $this->replaceNodes($id, $nodes);
-        if ($writeNodes && ($nodes !== null || array_key_exists('connections', $data) || array_key_exists('hidden_connections', $data))) $this->saveConnections($id, $data);
+        if ($writeNodes && ($nodes !== null || array_key_exists('connections', $data) || array_key_exists('hidden_connections', $data) || array_key_exists('connection_styles', $data))) $this->saveConnections($id, $data);
         $diagram = $this->db->one('SELECT id,name,version,created_at,updated_at,connections_json FROM diagrams WHERE id=? AND owner_user_id=?', [$id, $this->uid()]);
         $diagram['nodes'] = array_map(self::nodeResponse(...), $this->db->all('SELECT * FROM diagram_nodes WHERE diagram_id=? ORDER BY sort_order', [$id]));
         return self::diagramResponse($diagram);
@@ -61,6 +61,7 @@ final class DiagramsModel extends BaseModel
         $state = self::connectionState($diagram['connections_json']);
         $diagram['connections'] = $state['extra'];
         $diagram['hidden_connections'] = $state['hidden'];
+        $diagram['connection_styles'] = $state['styles'];
         unset($diagram['connections_json']);
         return $diagram;
     }
@@ -69,7 +70,7 @@ final class DiagramsModel extends BaseModel
     {
         $state = json_decode($json ?? '[]', true, 8, JSON_THROW_ON_ERROR);
         // The first release stored only the extra lines as a JSON list.
-        return array_is_list($state) ? ['extra' => $state, 'hidden' => []] : $state;
+        return array_is_list($state) ? ['extra' => $state, 'hidden' => [], 'styles' => []] : $state + ['styles' => []];
     }
 
     private function saveConnections(int $id, array $data): void
@@ -99,6 +100,42 @@ final class DiagramsModel extends BaseModel
                 $seen[$key] = true;
                 $state[$kind][] = ['from' => $from, 'to' => $to];
             }
+        }
+        $edges = [];
+        foreach ($parents as $to => $from) if ($from !== null) $edges[$from . ':' . $to] = true;
+        foreach ($state['extra'] as $edge) $edges[$edge['from'] . ':' . $edge['to']] = true;
+        foreach ($state['hidden'] as $edge) {
+            unset($edges[$edge['from'] . ':' . $edge['to']], $edges[$edge['to'] . ':' . $edge['from']]);
+        }
+        $explicitStyles = array_key_exists('connection_styles', $data);
+        $styles = $explicitStyles ? $data['connection_styles'] : $stored['styles'];
+        if (!is_array($styles) || !array_is_list($styles) || count($styles) > 1200) fail('error_validation');
+        $state['styles'] = []; $seen = [];
+        foreach ($styles as $style) {
+            if (!is_array($style) || !is_string($style['from'] ?? null) || !is_string($style['to'] ?? null)) fail('error_validation');
+            $key = $style['from'] . ':' . $style['to'];
+            if (!isset($edges[$key]) && !$explicitStyles) continue;
+            if (!isset($edges[$key]) || isset($seen[$key])) fail('error_validation');
+            $seen[$key] = true;
+            $points = $style['points'] ?? null;
+            if ($points !== null) {
+                if (!is_array($points) || !array_is_list($points) || count($points) < 2 || count($points) > 64) fail('error_validation');
+                foreach ($points as &$point) {
+                    if (!is_array($point) || !array_is_list($point) || count($point) !== 2) fail('error_validation');
+                    foreach ($point as &$value) {
+                        if ((!is_int($value) && !is_float($value)) || !is_finite((float) $value) || abs($value) > 1000000) fail('error_validation');
+                        $value = round((float) $value, 2);
+                    }
+                    unset($value);
+                }
+                unset($point);
+                for ($i = 1; $i < count($points); $i++) {
+                    if ($points[$i][0] !== $points[$i - 1][0] && $points[$i][1] !== $points[$i - 1][1]) fail('error_validation');
+                }
+            }
+            $state['styles'][] = ['from' => $style['from'], 'to' => $style['to'], 'points' => $points,
+                'label' => Validate::text($style, 'label', 120, false),
+                'arrows' => Validate::choice($style['arrows'] ?? 'none', ['none', 'start', 'end', 'both'])];
         }
         $this->db->run('UPDATE diagrams SET connections_json=? WHERE id=?', [json_encode($state, JSON_THROW_ON_ERROR), $id]);
     }
