@@ -151,7 +151,7 @@ class MindSpace extends PageController {
     return `<section class="mindspace-sidebar"><button type="button" id="mindspace-sidebar-toggle" class="nav-item ms-sidebar-toggle"
       data-action="ms-sidebar-toggle" aria-expanded="${this.sidebarOpen()}" aria-controls="mindspace-sidebar-list">${icon('overview')}<span>All MindSpace</span><span class="ms-sidebar-chevron" aria-hidden="true">›</span></button>
       <div id="mindspace-sidebar-list" class="mindspace-explorer" ${this.sidebarOpen() ? '' : 'hidden'}>${this.explorer()}
-        <button type="button" class="ms-sidebar-add ms-sidebar-add-global" data-action="ms-sidebar-add" data-global="true" aria-label="${esc(t('ms_sidebar_add'))}" title="${esc(t('ms_sidebar_add'))}">${icon('plus')}<span>${esc(t('ms_sidebar_add'))}</span></button>
+        <button type="button" class="ms-sidebar-add ms-sidebar-add-global" data-action="ms-sidebar-add" data-global="true" aria-label="${esc(t('ms_new_space'))}" title="${esc(t('ms_new_space'))}">${icon('plus')}<span>${esc(t('ms_sidebar_add'))}</span></button>
       </div></section>`;
   }
   explorer() {
@@ -449,7 +449,10 @@ class MindSpace extends PageController {
   async handleAction(action, button) {
     if (action === 'ms-sidebar-toggle') return this.toggleSidebar();
     if (action === 'ms-entry-menu') return this.entryMenu(button);
-    if (action === 'ms-sidebar-add') return this.newMenu(button.dataset.global === 'true', button.dataset.global === 'true' ? {spaceId:this.spaceId(), parent:null} : this.creationContext(button));
+    if (action === 'ms-sidebar-add') {
+      if (button.dataset.global === 'true') { this.closeMenu(); return this.newSpace(); }
+      return this.newMenu(false, this.creationContext(button));
+    }
     if (action === 'ms-space-rename') return this.rename(Number(button.dataset.id), true);
     if (action === 'ms-space-delete') return this.deleteForm(Number(button.dataset.id), true);
     if (action === 'ms-delete') return this.deleteForm(Number(button.dataset.id));
