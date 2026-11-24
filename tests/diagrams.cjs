@@ -117,7 +117,7 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
     get: () => html,
     set(value) {
       html = value;
-      const view = JSON.parse(value);
+      const view = value ? JSON.parse(value) : {};
       if (view.template === 'diagram-node') field.value = view.name;
     },
   });
@@ -1551,7 +1551,8 @@ test('Enter saves a trimmed diagram title independently of its root text and rel
   const page = JSON.parse(restored.home.render());
   restored.home.drawStage();
   assert.equal(JSON.parse(page.content).name, 'Idea central');
-  assert.ok(page.title, 'the title is supplied separately from the canvas nodes');
+  assert.equal(page.title, undefined, 'the canvas does not repeat the diagram title');
+  assert.match(JSON.parse(page.diagramToolbar).options, /Mi nuevo proyecto/);
   assert.equal(restored.home.diagramTitle, 'Mi nuevo proyecto');
   assert.equal(restored.titleLabel.textContent, 'Mi nuevo proyecto');
   assert.equal(restored.field.value, 'Idea central');

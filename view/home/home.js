@@ -231,17 +231,16 @@ class HomePage extends PageController {
     return renderTemplate('home', {
       greeting: t('greeting', { name: esc(S.user.name.split(' ')[0]) }),
       plus: icon('plus'),
-      newHabit: t('new_habit'),
+      createLabel: t('create_diagram'),
+      createDisabled: this.switching ? 'disabled' : '',
       diagramLabel: t('diagram_canvas'),
       diagramToolbar: this.toolbarContent(),
-      title: this.titleContent(),
       content: this.stageContent(),
     });
   }
 
   stageContent() {
-    if (!this.active && !this.draft)
-      return renderTemplate('diagram-start', { label: t('create_diagram') });
+    if (!this.active && !this.draft) return '';
     this.commitName();
     const nodes = this.ensureTree();
     if (nodes.length > 1) return renderTemplate('diagram-tree', {
@@ -313,13 +312,15 @@ class HomePage extends PageController {
     const options = diagrams.map((diagram) =>
       `<option value="${esc(diagram.id)}" ${diagram.id === this.active?.id ? 'selected' : ''}>${esc(diagram.name.replace(/\s+/g, ' ').trim())} · #${esc(diagram.id)}</option>`).join('');
     return renderTemplate('diagram-toolbar', {
-      label: t('my_diagrams'), plus: icon('plus'), createLabel: t('create_diagram'),
+      label: t('my_diagrams'),
       disabled: this.switching ? 'disabled' : '',
       options: (this.draft ? `<option value="" selected>${esc(t('diagram_default_name'))}</option>` : '') + options,
     });
   }
 
   syncToolbar() {
+    const create = document.getElementById('create-diagram');
+    if (create) create.disabled = this.switching;
     const toolbar = document.getElementById('diagram-toolbar');
     if (toolbar) toolbar.innerHTML = this.toolbarContent();
   }
@@ -614,10 +615,7 @@ class HomePage extends PageController {
 
   drawStage() {
     const stage = document.getElementById('mindmap-stage');
-    if (stage) {
-      stage.innerHTML = this.stageContent();
-      stage.insertAdjacentHTML?.('afterbegin', this.titleContent());
-    }
+    if (stage) stage.innerHTML = this.stageContent();
     this.mount();
   }
 

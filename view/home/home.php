@@ -6,10 +6,10 @@
   <section class="home-page">
     <div class="page-heading home-heading">
       <h1>{{greeting}}</h1>
-      <button class="btn primary" data-action="new-habit">{{plus}}{{newHabit}}</button>
+      <button type="button" class="btn primary" id="create-diagram" data-action="create-diagram" {{createDisabled}}>{{plus}}{{createLabel}}</button>
     </div>
     <div class="diagram-toolbar" id="diagram-toolbar">{{diagramToolbar}}</div>
-    <div class="mindmap-stage" id="mindmap-stage" aria-label="{{diagramLabel}}">{{title}}{{content}}</div>
+    <div class="mindmap-stage" id="mindmap-stage" aria-label="{{diagramLabel}}">{{content}}</div>
   </section>
 </template>
 
@@ -18,13 +18,6 @@
     <label for="diagram-select">{{label}}</label>
     <select id="diagram-select" {{disabled}}>{{options}}</select>
   </div>
-  <button type="button" class="btn secondary" data-action="create-diagram" {{disabled}}>{{plus}}{{createLabel}}</button>
-</template>
-
-<template id="view-diagram-start">
-  <button type="button" class="btn primary create-diagram" data-action="create-diagram">
-    {{label}}
-  </button>
 </template>
 
 <template id="view-diagram-title">
