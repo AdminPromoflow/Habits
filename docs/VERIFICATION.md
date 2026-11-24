@@ -233,3 +233,11 @@ No se ha sustituido una base existente ni se han importado cuentas o completados
 - 172 pruebas JavaScript de editor, enlaces, MindSpace, guardado concurrente y fórmulas.
 - Revisión visual local: crear Proyectos / Diseño; crear y mover una nota; recargar conservando contenido; calcular SUMA; crear tarjeta Kanban y cambiar su estado; configurar Scrum; crear y completar un hábito. Arrastre de una nota desde el explorador a una subcarpeta verificado en navegador.
 - Hostinger: migraciones 013 y 014 aplicadas; se conservaron 3 diagramas y 13 nodos. MindSpace visible en Safari, con pestañas y explorador. Detalles en MINDSPACE-MIGRATION.md.
+
+## All MindSpace en el sidebar — 24 de noviembre de 2026
+
+- Explorador trasladado al sidebar principal, entre Home y My habits; All MindSpace se expande/contrae sin reconstruir el editor y recuerda el estado por cuenta e instalación.
+- El botón + permite crear otro MindSpace o añadir documentos y carpetas al actual. Se reutiliza el esquema existente; no requiere una nueva migración.
+- 207 comprobaciones HTTP y 7 de esquema en MySQL aislado; 159 pruebas JavaScript de MindSpace y editor. Se verifican idempotencia, propiedad, separación de espacios, destinos, guardado antes de cambiar y enlaces directos.
+- Prueba visual local: crear Trabajo / Proyectos / Plan semanal; escribir, cambiar al MindSpace original y regresar; plegar, recargar y desplegar. Contenido y selección conservados.
+- Publicado mediante el administrador de archivos de Hostinger y verificado en Safari. Evidencia: tests/.runtime/mindspace-sidebar-production.png.
