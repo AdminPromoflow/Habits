@@ -247,8 +247,8 @@ class MindSpace extends PageController {
     if (!sources.length) return '';
     return `<nav class="ms-linked-from" aria-label="${esc(t('ms_link_sources'))}"><span>${esc(t('ms_link_sources'))}</span>${sources.map(({diagram, node}) => `<button type="button" data-action="ms-link-return" data-diagram="${diagram.id}" data-node="${esc(node.id)}">← ${esc(diagram.name)} · ${esc(node.text || t('diagram_link_untitled'))}</button>`).join('')}</nav>`;
   }
-  targetReturnLinks() {
-    const grouped = new Map(), type = MindSpaceLinkTargets.type(this.active);
+  targetReturnLinks(type = MindSpaceLinkTargets.type(this.active)) {
+    const grouped = new Map();
     for (const source of this.linkSources()) {
       const target = source.node.link.target;
       if (!target || target.type !== type || !MindSpaceLinkTargets.valid({...this.active, content:this.draft}, target)) continue;
@@ -350,14 +350,14 @@ class MindSpace extends PageController {
   async go(item, spaceId = this.spaceId(), target = null) {
     if (!await this.flush()) return;
     const url = new URL(location.href);
-    for (const key of ['diagram','topic','item','folder','space','cell','card','habit']) url.searchParams.delete(key);
+    for (const key of ['diagram','topic','item','folder','space','cell','card','column','habit']) url.searchParams.delete(key);
     if (item?.mindspace_id || spaceId) url.searchParams.set('space', item?.mindspace_id || spaceId);
     if (!item || item.kind === 'folder') url.searchParams.set('folder', String(item?.id || 0));
     else if (item.kind === 'diagram') url.searchParams.set('diagram', item.diagram_id);
     else url.searchParams.set('item', item.id);
     if (spaceId) this.rememberTree(`space-${item?.mindspace_id || spaceId}`, true);
     for (const folder of this.pathTo(item?.kind === 'folder' ? item.id : item?.parent_id, item?.mindspace_id || spaceId)) this.rememberTree(`item-${folder.id}`, true);
-    if (target && ['cell','card','habit','topic'].includes(target.type)) url.searchParams.set(target.type, target.id);
+    if (target && ['cell','card','column','habit','topic'].includes(target.type)) url.searchParams.set(target.type, target.id);
     // The creation request has finished; do not trigger beforeunload for its form.
     this.busy = false;
     location.assign(url.href);

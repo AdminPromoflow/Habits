@@ -49,6 +49,23 @@ test('spreadsheet preview includes blank selectable cells and safely renders val
   assert.doesNotMatch(html,/<script>/);
 });
 
+test('board previews group cards under their status and keep empty columns selectable',()=>{
+  const board={kind:'scrum',content:{cards:[{id:'working',title:'Working card',description:'<script>literal</script>',status:'doing'},
+    {id:'pending',title:'Pending card',status:'todo'},{id:'finished',title:'Finished card',status:'done'}]}};
+  const html=LinkTargets.preview(board);
+  const columns=[...html.matchAll(/<section class="ms-link-column"[^>]*>(.*?)<\/section>/gs)].map(match=>match[1]);
+  assert.equal(columns.length,4);
+  assert.match(columns[0],/data-link-type="column" data-link-target="backlog"/);assert.match(columns[0],/ms_link_column_empty/);
+  assert.match(columns[1],/Pending card/);assert.doesNotMatch(columns[1],/Working card|Finished card/);
+  assert.match(columns[2],/Working card/);assert.match(columns[2],/&lt;script>/);assert.doesNotMatch(columns[2],/<script>/);
+  assert.match(columns[3],/Finished card/);
+  for(const id of ['backlog','todo','doing','done']) assert.equal(LinkTargets.valid(board,{type:'column',id}),true);
+  assert.equal(LinkTargets.valid({...board,kind:'kanban'},{type:'column',id:'backlog'}),false);
+  assert.equal(LinkTargets.valid(board,{type:'column',id:'In progress'}),false);
+  assert.equal(LinkTargets.valid({kind:'notes',content:{text:''}},{type:'column',id:'todo'}),false);
+  assert.equal(LinkTargets.label(board,{type:'column',id:'doing'}),'ms_status_doing');
+});
+
 function setup(url='http://localhost/?item=3') {
   const items=[{id:1,kind:'folder',name:'Parent',parent_id:null,content:{}},{id:2,kind:'folder',name:'Child',parent_id:1,content:{}},
     {id:3,kind:'notes',name:'Note',parent_id:2,version:1,content:{text:'before'}},{id:4,kind:'diagram',name:'Map',parent_id:null,diagram_id:10,content:{}}];
@@ -199,6 +216,25 @@ test('card and habit return arrows stay attached to the exact linked target',()=
   state.data.diagrams[0].nodes[0].link.target={type:'habit',id:'7'};
   assert.match(space.targetReturnLinks().get('7'),/data-target-type="habit"/);
   space.draft.habit_ids=[];assert.equal(space.targetReturnLinks().size,0);
+});
+
+test('column links focus the column and keep their return arrow separate from its cards',async()=>{
+  const {space,state,context,location}=cellReturnFixture();
+  location.href='http://localhost/?item=3&column=todo';
+  space.active.kind='scrum';space.draft={cards:[{id:'card',title:'Task',status:'todo'}],sprint:{}};
+  state.data.diagrams[0].nodes[0].link.target={type:'column',id:'todo'};
+  state.data.diagrams[0].nodes.push({id:'card-source',text:'Card source',link:{item_id:3,target:{type:'card',id:'card'}}});
+  const html=space.editor.board(),header=html.match(/data-ms-column="todo"[^]*?<header>(.*?)<\/header>/s)[1];
+  assert.match(header,/data-target-type="column" data-target-id="todo"/);
+  assert.doesNotMatch(header,/Card source/);
+  assert.match(space.targetReturnLinks().get('card'),/data-target-type="card"/);
+  let focused=0,scrolled=0,tabindex;const classes=new Set();
+  const column={getAttribute:()=> 'todo',setAttribute:(key,value)=>{tabindex=value;},classList:{add:key=>classes.add(key)},scrollIntoView:()=>scrolled++,focus:()=>focused++};
+  context.document.querySelectorAll=selector=>selector.includes('data-ms-column')?[column]:[];
+  const Targets=vm.runInContext('MindSpaceLinkTargets;',context);Targets.arrive(space);
+  assert.equal(focused,1);assert.equal(scrolled,1);assert.equal(tabindex,'-1');assert.equal(classes.has('ms-link-target'),true);
+  await space.go(state.data.mindspace.items.find(item=>item.kind==='diagram'),undefined,{type:'topic',id:'root'});
+  assert.equal(new URL(location.assigned).searchParams.has('column'),false);
 });
 
 function multiple(url='http://localhost/?space=200&folder=0') {

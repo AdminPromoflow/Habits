@@ -677,3 +677,13 @@ button.diagram-handle-arrows { cursor: ew-resize; touch-action: none; }
 .ms-link-choices button[aria-pressed="true"], .ms-link-choices button:focus-visible { border-color: var(--purple-dark); background: var(--lavender-wash); outline: 1px solid var(--purple-dark); }
 .ms-link-note { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .875rem; line-height: 1.6; }
 .ms-link-children p { padding: 8px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.ms-link-board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(145px, 1fr); gap: 10px; min-height: 100%; align-items: stretch; }
+.ms-link-column { padding: 8px; border: 1px solid var(--line); border-radius: 9px; background: var(--lavender-wash); }
+.ms-link-column:has(> [aria-pressed="true"]) { outline: 2px solid var(--purple-dark); outline-offset: -2px; }
+.ms-link-column-select { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; padding: 7px 4px; margin-bottom: 8px; border: 0; border-radius: 5px; background: transparent; color: var(--purple-dark); font: inherit; font-size: .8125rem; text-align: left; cursor: pointer; }
+.ms-link-column-select > span { background: var(--surface); border-radius: 12px; min-width: 22px; padding: 2px 5px; text-align: center; }
+.ms-link-column-select:hover, .ms-link-column-select:focus-visible { background: var(--surface); outline: 1px solid var(--purple); }
+.ms-link-column .ms-link-choices { gap: 8px; }
+.ms-link-column .ms-link-choices button { padding: 10px; font-size: .8125rem; }
+.ms-link-column .ms-link-choices small { display: block; margin-top: 5px; color: var(--muted); font-size: .75rem; white-space: pre-wrap; }
+.ms-link-column-empty { color: var(--muted); text-align: center; font-size: .75rem; margin: 10px 0; }

@@ -148,11 +148,11 @@ class DiagramLinks {
     let target = documents.find(item => item.key === savedKey) || documents.find(item => item.key === `diagram:${home.active.id}`) || documents[0];
     if (!target) return;
     let key = target.key === savedKey ? (target.kind === 'diagram' ? node.link.node_id : node.link.target?.id) : null;
-    let scope = key ? 'part' : 'whole', scale = 1, plan;
-    const targetType = () => target.kind === 'diagram' ? 'topic' : MindSpaceLinkTargets.type(target);
-    const choices = () => target.kind === 'diagram' ? target.nodes.map((item, index) => ({id:item.id, label:item.text || `${t('diagram_link_untitled')} ${index + 1}`})) : MindSpaceLinkTargets.choices(target);
+    let scope = key ? (node.link?.target?.type === 'column' ? 'column' : 'part') : 'whole', scale = 1, plan;
+    const targetType = () => target.kind === 'diagram' ? 'topic' : scope === 'column' ? 'column' : MindSpaceLinkTargets.type(target);
+    const choices = () => target.kind === 'diagram' ? target.nodes.map((item, index) => ({id:item.id, label:item.text || `${t('diagram_link_untitled')} ${index + 1}`})) : MindSpaceLinkTargets.choices(target, undefined, targetType());
     const linkValue = () => target.kind === 'diagram' ? {diagram_id:target.id, node_id:scope === 'part' ? key : null}
-      : {item_id:target.id, target:scope === 'part' ? {type:targetType(), id:key} : null};
+      : {item_id:target.id, target:scope !== 'whole' ? {type:targetType(), id:key} : null};
     const validTarget = () => scope === 'whole' || (target.kind === 'diagram' ? choices().some(item => item.id === key) : MindSpaceLinkTargets.valid(target, linkValue().target));
     const optionLabel = item => {
       const entry = item.kind === 'diagram' ? items.find(file => file.diagram_id === item.id) : item;
@@ -164,6 +164,7 @@ class DiagramLinks {
         ${documents.map(item => `<option value="${item.key}">${esc(optionLabel(item))}</option>`).join('')}</select></label>
       <fieldset class="diagram-link-scope"><legend>${esc(t('diagram_link_destination'))}</legend>
         <label><input type="radio" name="link-scope" value="whole"><span id="diagram-link-whole-label"></span></label>
+        <label id="diagram-link-column-option" hidden><input type="radio" name="link-scope" value="column"><span>${esc(t('ms_link_column'))}</span></label>
         <label id="diagram-link-part-option"><input type="radio" name="link-scope" value="part"><span id="diagram-link-part-label"></span></label>
       </fieldset>
       <p class="muted">${esc(t('ms_link_hint'))}</p>
@@ -187,14 +188,16 @@ class DiagramLinks {
       if (!type) scope = 'whole';
       form.querySelectorAll('[name="link-scope"]').forEach(radio => { radio.checked = radio.value === scope; });
       form.querySelector('#diagram-link-whole-label').textContent = t(target.kind === 'diagram' ? 'diagram_link_whole' : 'ms_link_whole');
+      form.querySelector('#diagram-link-column-option').hidden = !MindSpaceLinkTargets.statuses(target).length;
       form.querySelector('#diagram-link-part-option').hidden = !type;
-      form.querySelector('#diagram-link-part-label').textContent = t(type === 'topic' ? 'diagram_link_topic' : `ms_link_${type}`);
+      form.querySelector('#diagram-link-part-label').textContent = t(type === 'topic' ? 'diagram_link_topic' : `ms_link_${MindSpaceLinkTargets.type(target)}`);
       form.querySelector('#diagram-link-part-field-label').textContent = t(type === 'topic' ? 'diagram_link_topic' : `ms_link_${type}`);
-      form.querySelector('.diagram-link-topic-field').hidden = scope !== 'part' || type === 'cell';
+      form.querySelector('.diagram-link-topic-field').hidden = scope === 'whole' || type === 'cell';
       form.querySelector('.diagram-link-cell-field').hidden = scope !== 'part' || type !== 'cell';
       form.querySelector('#diagram-link-zoom-tools').hidden = target.kind !== 'diagram';
+      topic.innerHTML = `<option value="">${esc(t('ms_link_choose_part'))}</option>` + choices().map(item => `<option value="${esc(item.id)}">${esc(item.label)}</option>`).join('');
       topic.value = key || ''; cell.value = type === 'cell' ? key || '' : '';
-      preview.querySelectorAll('[data-link-target]').forEach(item => item.setAttribute('aria-pressed', String(scope === 'part' && item.dataset.linkTarget === key)));
+      preview.querySelectorAll('[data-link-target]').forEach(item => item.setAttribute('aria-pressed', String(scope !== 'whole' && item.dataset.linkTarget === key && (!item.dataset.linkType || item.dataset.linkType === type))));
       form.querySelector('.diagram-link-selection').textContent = scope === 'whole'
         ? `${t(target.kind === 'diagram' ? 'diagram_link_whole' : 'ms_link_whole')}: ${target.name}`
         : validTarget() ? `${target.name} → ${type === 'cell' ? key : selected.label}` : t(type === 'cell' ? 'ms_link_cell_invalid' : 'ms_link_choose_part');
@@ -210,7 +213,6 @@ class DiagramLinks {
       const result = target.kind === 'diagram' ? this.preview(target) : {html:MindSpaceLinkTargets.preview(target), plan:null};
       plan = result.plan; preview.innerHTML = result.html;
       preview.classList.toggle('is-sheet-preview', target.kind === 'spreadsheet');
-      topic.innerHTML = `<option value="">${esc(t('ms_link_choose_part'))}</option>` + choices().map(item => `<option value="${esc(item.id)}">${esc(item.label)}</option>`).join('');
       fit(); update(); preview.scrollLeft = 0; preview.scrollTop = 0;
     };
     select.value = target.key;
@@ -221,7 +223,7 @@ class DiagramLinks {
     const choose = event => {
       const item = event.target.closest('[data-link-target]');
       if (!item || (event.type === 'keydown' && !['Enter',' '].includes(event.key))) return;
-      event.preventDefault(); key = item.dataset.linkTarget; scope = 'part'; update();
+      event.preventDefault(); key = item.dataset.linkTarget; scope = item.dataset.linkType === 'column' ? 'column' : 'part'; update();
     };
     preview.addEventListener('click', choose); preview.addEventListener('keydown', choose);
     form.querySelectorAll('[data-preview-zoom]').forEach(button => button.addEventListener('click', () => {

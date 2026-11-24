@@ -48,6 +48,20 @@ def run(owner, other, guest, check):
         assert save(target)['nodes'][0]['link'] == current()['nodes'][0]['link'] == target
     check(True, 'Kanban and Scrum links keep the selected card ID')
 
+    for kind, statuses in [('kanban', ['todo', 'doing', 'done']), ('scrum', ['backlog', 'todo', 'doing', 'done'])]:
+        for status in statuses:
+            target = link(targets[kind], 'column', status)
+            assert save(target)['nodes'][0]['link'] == current()['nodes'][0]['link'] == target
+    check(True, 'All Scrum and Kanban columns persist as link targets, including empty columns')
+    target = link(targets['scrum'], 'column', 'todo')
+    save(target)
+    updated = copy.deepcopy(targets['scrum']['content'])
+    updated['cards'][0]['status'] = 'doing'
+    targets['scrum'] = content(targets['scrum'], updated)
+    assert current()['nodes'][0]['link'] == target
+    assert save(target)['nodes'][0]['link'] == target
+    check(True, 'Moving cards between columns does not change a saved column destination')
+
     habits = targets['habits'] = owner.request('addMindSpaceHabit', dict(id=targets['habits']['id'],
         version=targets['habits']['version'], habit=dict(name='Link target habit', category_id=0,
         goal=1, unit='session')), module='mindspaces')
@@ -57,6 +71,7 @@ def run(owner, other, guest, check):
     check(True, 'A link selects a real owned habit within its habit document')
 
     private = create('spreadsheet', other)
+    private_board = create('scrum', other)
     before = current()
     invalid = [link(private), link(source), dict(item_id=987654321, target=None),
         dict(item_id=True, target=None), dict(item_id=str(sheet['id']), target=None),
@@ -64,7 +79,10 @@ def run(owner, other, guest, check):
         dict(item_id=sheet['id'], target=[]), link(sheet, 'cell', 3),
         link(sheet, 'card', str(uuid.uuid4())), link(targets['notes'], 'cell', 'A1'),
         link(targets['kanban'], 'card', str(uuid.uuid4())), link(habits, 'habit', '987654321'),
-        link(targets['folder'], 'unknown', 'anything')]
+        link(targets['folder'], 'unknown', 'anything'), link(private_board, 'column', 'todo'),
+        link(sheet, 'column', 'todo'), link(targets['notes'], 'column', 'todo'),
+        link(targets['kanban'], 'column', 'backlog'), link(targets['scrum'], 'column', 'archived'),
+        link(targets['scrum'], 'column', 'In progress'), link(targets['scrum'], 'column', 'todo<script>')]
     invalid += [link(sheet, 'cell', address) for address in ['A0', 'A01', 'a1', 'BA1', 'A201', 'A1:B3', 'A1<script>']]
     for value in invalid:
         save(value, 422)

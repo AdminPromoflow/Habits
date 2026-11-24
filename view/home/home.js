@@ -453,7 +453,7 @@ class HomePage extends PageController {
       url.searchParams.delete('item');
       url.searchParams.delete('folder');
       url.searchParams.delete('space');
-      for (const key of ['cell', 'card', 'habit']) url.searchParams.delete(key);
+      for (const key of ['cell', 'card', 'column', 'habit']) url.searchParams.delete(key);
       url.searchParams.set('diagram', id);
       url.searchParams.delete('topic');
       if (topic !== undefined) url.searchParams.set('topic', topic ?? 'overview');

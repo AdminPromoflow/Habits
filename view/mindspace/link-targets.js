@@ -3,7 +3,10 @@
 // Shared by the link picker, its tooltip and the destination editor.
 class MindSpaceLinkTargets {
   static type(item) { return {spreadsheet:'cell', kanban:'card', scrum:'card', habits:'habit'}[item?.kind] || null; }
-  static choices(item, habits = S.data?.habits || []) {
+  static statuses(item) { return item?.kind === 'scrum' ? ['backlog','todo','doing','done'] : item?.kind === 'kanban' ? ['todo','doing','done'] : []; }
+  static types(item) { return this.statuses(item).length ? ['card','column'] : this.type(item) ? [this.type(item)] : []; }
+  static choices(item, habits = S.data?.habits || [], type = this.type(item)) {
+    if (type === 'column') return this.statuses(item).map(id => ({id, label:t(`ms_status_${id}`)}));
     if (['kanban','scrum'].includes(item?.kind)) return (item.content.cards || []).map(card => ({id:card.id, label:card.title}));
     if (item?.kind === 'habits') return habits.filter(habit => habit.permission === 'owner' && item.content.habit_ids.includes(habit.id)).map(habit => ({id:String(habit.id), label:habit.name}));
     return [];
@@ -11,19 +14,19 @@ class MindSpaceLinkTargets {
   static valid(item, target, habits = S.data?.habits || []) {
     if (!item || item.kind === 'diagram') return false;
     if (target === null) return true;
-    if (!target || target.type !== this.type(item) || typeof target.id !== 'string') return false;
+    if (!target || !this.types(item).includes(target.type) || typeof target.id !== 'string') return false;
     if (target.type === 'cell') {
       if (!/^[A-Z]{1,2}[1-9][0-9]{0,2}$/.test(target.id)) return false;
       const [row, column] = MindSpaceSheet.address(target.id);
       return row < item.content.rows && column < item.content.columns;
     }
-    return this.choices(item, habits).some(choice => choice.id === target.id);
+    return this.choices(item, habits, target.type).some(choice => choice.id === target.id);
   }
   static label(item, target) {
     if (!target) return t('ms_link_whole');
     if (!this.valid(item, target)) return t('diagram_link_unavailable');
     if (target.type === 'cell') return `${t('ms_link_cell')} ${target.id}`;
-    return this.choices(item).find(choice => choice.id === target.id)?.label || t('diagram_link_unavailable');
+    return this.choices(item, undefined, target.type).find(choice => choice.id === target.id)?.label || t('diagram_link_unavailable');
   }
   static preview(item) {
     if (item.kind === 'spreadsheet') {
@@ -33,6 +36,13 @@ class MindSpaceLinkTargets {
           const key = `${MindSpaceSheet.column(column)}${row + 1}`, value = evaluator.display(key);
           return `<td><button type="button" data-link-target="${key}" aria-label="${key}${value ? `: ${esc(value)}` : ''}" aria-pressed="false" title="${key}${value ? `: ${esc(value)}` : ''}">${esc(value) || '&nbsp;'}</button></td>`;
         }).join('')}</tr>`).join('')}</tbody></table>`;
+    }
+    if (this.statuses(item).length) {
+      return `<div class="ms-link-board">${this.statuses(item).map(status => {
+        const cards = item.content.cards.filter(card => card.status === status), name = t(`ms_status_${status}`);
+        return `<section class="ms-link-column" aria-label="${esc(name)}"><button type="button" class="ms-link-column-select" data-link-type="column" data-link-target="${status}" aria-pressed="false" aria-label="${esc(`${t('ms_link_column')}: ${name}`)}"><strong>${esc(name)}</strong><span>${cards.length}</span></button>
+          <div class="ms-link-choices">${cards.length ? cards.map(card => `<button type="button" data-link-type="card" data-link-target="${esc(card.id)}" aria-pressed="false"><strong>${esc(card.title)}</strong>${card.description ? `<small>${esc(card.description)}</small>` : ''}</button>`).join('') : `<p class="ms-link-column-empty">${esc(t('ms_link_column_empty'))}</p>`}</div></section>`;
+      }).join('')}</div>`;
     }
     if (this.type(item)) {
       const choices = this.choices(item);
@@ -44,13 +54,13 @@ class MindSpaceLinkTargets {
   }
   static arrive(space) {
     if (!space.active || space.isDiagram()) return;
-    const url = new URL(location.href), type = this.type(space.active);
-    if (!type || !url.searchParams.has(type)) return;
+    const url = new URL(location.href), type = this.types(space.active).find(type => url.searchParams.has(type));
+    if (!type) return;
     const target = {type, id:url.searchParams.get(type)}, marker = `${space.active.id}:${type}:${target.id}`;
     if (space.linkArrival === marker) return;
     space.linkArrival = marker;
     if (!this.valid({...space.active, content:space.draft}, target)) { toast(t('error_diagram_link_missing'), true); return; }
-    const attr = {cell:'data-ms-cell', card:'data-ms-card', habit:'data-ms-habit'}[type];
+    const attr = {cell:'data-ms-cell', card:'data-ms-card', column:'data-ms-column', habit:'data-ms-habit'}[type];
     const element = [...document.querySelectorAll(`#mindspace-panel [${attr}]`)].find(el => el.getAttribute(attr) === target.id);
     if (!element) return;
     document.querySelectorAll('.ms-link-target').forEach(el => el.classList.remove('ms-link-target'));

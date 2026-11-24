@@ -95,7 +95,7 @@
 .ms-column { border-radius: 12px; background: var(--lavender-wash); padding: 12px; min-height: 340px; }
 .ms-column > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
 .ms-column h3 { font: 600 .875rem/1.4 system-ui,sans-serif; margin: 0; }
-.ms-column > header span { color: var(--purple-dark); background: var(--surface); border-radius: 12px; min-width: 22px; text-align: center; font-size: .75rem; }
+.ms-column > header > span:not(.ms-target-return) { color: var(--purple-dark); background: var(--surface); border-radius: 12px; min-width: 22px; text-align: center; font-size: .75rem; }
 .ms-card { padding: 12px; margin-bottom: 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); cursor: grab; }
 .ms-card-title { display: block; padding: 0; width: 100%; border: 0; background: none; color: var(--ink); text-align: left; font: 600 .875rem/1.5 system-ui,sans-serif; overflow-wrap: anywhere; cursor: pointer; }
 .ms-card p { font-size: .8125rem; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -142,3 +142,6 @@
 .ms-sheet-cell.has-return input { padding-right: 32px; }
 .ms-card:has(.ms-target-return) { padding-bottom: 34px; }
 .ms-habit:has(.ms-target-return) { padding-right: 42px; }
+.ms-column > header { position: relative; }
+.ms-column > header:has(.ms-target-return) { padding-right: 32px; }
+.ms-column > header .ms-target-return { right: 0; bottom: 50%; transform: translateY(50%); }

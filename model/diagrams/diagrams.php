@@ -201,6 +201,7 @@ final class DiagramsModel extends BaseModel
                             $pattern = match ($target['type'] ?? '') {
                                 'cell' => '/^[A-Z]{1,2}[1-9][0-9]{0,2}$/D',
                                 'card' => '/^[a-f0-9-]{36}$/D',
+                                'column' => '/^(backlog|todo|doing|done)$/D',
                                 'habit' => '/^[1-9][0-9]{0,17}$/D',
                                 default => null,
                             };

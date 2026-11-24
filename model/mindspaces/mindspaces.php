@@ -110,6 +110,8 @@ final class MindSpacesModel extends BaseModel
             $valid = $column <= $content['columns'] && (int) $parts[2] <= $content['rows'];
         } elseif (in_array($item['kind'], ['kanban', 'scrum'], true) && $target['type'] === 'card') {
             $valid = in_array($target['id'], array_column($content['cards'], 'id'), true);
+        } elseif (in_array($item['kind'], ['kanban', 'scrum'], true) && $target['type'] === 'column') {
+            $valid = in_array($target['id'], $item['kind'] === 'scrum' ? ['backlog','todo','doing','done'] : ['todo','doing','done'], true);
         } elseif ($item['kind'] === 'habits' && $target['type'] === 'habit') {
             $valid = in_array((int) $target['id'], $content['habit_ids'], true)
                 && $this->db->one('SELECT id FROM habits WHERE id=? AND owner_user_id=?', [(int) $target['id'], $this->uid()]);

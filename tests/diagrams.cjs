@@ -466,6 +466,20 @@ test('typing during an item lookup is saved before leaving the source', async ()
   assert.equal(navigations.length,1);
 });
 
+test('column links save and navigate to the selected board column, even when it is empty',async()=>{
+  const {home,state,navigations}=savedEditor();
+  const board={id:71,mindspace_id:90,kind:'scrum',name:'Sprint',parent_id:null,content:{cards:[]}};
+  home.nodes[0].link={item_id:71,target:{type:'column',id:'doing'}};
+  const calls=[];
+  home.makeRequest=async(action,data)=>{calls.push(action);return action==='saveDiagram'?{...data,version:2}:
+    {diagrams:state.data.diagrams,habits:[],mindspace:{id:90,spaces:[{id:90,name:'Work'}],items:[board]}};};
+  await home.links.follow(home.nodes[0].link);
+  assert.deepEqual(calls,['saveDiagram','data']);
+  assert.equal(new URL(navigations[0]).searchParams.get('column'),'doing');
+  assert.equal(home.active.nodes[0].link.target.type,'column');
+  assert.match(home.links.badge(home.nodes[0]),/ms_status_doing/);
+});
+
 test('the more action toggles its panel without editing or saving the diagram', async () => {
   const { home, field, more, menu, controls } = savedEditor();
   home.makeRequest = () => { throw new Error('Opening the panel must not save'); };

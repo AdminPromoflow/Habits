@@ -32,15 +32,15 @@ class MindSpaceEditors {
     if (panel) panel.innerHTML = this.render();
     this.space.status();
   }
-  statuses() { return this.space.active.kind === 'scrum' ? ['backlog','todo','doing','done'] : ['todo','doing','done']; }
+  statuses() { return MindSpaceLinkTargets.statuses(this.space.active); }
   board() {
     const draft = this.space.draft, scrum = this.space.active.kind === 'scrum', sprint = draft.sprint || {};
-    const returns = this.space.targetReturnLinks();
+    const returns = this.space.targetReturnLinks(), columnReturns = this.space.targetReturnLinks('column');
     return `<div class="ms-board-editor">${scrum ? `<div class="ms-sprint"><div><h3>${esc(sprint.name || t('ms_sprint'))}</h3><p>${esc(sprint.goal || t('ms_sprint_hint'))}</p>
       ${sprint.start || sprint.end ? `<small>${esc(sprint.start || '')} — ${esc(sprint.end || '')}</small>` : ''}</div><button class="btn secondary" data-action="ms-sprint">${esc(t('ms_edit_sprint'))}</button></div>` : ''}
       <div class="ms-board">${this.statuses().map(status => {
         const cards = draft.cards.filter(card => card.status === status);
-        return `<section class="ms-column" data-ms-column="${status}" aria-label="${esc(t(`ms_status_${status}`))}"><header><h3>${esc(t(`ms_status_${status}`))}</h3><span>${cards.length}</span></header>
+        return `<section class="ms-column" data-ms-column="${status}" aria-label="${esc(t(`ms_status_${status}`))}"><header><h3>${esc(t(`ms_status_${status}`))}</h3><span>${cards.length}</span>${columnReturns.get(status) || ''}</header>
           ${cards.map(card => `<article class="ms-card" draggable="true" data-ms-card="${card.id}"><button type="button" class="ms-card-title" data-action="ms-card-edit" data-id="${card.id}">${esc(card.title)}</button>
             ${card.description ? `<p>${esc(card.description)}</p>` : ''}${scrum ? `<small>${esc(t('ms_points'))}: ${card.points}</small>` : ''}
             <label class="sr-only" for="ms-card-${card.id}">${esc(t('ms_card_status'))}: ${esc(card.title)}</label><select id="ms-card-${card.id}" data-ms-card-status="${card.id}">${this.statuses().map(value => `<option value="${value}" ${value === status ? 'selected' : ''}>${esc(t(`ms_status_${value}`))}</option>`).join('')}</select>${returns.get(card.id) || ''}</article>`).join('')}
