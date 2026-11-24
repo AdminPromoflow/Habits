@@ -73,7 +73,7 @@
       <span class="diagram-handle diagram-handle-text" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="M3 4h18M12 4v18"/></svg>
       </span>
-      <button type="button" class="diagram-handle diagram-handle-add" data-action="add-diagram-child" aria-label="{{addChildLabel}}" title="{{addChildLabel}}">
+      <button type="button" class="diagram-handle diagram-handle-add" data-action="add-diagram-child" aria-label="{{addChildLabel}}" title="{{addChildHint}}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="M12 2v20M2 12h20"/></svg>
       </button>
       <button type="button" class="diagram-handle diagram-handle-star" data-action="add-diagram-sibling" aria-label="{{addSiblingLabel}}" title="{{addSiblingLabel}}">

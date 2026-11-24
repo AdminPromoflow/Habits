@@ -105,7 +105,7 @@ const DiagramLayout = (() => {
       a.y < b.y + b.height + gap && a.y + a.height + gap > b.y;
   }
 
-  function arrange(nodes, sizes = {}) {
+  function arrange(nodes, sizes = {}, connections = []) {
     const { roots } = indexNodes(nodes);
     if (!roots.length) return { nodes: [], edges: [], width: 0, height: 0, origin: { x: 0, y: 0 } };
 
@@ -127,11 +127,17 @@ const DiagramLayout = (() => {
         const blocks = children.map((child) => build(child, { ...flow, x: side }));
         const total = blocks.reduce((sum, block) => sum + blockHeight(block), 0) + gap * (blocks.length - 1);
         let top = (self.height - total) / 2;
+        const placed = [];
+        const centers = [];
         for (const block of blocks) {
           const left = side === 'left' ? -GAP - blockWidth(block) : self.width + GAP;
-          entries.push(...move(block, left - block.minX, top - block.minY));
+          const branch = move(block, left - block.minX, top - block.minY);
+          centers.push(branch[0].y + branch[0].height / 2);
+          placed.push(...branch);
           top += blockHeight(block) + gap;
         }
+        const shift = self.height / 2 - (Math.min(...centers) + Math.max(...centers)) / 2;
+        entries.push(...placed.map(entry => ({ ...entry, y: entry.y + shift })));
       }
 
       function horizontalRow(children, side, gap = ROW_GAP) {
@@ -139,11 +145,17 @@ const DiagramLayout = (() => {
         const blocks = children.map((child) => build(child, { ...flow, y: side }));
         const total = blocks.reduce((sum, block) => sum + blockWidth(block), 0) + gap * (blocks.length - 1);
         let left = (self.width - total) / 2;
+        const placed = [];
+        const centers = [];
         for (const block of blocks) {
           const top = side === 'top' ? -GAP - blockHeight(block) : self.height + GAP;
-          entries.push(...move(block, left - block.minX, top - block.minY));
+          const branch = move(block, left - block.minX, top - block.minY);
+          centers.push(branch[0].x + branch[0].width / 2);
+          placed.push(...branch);
           left += blockWidth(block) + gap;
         }
+        const shift = self.width / 2 - (Math.min(...centers) + Math.max(...centers)) / 2;
+        entries.push(...placed.map(entry => ({ ...entry, x: entry.x + shift })));
       }
 
       if (layout.mode === 'horizontal') {
@@ -266,6 +278,24 @@ const DiagramLayout = (() => {
       item.children.forEach((child) => manualPositions(child, dx, dy));
     }
     roots.forEach((root) => manualPositions(root));
+    // Keep the drag anchor separate from centering: moving a whole branch then
+    // translates its automatic and explicitly positioned descendants equally.
+    raw.forEach(entry => { entry.baseX = entry.x; entry.baseY = entry.y; });
+    function centerParent(item) {
+      item.children.forEach(centerParent);
+      if (!item.children.length) return;
+      const entry = byId.get(item.node.id);
+      const axis = entry.layout.mode === 'horizontal' ? 'y'
+        : ['vertical', 'topdown'].includes(entry.layout.mode) ? 'x' : null;
+      if (!axis) return;
+      const size = axis === 'x' ? 'width' : 'height';
+      const centers = item.children.map(child => {
+        const box = byId.get(child.node.id);
+        return box[axis] + box[size] / 2;
+      });
+      entry[axis] = (Math.min(...centers) + Math.max(...centers)) / 2 - entry[size] / 2;
+    }
+    roots.forEach(centerParent);
     const frame = bounds(raw);
     const origin = { x: PADDING - frame.minX, y: PADDING - frame.minY };
     raw.forEach((entry) => { entry.x += origin.x; entry.y += origin.y; });
@@ -280,6 +310,11 @@ const DiagramLayout = (() => {
       const to = byId.get(node.id);
       return { from: from.id, to: to.id, path: edgePath(from, to, raw, children.get(from.id)) };
     });
+    for (const edge of connections) {
+      const from = byId.get(edge.from), to = byId.get(edge.to);
+      if (!from || !to || from === to) continue;
+      edges.push({ from: from.id, to: to.id, path: connectionPath(from, to, raw) });
+    }
     return {
       nodes: raw,
       edges,
@@ -346,6 +381,10 @@ const DiagramLayout = (() => {
     return roundedOrthogonal(clearRoute(direct, lanes, nodes, from, to));
   }
 
+  function connectionPath(from, to, nodes = [from, to]) {
+    return edgePath(from, to, nodes, [to]);
+  }
+
   function clearRoute(direct, alternatives, nodes, from, to) {
     const obstacles = nodes.filter((node) => node.id !== from.id && node.id !== to.id);
     const clear = (points) => points.slice(1).every((b, index) => {
@@ -409,5 +448,5 @@ const DiagramLayout = (() => {
     return `<svg viewBox="0 0 ${plan.width} ${plan.height}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><g fill="none" stroke="#a8cede" stroke-width="3">${paths}</g><g stroke="#83bad1" stroke-width="2">${boxes}</g></svg>`;
   }
 
-  return Object.freeze({ modes: Object.freeze([...MODES]), defaults, effective, arrange, preview });
+  return Object.freeze({ modes: Object.freeze([...MODES]), defaults, effective, arrange, connectionPath, preview });
 })();

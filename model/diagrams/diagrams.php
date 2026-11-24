@@ -6,7 +6,7 @@ final class DiagramsModel extends BaseModel
     public function list(): array
     {
         $diagrams = $this->db->all(
-            'SELECT id,name,version,created_at,updated_at FROM diagrams WHERE owner_user_id=? ORDER BY updated_at DESC,id DESC',
+            'SELECT id,name,version,created_at,updated_at,connections_json FROM diagrams WHERE owner_user_id=? ORDER BY updated_at DESC,id DESC',
             [$this->uid()],
         );
         $nodes = $this->db->all(
@@ -15,7 +15,10 @@ final class DiagramsModel extends BaseModel
         );
         $byDiagram = [];
         foreach ($nodes as $node) $byDiagram[$node['diagram_id']][] = self::nodeResponse($node);
-        foreach ($diagrams as &$diagram) $diagram['nodes'] = $byDiagram[$diagram['id']] ?? [];
+        foreach ($diagrams as &$diagram) {
+            $diagram['nodes'] = $byDiagram[$diagram['id']] ?? [];
+            $diagram = self::diagramResponse($diagram);
+        }
         return $diagrams;
     }
 
@@ -47,9 +50,44 @@ final class DiagramsModel extends BaseModel
         // The diagram title and the central idea are independent. A title-only
         // update preserves every node, including the root text and its styling.
         if ($writeNodes && $nodes !== null) $this->replaceNodes($id, $nodes);
-        $diagram = $this->db->one('SELECT id,name,version,created_at,updated_at FROM diagrams WHERE id=? AND owner_user_id=?', [$id, $this->uid()]);
+        if ($writeNodes && ($nodes !== null || array_key_exists('connections', $data))) $this->saveConnections($id, $data);
+        $diagram = $this->db->one('SELECT id,name,version,created_at,updated_at,connections_json FROM diagrams WHERE id=? AND owner_user_id=?', [$id, $this->uid()]);
         $diagram['nodes'] = array_map(self::nodeResponse(...), $this->db->all('SELECT * FROM diagram_nodes WHERE diagram_id=? ORDER BY sort_order', [$id]));
+        return self::diagramResponse($diagram);
+    }
+
+    private static function diagramResponse(array $diagram): array
+    {
+        $diagram['connections'] = json_decode($diagram['connections_json'] ?? '[]', true, 8, JSON_THROW_ON_ERROR);
+        unset($diagram['connections_json']);
         return $diagram;
+    }
+
+    private function saveConnections(int $id, array $data): void
+    {
+        $explicit = array_key_exists('connections', $data);
+        $input = $explicit ? $data['connections'] : json_decode(
+            $this->db->one('SELECT connections_json FROM diagrams WHERE id=?', [$id])['connections_json'] ?? '[]',
+            true, 8, JSON_THROW_ON_ERROR,
+        );
+        if (!is_array($input) || !array_is_list($input) || count($input) > 1000) fail('error_validation');
+        $parents = array_column($this->db->all('SELECT node_key,parent_key FROM diagram_nodes WHERE diagram_id=?', [$id]), 'parent_key', 'node_key');
+        $connections = []; $seen = [];
+        foreach ($input as $edge) {
+            if (!is_array($edge) || !is_string($edge['from'] ?? null) || !is_string($edge['to'] ?? null)) fail('error_validation');
+            $from = $edge['from']; $to = $edge['to'];
+            $valid = $from !== $to && array_key_exists($from, $parents) && array_key_exists($to, $parents)
+                && $parents[$from] !== $to && $parents[$to] !== $from;
+            // Older clients can remove nodes without knowing about extra connections.
+            if (!$valid && !$explicit) continue;
+            if (!$valid) fail('error_validation');
+            $pair = [$from, $to]; sort($pair, SORT_STRING);
+            $key = implode(':', $pair);
+            if (isset($seen[$key])) fail('error_validation');
+            $seen[$key] = true;
+            $connections[] = ['from' => $from, 'to' => $to];
+        }
+        $this->db->run('UPDATE diagrams SET connections_json=? WHERE id=?', [json_encode($connections, JSON_THROW_ON_ERROR), $id]);
     }
 
     public function delete(array $data): array

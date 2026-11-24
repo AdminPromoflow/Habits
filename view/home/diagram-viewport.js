@@ -8,6 +8,8 @@ class DiagramViewport {
     this.x = 0;
     this.y = 0;
     this.scale = 1;
+    this.persistenceKey = null;
+    this.lastSavedView = null;
     this.stage = null;
     this.content = null;
     this.anchorX = 0;
@@ -75,6 +77,9 @@ class DiagramViewport {
     this.x = 0;
     this.y = 0;
     this.scale = 1;
+    // Forget the active binding without erasing the previous diagram's view.
+    this.persistenceKey = null;
+    this.lastSavedView = null;
     this.anchorX = 0;
     this.anchorY = 0;
     this.suppressClickUntil = 0;
@@ -83,6 +88,39 @@ class DiagramViewport {
 
   isInteracting() {
     return !!(this.pan || this.gesture);
+  }
+
+  setPersistenceKey(key, { keepView = false } = {}) {
+    if (key === this.persistenceKey) return;
+    this.cancelInteraction();
+    this.persistenceKey = key;
+    this.lastSavedView = null;
+    if (!keepView) {
+      this.x = 0;
+      this.y = 0;
+      this.scale = 1;
+      try {
+        const view = key ? JSON.parse(localStorage.getItem(key) || 'null') : null;
+        if (view && Number.isFinite(view.x) && Number.isFinite(view.y) &&
+            Number.isFinite(view.scale) && view.scale >= 0.2 && view.scale <= 3) {
+          this.x = view.x;
+          this.y = view.y;
+          this.scale = view.scale;
+        }
+      } catch { /* Unavailable storage or invalid saved data uses the default view. */ }
+    }
+    this.render();
+  }
+
+  saveView() {
+    if (!this.persistenceKey) return;
+    const serialized = JSON.stringify({ x: this.x, y: this.y, scale: this.scale });
+    if (serialized === this.lastSavedView) return;
+    try {
+      // Save each changed view immediately: even a reload during a gesture is safe.
+      localStorage.setItem(this.persistenceKey, serialized);
+      this.lastSavedView = serialized;
+    } catch { /* Storage restrictions must not interrupt navigation or gestures. */ }
   }
 
   render() {
@@ -94,6 +132,7 @@ class DiagramViewport {
     // Hidden overflow is still scrollable by focus; camera state owns this viewport.
     this.stage.scrollLeft = 0;
     this.stage.scrollTop = 0;
+    this.saveView();
   }
 
   ignoredTarget(target) {

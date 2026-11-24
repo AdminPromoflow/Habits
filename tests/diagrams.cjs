@@ -135,6 +135,7 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
       constructor(options) { this.options = options; this.reset(); }
       reset() { this.x = 0; this.y = 0; this.scale = 1; this.interacting = false; }
       mount(stage, content, anchor) { this.stage = stage; this.content = content; this.anchor = anchor; }
+      setPersistenceKey(key, options) { this.persistenceKey = key; this.persistenceOptions = options; }
       reveal(target) { this.revealed = target; }
       isInteracting() { return this.interacting; }
     },

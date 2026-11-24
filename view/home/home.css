@@ -413,6 +413,10 @@ button.diagram-handle {
 .diagram-handle-more { top: -38px; left: 20px; }
 .diagram-handle-text { top: -38px; right: 20px; }
 .diagram-handle-add { top: calc(50% - 14px); right: -38px; }
+button.diagram-handle-add { touch-action: none; }
+.diagram-connection-preview { width: 100%; height: 100%; z-index: 4; }
+.mindmap-stage.is-connecting, .mindmap-stage.is-connecting * { cursor: crosshair !important; user-select: none; }
+.diagram-node.is-connection-target { border-color: var(--purple-dark); box-shadow: 0 0 0 5px #8e78b840; }
 .diagram-handle-star { bottom: -38px; left: 20px; }
 .diagram-handle-arrows { bottom: -38px; right: 20px; }
 button.diagram-handle-arrows { cursor: ew-resize; touch-action: none; }

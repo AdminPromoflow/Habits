@@ -8,13 +8,14 @@ class HomePage extends PageController {
     this.nodeTools = new DiagramNodeTools(this);
     this.generation = 0;
     this.viewport = new DiagramViewport({
-      canInteract: () => !this.drag && !this.resizing && !this.layoutOpen && !this.titleEditing,
+      canInteract: () => !this.drag && !this.resizing && !this.connectionTool?.drag && !this.layoutOpen && !this.titleEditing,
       onInteractionStart: () => {
         this.menuOpen = false;
         this.syncNodeState();
       },
     });
     this.reset();
+    this.connectionTool = new DiagramConnections(this);
     document.addEventListener('load', (event) => {
       if (event.target.classList?.contains('diagram-node-image')) this.positionTree();
     }, true);
@@ -141,7 +142,7 @@ class HomePage extends PageController {
             !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey &&
             this.selected && this.keyFor(event.target) === this.selectedKey &&
             !this.editing && !this.titleEditing && !this.layoutOpen && !this.switching &&
-            !this.drag && !this.resizing && !this.viewport.isInteracting()) {
+            !this.drag && !this.resizing && !this.connectionTool.drag && !this.viewport.isInteracting()) {
           event.preventDefault();
           // Holding Delete must not continue deleting the newly selected parent.
           if (!event.repeat && !this.nodeTools.busy) void this.nodeTools.remove();
@@ -198,6 +199,7 @@ class HomePage extends PageController {
   reset() {
     clearTimeout(this.timer);
     this.generation++;
+    this.connectionTool?.cancel();
     this.finishNodeDrag(false);
     this.finishNodeResize(false);
     this.viewport?.reset();
@@ -206,6 +208,7 @@ class HomePage extends PageController {
     this.layoutPanel = null;
     this.layoutOpen = false;
     this.nodes = null;
+    this.connections = [];
     this.childDrafts = new Set();
     this.draftOrigins = new Map();
     this.submittedChildren = new Map();
@@ -239,6 +242,7 @@ class HomePage extends PageController {
         null;
       this.selectedKey = 'root';
       this.nodes = this.treeFor(this.active);
+      this.connections = this.connectionsFor(this.active);
       this.name = this.nodes.find((node) => node.id === 'root')?.text || '';
       this.diagramTitle = this.active?.name || '';
       this.rememberDiagram();
@@ -394,6 +398,7 @@ class HomePage extends PageController {
     this.element('name')?.blur();
     this.finishNodeDrag();
     this.finishNodeResize();
+    this.connectionTool.cancel();
     do {
       await this.save();
       if (generation !== this.generation || this.error) return false;
@@ -443,6 +448,7 @@ class HomePage extends PageController {
       nodeKey: esc(node.id),
       suffix: node.id === 'root' ? '' : `-${esc(node.id)}`,
       addChildLabel: esc(t('diagram_add_child')),
+      addChildHint: esc(t('diagram_add_child_hint')),
       addSiblingLabel: esc(t('diagram_add_sibling')),
       widthLabel: esc(t('diagram_node_width')),
       widthHint: esc(t('diagram_node_width_hint')),
@@ -481,6 +487,14 @@ class HomePage extends PageController {
     return diagram?.nodes?.length ? JSON.parse(JSON.stringify(diagram.nodes)) : [{
       id: 'root', parent_id: null, text: diagram?.name || '', layout: null, x: null, y: null, width: null,
     }];
+  }
+
+  connectionsFor(diagram) {
+    return (diagram?.connections || []).map((edge) => ({ ...edge }));
+  }
+
+  connectionFingerprint(connections) {
+    return JSON.stringify(connections.map((edge) => [edge.from, edge.to].sort().join(':')).sort());
   }
 
   ensureTree() {
@@ -525,6 +539,7 @@ class HomePage extends PageController {
     if (!this.active && !this.draft) return false;
     const nodes = this.snapshot();
     return !!this.draft || this.titleName() !== this.active.name ||
+      this.connectionFingerprint(this.connections) !== this.connectionFingerprint(this.connectionsFor(this.active)) ||
       this.fingerprint(nodes) !== this.fingerprint(this.treeFor(this.active));
   }
 
@@ -683,6 +698,7 @@ class HomePage extends PageController {
   }
 
   positionTree() {
+    this.syncViewport();
     const stage = document.getElementById('mindmap-stage');
     const scene = document.getElementById('diagram-scene');
     const enabled = !!(this.active || this.draft);
@@ -708,7 +724,7 @@ class HomePage extends PageController {
       return;
     }
     this.commitName();
-    this.plan = DiagramLayout.arrange(this.nodes, sizes);
+    this.plan = DiagramLayout.arrange(this.nodes, sizes, this.connections);
     scene.style.width = `${this.plan.width}px`;
     scene.style.height = `${this.plan.height}px`;
     const connections = document.getElementById('diagram-connections');
@@ -732,6 +748,14 @@ class HomePage extends PageController {
       anchorX: this.plan.origin.x + rootPosition.width / 2,
       anchorY: this.plan.origin.y + rootPosition.height / 2,
     });
+  }
+
+  syncViewport(keepView = false) {
+    // Origin storage plus installation path, account and diagram isolate saved views.
+    const key = S.user?.id && this.active?.id
+      ? `diagram-view:v1:${JSON.stringify([new URL(location.href).pathname, String(S.user.id), String(this.active.id)])}`
+      : null;
+    this.viewport.setPersistenceKey(key, { keepView });
   }
 
   addChild() {
@@ -883,8 +907,8 @@ class HomePage extends PageController {
       this.drag = {
         key, root, pointerId: event.pointerId,
         startX: event.clientX, startY: event.clientY,
-        x: position ? position.x - this.plan.origin.x : node.x || 0,
-        y: position ? position.y - this.plan.origin.y : node.y || 0,
+        x: position ? position.baseX ?? position.x - this.plan.origin.x : node.x || 0,
+        y: position ? position.baseY ?? position.y - this.plan.origin.y : node.y || 0,
         scale: this.viewport.scale,
         descendants: this.branchNodes(key).filter((item) => item.id !== key &&
           Number.isFinite(item.x) && Number.isFinite(item.y)).map((item) => ({ id: item.id, x: item.x, y: item.y })),
@@ -1072,6 +1096,7 @@ class HomePage extends PageController {
       this.switching ||
       this.pickerOpen ||
       this.nodeTools.busy ||
+      this.connectionTool.drag ||
       this.error ||
       this.layoutOpen ||
       this.drag ||
@@ -1112,6 +1137,7 @@ class HomePage extends PageController {
     const data = this.active
       ? { id: this.active.id, version: this.active.version, name, nodes }
       : { client_key: this.draft.client_key, name, nodes };
+    data.connections = this.connections.map((edge) => ({ ...edge }));
     this.saving = true;
     for (const node of nodes) {
       if (this.childDrafts.has(node.id)) this.submittedChildren.set(node.id, node.text);
@@ -1123,7 +1149,11 @@ class HomePage extends PageController {
       const diagram = await this.makeRequest('saveDiagram', data);
       if (generation !== this.generation) return;
       diagram.nodes ||= nodes.map((node) => ({ ...node }));
+      diagram.connections ||= data.connections;
+      const created = !!this.draft;
       this.active = diagram;
+      // Keep any pan/zoom made while the new diagram's first save was pending.
+      this.syncViewport(created);
       for (const node of diagram.nodes) {
         this.childDrafts.delete(node.id);
         this.draftOrigins.delete(node.id);

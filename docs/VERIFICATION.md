@@ -1,5 +1,11 @@
 # Verificación realizada
 
+## Eliminar una rama con el teclado
+
+- Verificado el atajo Delete/Suprimir y Backspace/Retroceso sobre el cuadro seleccionado con foco. Usa la misma eliminación que la papelera: quita el cuadro y todos sus descendientes, conserva los otros árboles y guarda el resultado. Si se elimina la única idea principal se mantiene la confirmación existente del borrado completo.
+- Mientras se edita texto o el nombre del diagrama no se elimina la rama. Se ignoran composiciones, combinaciones con modificadores y pulsaciones repetidas; tampoco se ejecuta durante arrastres, ajuste de ancho, distribución modal, cambio de diagrama o una eliminación pendiente.
+- 100 pruebas del editor aprobadas, incluidas eliminación con ambas teclas, descendientes de varios niveles, persistencia y relectura, conservación de hermanos y recuperación del foco. Revisión de código independiente sin fallos bloqueantes. Sin modificaciones en Hostinger ni pruebas destructivas sobre datos reales.
+
 ## Cuadros vacíos y conexiones simétricas — 23 de noviembre de 2026
 
 - Los cuadros admiten texto vacío, incluso la idea principal. Los hijos y hermanos nuevos entran en el guardado automático; salir del campo o pulsar Enter los conserva. Se pueden crear hijos, copiar y pegar desde ideas vacías. Escape sigue permitiendo cancelar un borrador todavía no enviado y restaura correctamente un texto vacío ya guardado.
