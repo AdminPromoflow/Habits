@@ -2,17 +2,19 @@
 
 class HomePage extends PageController {
   constructor() {
-    super(['create-diagram', 'retry-diagram']);
+    super(['create-diagram', 'retry-diagram', 'toggle-diagram-menu']);
     this.generation = 0;
     this.reset();
     document.addEventListener('click', (event) => {
       const node = event.target.closest?.('.diagram-node');
       if (node) {
+        this.menuOpen = false;
         this.selectNode();
         if (!this.editing) node.focus();
       } else if (this.selected && !event.target.closest?.('.diagram-root')) {
         document.getElementById('diagram-name')?.blur();
         this.selected = false;
+        this.menuOpen = false;
         this.syncNodeState();
       }
     });
@@ -43,6 +45,13 @@ class HomePage extends PageController {
     });
     document.addEventListener('keydown', (event) => {
       if (event.isComposing) return;
+      if (event.key === 'Escape' && this.menuOpen) {
+        event.preventDefault();
+        this.menuOpen = false;
+        this.syncNodeState();
+        document.getElementById('diagram-more')?.focus();
+        return;
+      }
       if (event.target.id === 'diagram-node') {
         if (event.key === 'Enter' || event.key === 'F2') {
           event.preventDefault();
@@ -96,6 +105,7 @@ class HomePage extends PageController {
     this.draft = null;
     this.name = '';
     this.selected = false;
+    this.menuOpen = false;
     this.editing = false;
     this.saving = false;
     this.error = '';
@@ -121,11 +131,19 @@ class HomePage extends PageController {
   stageContent() {
     if (!this.active && !this.draft)
       return renderTemplate('diagram-start', { label: t('create_diagram') });
+    const options = ['copy', 'cut', 'paste', 'trash', 'image', 'format',
+      'link', 'checkbox', 'calendar', 'tag', 'branch', 'resize'];
+    const menuFields = Object.fromEntries(options.flatMap((name) => [
+      [`${name}Label`, esc(t(`diagram_option_${name}`))],
+      [`${name}Icon`, icon(name)],
+    ]));
     return renderTemplate('diagram-node', {
+      ...menuFields,
       label: t('diagram_name'),
       placeholder: t('diagram_name'),
       hint: t('diagram_interaction_hint'),
       nodeLabel: esc(`${t('diagram_name')}: ${this.name}`),
+      menuLabel: t('diagram_options'),
       name: esc(this.name),
     });
   }
@@ -145,11 +163,12 @@ class HomePage extends PageController {
   beginEditing() {
     if (!this.active && !this.draft) return;
     this.selected = true;
+    this.menuOpen = false;
     this.editing = true;
     this.syncNodeState();
     const input = document.getElementById('diagram-name');
     input?.focus();
-    input?.select();
+    input?.setSelectionRange(input.value.length, input.value.length);
   }
 
   syncNodeState() {
@@ -157,9 +176,14 @@ class HomePage extends PageController {
     const node = document.getElementById('diagram-node');
     const input = document.getElementById('diagram-name');
     const controls = document.getElementById('diagram-controls');
+    const menu = document.getElementById('diagram-menu');
+    const more = document.getElementById('diagram-more');
+    const menuVisible = this.selected && this.menuOpen;
     root?.classList.toggle('is-selected', this.selected);
     root?.classList.toggle('is-editing', this.editing);
     if (controls) controls.hidden = !this.selected;
+    if (menu) menu.hidden = !menuVisible;
+    more?.setAttribute('aria-expanded', String(menuVisible));
     if (node) {
       node.tabIndex = this.editing ? -1 : 0;
       node.setAttribute('role', this.editing ? 'group' : 'button');
@@ -193,6 +217,13 @@ class HomePage extends PageController {
 
   async handleAction(action) {
     if (action === 'retry-diagram') return this.save();
+    if (action === 'toggle-diagram-menu') {
+      if (!this.active && !this.draft) return;
+      this.selected = true;
+      this.menuOpen = !this.menuOpen;
+      this.syncNodeState();
+      return;
+    }
     if (this.active || this.draft) return;
     this.draft = { client_key: crypto.randomUUID() };
     this.name = t('diagram_default_name');

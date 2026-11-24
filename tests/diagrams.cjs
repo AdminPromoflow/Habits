@@ -65,6 +65,9 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
   const node = element('diagram-node', 'diagram-node', root);
   const controls = element('diagram-controls', 'diagram-controls', root);
   const tool = element('diagram-tool', 'diagram-tool', controls);
+  const more = element('diagram-more', 'diagram-handle diagram-handle-more', controls);
+  const menu = element('diagram-menu', 'diagram-menu diagram-popover', root);
+  const menuItem = element('diagram-menu-item', 'diagram-menu-item', menu);
   const outside = element('outside');
   element('create-diagram', '', stage);
   const field = Object.assign(element('diagram-name', '', node), {
@@ -74,6 +77,7 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
     readOnly: true,
     blurred: false,
     select() { this.selectionStart = 0; this.selectionEnd = this.value.length; },
+    setSelectionRange(start, end) { this.selectionStart = start; this.selectionEnd = end; },
   });
   let html = '';
   Object.defineProperty(stage, 'innerHTML', {
@@ -109,7 +113,7 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
     return event;
   }
   return {
-    home, state, timers, stage, field, root, node, controls, tool, outside, document, windowListeners,
+    home, state, timers, stage, field, root, node, controls, tool, more, menu, menuItem, outside, document, windowListeners,
     typeName(value) {
       field.value = value;
       documentListeners.get('input')({ target: field });
@@ -132,6 +136,91 @@ function savedEditor() {
   return fixture;
 }
 
+test('the more action toggles its panel without editing or saving the diagram', async () => {
+  const { home, field, more, menu, controls } = savedEditor();
+  home.makeRequest = () => { throw new Error('Opening the panel must not save'); };
+  assert.equal(home.menuOpen, false);
+  assert.equal(menu.hidden, true);
+  assert.equal(more.getAttribute('aria-expanded'), 'false');
+
+  await home.handleAction('toggle-diagram-menu');
+  assert.equal(home.menuOpen, true);
+  assert.equal(home.selected, true);
+  assert.equal(home.editing, false);
+  assert.equal(field.readOnly, true);
+  assert.equal(menu.hidden, false);
+  assert.equal(controls.hidden, false);
+  assert.equal(more.getAttribute('aria-expanded'), 'true');
+
+  await home.handleAction('toggle-diagram-menu');
+  assert.equal(home.menuOpen, false);
+  assert.equal(menu.hidden, true);
+  assert.equal(more.getAttribute('aria-expanded'), 'false');
+  assert.equal(home.selected, true);
+});
+
+test('the panel closes on outside or node clicks and when editing begins', async () => {
+  const { home, menu, menuItem, field, outside, click, doubleClick } = savedEditor();
+  home.makeRequest = () => { throw new Error('Panel interactions must not save'); };
+  await home.handleAction('toggle-diagram-menu');
+  click(menuItem);
+  assert.equal(home.menuOpen, true);
+  assert.equal(menu.hidden, false);
+  click(outside);
+  assert.equal(home.menuOpen, false);
+  assert.equal(menu.hidden, true);
+  assert.equal(home.selected, false);
+
+  await home.handleAction('toggle-diagram-menu');
+  click();
+  assert.equal(home.menuOpen, false);
+  assert.equal(menu.hidden, true);
+  assert.equal(home.selected, true);
+  assert.equal(home.editing, false);
+
+  await home.handleAction('toggle-diagram-menu');
+  doubleClick();
+  assert.equal(home.menuOpen, false);
+  assert.equal(menu.hidden, true);
+  assert.equal(home.editing, true);
+  assert.equal(field.readOnly, false);
+  assert.equal(field.selectionStart, field.value.length);
+  assert.equal(field.selectionEnd, field.value.length);
+});
+
+test('Escape closes the panel and restores the more button focus before deselecting', async () => {
+  const { home, node, more, menu, menuItem, controls, document, pressKey } = savedEditor();
+  await home.handleAction('toggle-diagram-menu');
+  menuItem.focus();
+  assert.equal(pressKey('Escape', { target: menuItem }).prevented, true);
+  assert.equal(home.menuOpen, false);
+  assert.equal(menu.hidden, true);
+  assert.equal(home.selected, true);
+  assert.equal(document.activeElement, more);
+  assert.equal(more.getAttribute('aria-expanded'), 'false');
+
+  node.focus();
+  assert.equal(pressKey('Escape', { target: node }).prevented, true);
+  assert.equal(home.selected, false);
+  assert.equal(controls.hidden, true);
+});
+
+test('account reset and reload never restore an open diagram panel', async () => {
+  const { home, state } = savedEditor();
+  await home.handleAction('toggle-diagram-menu');
+  assert.equal(home.menuOpen, true);
+  home.reset();
+  assert.equal(home.menuOpen, false);
+  assert.equal(home.selected, false);
+
+  const restored = editor({ draft: false, state: JSON.parse(JSON.stringify(state)) });
+  restored.home.render();
+  restored.home.drawStage();
+  assert.equal(restored.home.menuOpen, false);
+  assert.equal(restored.menu.hidden, true);
+  assert.equal(restored.more.getAttribute('aria-expanded'), 'false');
+});
+
 test('a single click selects the node and reveals controls without editing or saving', () => {
   const { home, node, field, controls, root, document, click } = savedEditor();
   home.makeRequest = () => { throw new Error('Selection must not save'); };
@@ -147,7 +236,7 @@ test('a single click selects the node and reveals controls without editing or sa
   assert.equal(home.isEditing(), true, 'selection protects the node from polling redraws');
 });
 
-test('only the double click unlocks the text area, and clicking inside keeps the caret', () => {
+test('double click edits with the caret at the end, and clicking inside keeps its position', () => {
   const { home, field, controls, document, click, doubleClick } = savedEditor();
   click();
   click();
@@ -159,6 +248,8 @@ test('only the double click unlocks the text area, and clicking inside keeps the
   assert.equal(controls.hidden, false);
   assert.equal(field.readOnly, false);
   assert.equal(document.activeElement, field);
+  assert.equal(field.selectionStart, field.value.length);
+  assert.equal(field.selectionEnd, field.value.length);
   field.selectionStart = 3;
   field.selectionEnd = 3;
   click(field);

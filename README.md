@@ -59,7 +59,7 @@ Los constructores JavaScript registran las acciones una sola vez. Los eventos co
 
 ## Primer paso del editor de diagramas
 
-En Inicio, **Crear diagrama** muestra inmediatamente un rectángulo con esquinas redondeadas en el centro y guarda su creación como «Nuevo diagrama». Queda seleccionado, con cinco símbolos alrededor. **Un clic** selecciona el cuadro; **doble clic** habilita la edición del texto. Los símbolos son visuales por ahora, sin acciones asignadas. Pulsar fuera del cuadro oculta los símbolos y guarda la edición. También se puede usar Tab para enfocar el nodo y Enter o F2 para editarlo.
+En Inicio, **Crear diagrama** muestra inmediatamente un rectángulo con esquinas redondeadas en el centro y guarda su creación como «Nuevo diagrama». Queda seleccionado, con cinco símbolos alrededor. **Un clic** selecciona el cuadro; **doble clic** habilita la edición con el cursor al final del texto, sin seleccionarlo. Los símbolos son visuales por ahora, sin acciones asignadas. Pulsar fuera del cuadro oculta los símbolos y guarda la edición. También se puede usar Tab para enfocar el nodo y Enter o F2 para editarlo.
 
 El nodo tiene 10 px de espacio interior y ajusta su altura al texto: durante la edición, **Shift + Enter** añade una línea y **Enter** guarda y termina de editar. Los nombres y saltos de línea se guardan automáticamente y se recuperan al volver a entrar. Escape restaura el último nombre guardado al editar, o deselecciona el cuadro fuera de la edición. Los diagramas son privados y tienen control de versión para no sobrescribir cambios hechos en otra pestaña.
 

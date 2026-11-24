@@ -100,6 +100,7 @@
   position: absolute;
   width: 36px;
   height: 36px;
+  padding: 0;
   display: grid;
   place-items: center;
   border: 2px solid #77787f;
@@ -109,6 +110,10 @@
   box-shadow: 0 2px 5px #34304418;
   pointer-events: auto;
   cursor: default;
+}
+
+button.diagram-handle {
+  cursor: pointer;
 }
 
 .diagram-handle svg {
@@ -121,6 +126,72 @@
 .diagram-handle-add { top: calc(50% - 18px); right: -48px; }
 .diagram-handle-star { bottom: -48px; left: 20px; }
 .diagram-handle-arrows { bottom: -48px; right: 20px; }
+
+.diagram-menu {
+  position: absolute;
+  z-index: 5;
+  bottom: calc(100% + 64px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(360px, calc(100vw - 32px));
+  padding: 10px;
+  border: 1px solid #c8c7ca;
+  border-radius: 16px;
+  background: #eeedef;
+  box-shadow: 0 6px 20px #34304424;
+}
+
+.diagram-menu[hidden] {
+  display: none;
+}
+
+.diagram-menu::after {
+  content: '';
+  position: absolute;
+  left: calc(50% - 7px);
+  bottom: -8px;
+  width: 14px;
+  height: 14px;
+  transform: rotate(45deg);
+  background: #eeedef;
+  border-right: 1px solid #c8c7ca;
+  border-bottom: 1px solid #c8c7ca;
+}
+
+.diagram-menu-row {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  padding: 4px 0;
+  border: 1px solid #dddcdf;
+  border-radius: 9px;
+}
+
+.diagram-menu-row + .diagram-menu-row {
+  margin-top: 8px;
+}
+
+.diagram-menu-row button {
+  display: grid;
+  place-items: center;
+  height: 28px;
+  padding: 0;
+  color: #707074;
+}
+
+.diagram-menu-row button + button {
+  border-left: 1px solid #d9d8dc;
+}
+
+.diagram-menu-row button:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
+.diagram-menu-row .icon {
+  width: 23px;
+  height: 23px;
+  stroke-width: 1.7;
+}
 
 .diagram-status.is-error {
   position: absolute;
