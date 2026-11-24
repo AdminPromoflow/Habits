@@ -1,5 +1,13 @@
 # Verificación realizada
 
+## Alcance del cambio de distribución — 23 de noviembre de 2026
+
+- El selector incluye dos opciones excluyentes debajo de las direcciones: «Modificar todo el diagrama» y «Modificar todos los hijos» (predeterminada, incluye el cuadro seleccionado). Afectan tanto al modo como a la dirección.
+- Todo el diagrama aplica el estilo desde la raíz, aunque se abra el panel desde un hijo. La opción de hijos solo cambia el cuadro seleccionado y sus descendientes. En el grupo elegido se limpian los estilos propios y las posiciones manuales anteriores; las ramas externas conservan sus valores. «Heredar del padre» cambia a «Predeterminado» al elegir todo el diagrama.
+- 81 pruebas JavaScript aprobadas: 39 del editor, 31 de distribución/conectores y 11 de cámara. Las nuevas comprobaciones cubren alcance, herencia, aislamiento de ancestros/hermanos, guardado único y recuperación tras recargar.
+- Navegador local sobre base aislada: aplicar Horizontal/Derecha a todo el diagrama desde un hijo; recargar y comprobar raíz y herencia del hijo; aplicar Vertical/Abajo solo a la rama y recuperar esa elección, manteniendo Horizontal en su padre. Vista móvil de 390 × 844 sin desbordamiento horizontal, opciones y Aplicar accesibles. Capturas: `tests/.runtime/diagram-layout-scope-desktop.png` y `diagram-layout-scope-mobile.png`.
+- Cambios locales, sin publicación ni cambios del esquema de base de datos. Este alcance reemplaza el comportamiento anterior que conservaba las excepciones de las subramas al cambiar el estilo del padre.
+
 ## Desplazamiento, zoom, manito y conectores — 23 de noviembre de 2026
 
 - Cámara independiente de los datos: arrastre del fondo con clic mantenido, desplazamiento horizontal/vertical con trackpad y zoom de pinza (20 %–300 %) anclado al cursor. Se atienden eventos wheel de Chromium y gestos acumulativos de Safari, evitando procesar el mismo zoom dos veces. La cámara se conserva durante los redibujados de la página y se reinicia al cambiar de cuenta.
