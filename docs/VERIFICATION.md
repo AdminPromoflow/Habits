@@ -1,5 +1,11 @@
 # Verificación realizada
 
+## Guías de alineación durante el arrastre — 24 de noviembre de 2026
+
+- Guías horizontales y verticales para bordes y centros, calculadas sobre el tamaño visible de cada cuadro, sin incluir herramientas ni etiquetas externas. Tolerancia de 4 px en pantalla con cualquier zoom; se excluye toda la rama que se desplaza y no se modifica el movimiento del cursor.
+- 178 pruebas de geometría, editor y cámara aprobadas. Incluyen tamaños distintos, ambos ejes, exclusión de descendientes automáticos y manuales, movimiento sin ajustes automáticos, guardado al soltar y limpieza al terminar, cancelar, perder captura/foco o cambiar de cuenta. Sintaxis JavaScript/PHP y revisión de diferencias correctas.
+- Navegador sobre la base aislada: dos ideas principales arrastradas hasta compartir su altura, posición actualizada y guías vacías al soltar; sin errores de consola. Cambios locales, sin migraciones ni publicación.
+
 ## Flechitas de topics y ruta exclusiva de diagramas — 24 de noviembre de 2026
 
 - Los cuadros muestran solamente → o ← para destinos específicos, sin icono de cadena ni contador. Una tarjeta al pasar el cursor o enfocar la flecha identifica Diagrama y Topic por separado; se mantiene fuera del zoom y del recorte del lienzo, admite varios orígenes y se cierra con Escape.
