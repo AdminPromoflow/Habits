@@ -1,5 +1,13 @@
 # Verificación realizada
 
+## Flecha en el padre y selector de diagramas hermanos — 24 de noviembre de 2026
+
+- El cuadro que enlaza a un diagrama completo vuelve a mostrar su flechita. El tooltip identifica el diagrama completo, sin presentarlo como topic inexistente. El destino no recibe flechas de regreso por este tipo de enlace y usa la ruta superior.
+- Cada nivel de la ruta muestra un solo hijo y un desplegable pequeño cuando hay hermanos. Cambiar de hermano conserva el padre y descarta los niveles de la rama anterior. Orden inicial alfabético, opción de subir/bajar y restaurar el orden; persistencia en `localStorage` por cuenta, instalación y padre.
+- 162 pruebas del editor y navegación aprobadas, incluidas las pruebas del historial que estaban presentes en el proyecto. Casos específicos: flecha para diagrama completo, un solo hermano por nivel, cambio entre hermanos desde una rama profunda, reordenación, recarga, aislamiento de preferencias y eliminación de destinos. Sintaxis PHP y `git diff --check` correctos.
+- Navegador local: «Second tree» enlaza a «Proyecto de aprendizaje» y «Título del conjunto». Ambos cuadros de origen tienen flecha. Cambiar al segundo hijo dejó la ruta «Second tree › Título del conjunto» y cero flechas en los cuadros del destino. Subir ese hijo al primer lugar se conservó al volver al padre y recargar. También se comprobó la flecha del padre, el cierre del menú con Escape y ausencia de errores de consola.
+- Captura: `tests/.runtime/diagram-sibling-navigation.jpg`. Sin cambios de esquema ni despliegue realizado desde esta tarea.
+
 ## Guías de alineación durante el arrastre — 24 de noviembre de 2026
 
 - Guías horizontales y verticales para bordes y centros, calculadas sobre el tamaño visible de cada cuadro, sin incluir herramientas ni etiquetas externas. Tolerancia de 4 px en pantalla con cualquier zoom; se excluye toda la rama que se desplaza y no se modifica el movimiento del cursor.
