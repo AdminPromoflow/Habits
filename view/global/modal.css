@@ -1,0 +1,227 @@
+dialog {
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  color: var(--ink);
+  background: var(--surface);
+  width: min(510px, calc(100% - 28px));
+  max-height: 90vh;
+  max-height: 90dvh;
+  box-shadow: 0 25px 100px #34204730;
+  overflow: auto;
+}
+dialog.wide {
+  width: min(710px, calc(100% - 28px));
+}
+dialog::backdrop {
+  background: #3324434d;
+  backdrop-filter: blur(4px);
+}
+.modal-header {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 2;
+  padding: 20px 26px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+.modal-header > h2 {
+  font-size: 1.45rem;
+}
+.modal-body {
+  padding: 22px 28px 28px;
+}
+.modal-body > .muted {
+  font-size: 0.875rem;
+}
+.detail-heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 23px;
+}
+.detail-heading .category-icon {
+  margin: 0;
+  flex-shrink: 0;
+}
+.detail-heading h2 {
+  font-size: 1.4rem;
+}
+.detail-heading > div {
+  flex: 1;
+}
+.detail-heading p {
+  font-size: 0.75rem;
+  margin-top: 6px;
+  color: var(--muted);
+}
+.detail-facts {
+  display: flex;
+  gap: 17px;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+  color: var(--muted);
+  margin: 22px 0;
+}
+.detail-facts > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.detail-facts .icon {
+  width: 16px;
+  height: 16px;
+}
+.detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 15px 0 25px;
+}
+.detail-actions .btn {
+  font-size: 0.8125rem;
+  padding: 10px 13px;
+}
+.detail-actions .icon {
+  width: 17px;
+}
+.progress-form {
+  padding-top: 24px;
+  margin: 20px 0 28px;
+  border-top: 1px solid var(--line);
+}
+.history-list {
+  max-height: 230px;
+  overflow: auto;
+  margin-top: 14px;
+}
+.history-list > div {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--line);
+  gap: 10px;
+  font-size: 0.8125rem;
+}
+.history-list p {
+  width: 100%;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+.group-average {
+  display: flex;
+  align-items: center;
+  gap: 23px;
+  padding: 25px;
+  background: var(--lavender-wash);
+  border-radius: 14px;
+  margin: 24px 0;
+}
+.group-average p {
+  color: var(--purple-dark);
+  font-size: 1.4rem;
+  margin-top: 5px;
+}
+.group-members > div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 17px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.875rem;
+}
+.group-members > div > div:nth-child(2) {
+  flex: 1;
+}
+.group-members small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.75rem;
+  margin-top: 5px;
+}
+.group-members .progress-track {
+  width: 110px;
+}
+.group-members details {
+  width: 100%;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+.group-members summary {
+  cursor: pointer;
+}
+.group-members details p {
+  padding: 5px 0;
+}
+.template-list > article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--line);
+}
+.template-list p {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  margin-top: 6px;
+}
+.notifications-list > article {
+  display: flex;
+  gap: 15px;
+  padding: 18px 12px;
+  border-radius: 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.875rem;
+}
+.notifications-list > article.unread {
+  background: var(--lavender-wash);
+}
+.notifications-list > article > .icon {
+  color: var(--purple);
+  margin-top: 3px;
+}
+.notifications-list p {
+  margin: 5px 0;
+}
+.notifications-list small {
+  color: var(--muted);
+  font-size: 0.6875rem;
+}
+.notifications-list strong {
+  font-weight: 550;
+}
+#toast {
+  position: fixed;
+  bottom: 25px;
+  left: 50%;
+  transform: translate(-50%, 20px);
+  padding: 14px 22px;
+  z-index: 1000;
+  max-width: calc(100% - 30px);
+  border-radius: 12px;
+  box-shadow: 0 8px 35px #21152920;
+  background: #566e60;
+  color: white;
+  font-size: 0.875rem;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.2s,
+    transform 0.2s;
+  line-height: 1.5;
+}
+#toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+#toast.error {
+  background: #9d5b71;
+}

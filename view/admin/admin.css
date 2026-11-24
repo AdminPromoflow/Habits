@@ -1,0 +1,85 @@
+.requests-card {
+  margin-top: 30px;
+}
+.request-row {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 23px 0;
+  border-bottom: 1px solid var(--line);
+}
+.request-row:last-child {
+  border-bottom: 0;
+}
+.request-row p {
+  font-size: 0.875rem;
+  color: var(--muted);
+  margin-top: 8px;
+  max-width: 650px;
+}
+.request-row h3 {
+  margin-top: 8px;
+}
+.request-row .eyebrow {
+  font-size: 0.625rem;
+}
+.table-wrap {
+  overflow-x: auto;
+  padding: 10px 22px;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  text-align: left;
+  font-size: 0.8125rem;
+}
+th {
+  font-size: 0.6875rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 550;
+}
+th,
+td {
+  padding: 19px 13px;
+  border-bottom: 1px solid var(--line);
+}
+td strong {
+  font-weight: 550;
+}
+tr:last-child td {
+  border-bottom: 0;
+}
+.admin-stats {
+  grid-template-columns: repeat(4, 1fr);
+}
+.new-users-card {
+  margin-top: 25px;
+}
+.registration-chart {
+  margin-top: 25px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+.registration-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: 0.8125rem;
+}
+.registration-row > span {
+  width: 140px;
+}
+.registration-row > .progress-track {
+  flex: 1;
+}
+.registration-row > strong {
+  font-weight: 500;
+  min-width: 30px;
+}
+.settings-panel {
+  max-width: 670px;
+}

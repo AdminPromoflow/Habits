@@ -1,6 +1,77 @@
-# MI RUTINA 3.0
+# MyRemarkable Mind
 
-Plataforma bilingüe de hábitos, rutinas y colaboración. PHP 8.2+, MySQL 8.0.16+ / MariaDB 10.4+, HTML, CSS y JavaScript; sin Node.js, Composer ni Docker en producción.
+Plataforma bilingüe de ideas, diagramas, hábitos, rutinas y colaboración. PHP 8.2+, MySQL 8.0.16+ / MariaDB 10.4+, HTML, CSS y JavaScript; sin Node.js, Composer ni Docker en producción.
+
+## Estructura por módulos
+
+El proyecto sigue la separación de vistas, controladores, seguridad y modelos de Dot63. Cada pantalla tiene su plantilla PHP/HTML, su JavaScript y sus estilos en `view/`. El HTML está en plantillas `<template>`: los cambios de pantalla y el editor del diagrama se dibujan en la página actual, sin navegación ni recarga.
+
+```text
+index.php                         Entrada de la aplicación
+view/
+  layout/                         Documento HTML, navegación y marco de la aplicación
+  home/                           Inicio: botón y nodo editable del diagrama
+  habits/                         Hábitos y sus formularios
+  categories/                     Categorías y suscripciones
+  category_week/                  Tablero semanal por categoría
+  routines/                       Rutinas
+  calendar/                       Calendario
+  progress/                       Progreso
+  sharing/                        Colaboración
+  profile/                        Preferencias de la cuenta
+  auth/                           Acceso y recuperación de contraseña
+  admin/                          Administración
+  global/                         AJAX, eventos delegados y componentes compartidos
+controller/
+  diagrams/index.php              Endpoint AJAX público del módulo
+  diagrams/diagrams.php           Controlador de acciones del diagrama
+  habits/, categories/, ...      Controladores de los demás módulos
+  security/                      Sesiones, CSRF, permisos, validación y errores
+  config/                        Conexión PDO y manifiesto de vistas/recursos
+  emails/                        Correo de recuperación
+  routes.php                     Lista explícita de acciones y módulos
+model/
+  diagrams/diagrams.php           Consultas de diagramas privados
+  habits/, categories/, ...      Operaciones de cada módulo
+  base.php                       Contexto de usuario y funciones compartidas
+database/migrations/             Cambios de esquema incrementales
+translations/                    Textos de interfaz en inglés y español
+config/local.php                 Configuración privada de cada instalación
+```
+
+Ejemplo del recorrido completo de una acción:
+
+```text
+view/home/home.php               HTML del botón y del nodo
+  → view/home/home.js            Evento → método → makeRequest()
+  → view/global/request.js       Petición AJAX y respuesta JSON
+  → controller/diagrams/index.php
+  → controller/security/request.php  Sesión, CSRF, acción y método HTTP
+  → controller/diagrams/diagrams.php
+  → model/diagrams/diagrams.php   Propiedad del registro y consultas preparadas
+  → MySQL
+  → respuesta JSON → JavaScript → actualización del mismo nodo
+```
+
+Los constructores JavaScript registran las acciones una sola vez. Los eventos compartidos delegan al controlador de cada pantalla. Las plantillas reciben campos con nombre, como `{{heading}}` o `{{name}}`; los datos personales se escapan antes de insertarse. Las solicitudes comparten el transporte AJAX para evitar copias divergentes de la lógica de sesiones y errores.
+
+`api.php` y `app/bootstrap.php` se conservan como entradas de compatibilidad; la implementación está en las carpetas nuevas. Solo los `index.php` de controladores enumerados son endpoints públicos. Los modelos, la configuración y los archivos internos de seguridad están bloqueados por el router local y `.htaccess`.
+
+## Primer paso del editor de diagramas
+
+En Inicio, **Crear diagrama** muestra inmediatamente un nodo circular en el centro y enfoca el campo del nombre. El nombre se guarda después de escribir o pulsar Enter; se puede editar dentro del mismo nodo y se recupera al volver a entrar. Escape cancela un borrador vacío. Los diagramas son privados y tienen control de versión para no sobrescribir cambios hechos en otra pestaña.
+
+Esta primera entrega incluye el nodo inicial. Las ramas, conexiones y herramientas adicionales se definirán en los siguientes pasos; no depende de servicios externos de SimpleMind.
+
+## Actualizar una instalación existente
+
+Los cambios de esta entrega están guardados localmente y no se publican automáticamente. Tras copiar manualmente el proyecto al servidor, ejecuta con PHP 8.2 o superior:
+
+```sh
+php bin/migrate.php
+```
+
+La migración `005_diagrams.sql` añade la tabla de diagramas. No importa una base nueva ni reemplaza usuarios, hábitos, rutinas o registros existentes. Conserva el `config/local.php` propio del servidor.
 
 ## Abrir la instalación local
 
@@ -44,6 +115,7 @@ El importador utiliza identificadores de origen para no duplicar rutinas ni ejer
 
 ```sh
 PHP_BIN=/opt/homebrew/bin/php python3 tests/functional.py
+node --test tests/diagrams.cjs
 ```
 
 Requiere Python 3, PHP con PDO MySQL y un usuario de MySQL autorizado para crear una base aislada `mi_rutina_test_*`. Configura `RUTINA_TEST_DB_USER` y `RUTINA_TEST_DB_PASSWORD` según tu entorno; el valor predeterminado `root` sin contraseña corresponde únicamente al XAMPP local. No usa la base real de Aleina.

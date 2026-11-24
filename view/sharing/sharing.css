@@ -1,0 +1,152 @@
+.tabs {
+  display: flex;
+  gap: 24px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 25px;
+  overflow-x: auto;
+}
+.tabs > button {
+  position: relative;
+  padding: 0 0 17px;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  border-bottom: 2px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tabs > button.active {
+  color: var(--purple-dark);
+  border-bottom-color: var(--purple);
+  font-weight: 600;
+}
+.tab-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #c48b9d;
+}
+.share-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+}
+.empty-wide {
+  grid-column: 1/-1;
+}
+.share-card {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+.share-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.share-symbol {
+  width: 43px;
+  height: 43px;
+  display: grid;
+  place-items: center;
+  background: var(--lavender-wash);
+  border-radius: 13px;
+  color: var(--purple-dark);
+}
+.share-card > h3 {
+  font-family: Georgia, serif;
+  font-size: 1.3rem;
+  font-weight: 400;
+}
+.share-card > p {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.share-card .share-meta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.share-card-actions {
+  margin-top: auto;
+  padding-top: 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+  border-top: 1px solid var(--line);
+}
+.share-card-actions .btn {
+  font-size: 0.75rem;
+  padding: 9px 12px;
+  min-height: 38px;
+}
+.share-card-actions .text-btn {
+  font-size: 0.75rem;
+}
+.share-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 0.8125rem;
+  color: var(--muted);
+  margin: 7px 0 8px;
+}
+.share-details > span {
+  display: flex;
+  gap: 8px;
+}
+.share-details .icon {
+  width: 16px;
+  height: 16px;
+}
+.invitation-message {
+  background: var(--canvas);
+  border-radius: 8px;
+  padding: 12px;
+  white-space: pre-wrap;
+}
+.habit-selection {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  max-height: 220px;
+  overflow: auto;
+  padding: 8px 13px;
+  margin: 15px 0 20px;
+}
+.habit-selection > label {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.875rem;
+}
+.habit-selection > label:last-child {
+  border-bottom: 0;
+}
+.habit-selection small {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+  font-size: 0.6875rem;
+}
+.share-participants {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.7;
+  padding-bottom: 8px;
+}
+.share-participants > span:first-child {
+  width: 100%;
+}

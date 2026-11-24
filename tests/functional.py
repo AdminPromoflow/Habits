@@ -20,9 +20,10 @@ def check(value,message):
 class Client:
  def __init__(self):
   self.jar=http.cookiejar.CookieJar();self.opener=urllib.request.build_opener(urllib.request.HTTPCookieProcessor(self.jar));self.csrf=None;self.boot()
- def request(self,action,body=None,expected=200,params=None,csrf=True):
+ def request(self,action,body=None,expected=200,params=None,csrf=True,module=None):
   from urllib.parse import urlencode
-  url=BASE+'/api.php?'+urlencode(dict(action=action,**(params or {})))
+  endpoint=f'/controller/{module}/index.php' if module else '/api.php'
+  url=BASE+endpoint+'?'+urlencode(dict(action=action,**(params or {})))
   headers={};data=None
   if body is not None:
    data=json.dumps(body).encode();headers={'Content-Type':'application/json','X-CSRF-Token':self.csrf if csrf else 'invalid'}
@@ -63,6 +64,30 @@ try:
  check(len(a['data']['habits'])==40 and len(a['data']['routines'])==1,'Routine import is idempotent: 40 exercises, one routine')
  check(not a['data']['completions'],'PDF import does not fabricate completion history')
  bob.register('bob@example.test','Bob');eve.register('eve@example.test','Eve');viewer.register('viewer@example.test','Viewer')
+ # Diagrams exercise the new module endpoint and its real shared security boundary.
+ import uuid
+ diagram_key=str(uuid.uuid4())
+ guest.request('saveDiagram',{'name':'Private diagram','client_key':diagram_key},401,module='diagrams')
+ owner.request('saveDiagram',{'name':'Private diagram','client_key':diagram_key},419,csrf=False,module='diagrams')
+ check(True,'Diagram creation requires a signed-in session and CSRF protection')
+ owner.request('saveDiagram',{'name':'   ','client_key':diagram_key},422,module='diagrams')
+ owner.request('saveDiagram',{'name':'x'*121,'client_key':diagram_key},422,module='diagrams')
+ check(True,'Diagram names must be non-empty and at most 120 characters')
+ diagram=owner.request('saveDiagram',{'name':'My first diagram','client_key':diagram_key,'owner_user_id':bob.boot()['user']['id']},module='diagrams')
+ repeated=owner.request('saveDiagram',{'name':'My first diagram','client_key':diagram_key},module='diagrams')
+ check(diagram['id']==repeated['id'] and len(owner.data()['diagrams'])==1,'Retrying diagram creation is idempotent and ignores a forged owner')
+ check(not bob.request('diagrams',module='diagrams') and not guest.boot().get('data'),'Diagrams are visible only to their owner')
+ bob.request('saveDiagram',{'id':diagram['id'],'version':diagram['version'],'name':'Stolen'},404,module='diagrams')
+ check(True,'A different account cannot rename a diagram by guessing its ID')
+ renamed=owner.request('saveDiagram',{'id':diagram['id'],'version':diagram['version'],'name':'Ideas <script>literal</script>'},module='diagrams')
+ check(renamed['name']=='Ideas <script>literal</script>' and renamed['version']==2,'Renaming persists the exact name and advances its version')
+ owner.request('saveDiagram',{'id':diagram['id'],'version':diagram['version'],'name':'Stale edit'},409,module='diagrams')
+ check(owner.request('diagrams',module='diagrams')[0]['name']==renamed['name'],'Stale diagram edits cannot overwrite a newer name')
+ owner.request('saveDiagram',{'name':'Wrong endpoint','client_key':str(uuid.uuid4())},404,module='habits')
+ owner.request('diagrams',{},405,module='diagrams')
+ check(True,'Module endpoints reject unrelated actions and incorrect HTTP methods')
+ direct=owner.request('data',module='dashboard')
+ check(direct['habits']==owner.data()['habits'] and direct['diagrams'][0]['id']==diagram['id'],'Module controllers and the compatibility API return the same existing data')
  bob.request('admin',expected=403);check(True,'Normal users cannot read administration data')
  check(not bob.data()['habits'],'New users cannot see Aleina’s private routine')
  check(not bob.data()['categories'] and not bob.data()['templates'],'New users have no preselected categories or templates')
@@ -226,7 +251,7 @@ try:
  _,messages=recover('dormant@example.test');token=re.search(r'#reset=([a-f0-9]{64})',messages[0]['body']).group(1)
  fixture('suspend','dormant@example.test');recovery_guest.request('resetPassword',{'token':token,'password':replacement},403)
  _,empty=recover('dormant@example.test');check(not empty,'Suspended accounts cannot request or use password recovery')
- for path in ['config/local.php','storage/initial-access.txt','database/routine-nov-dec-2026.json','.git/config','app/Habits.php','tests/provision.php','tests/.runtime/mail/']:
+ for path in ['config/local.php','storage/initial-access.txt','database/routine-nov-dec-2026.json','.git/config','app/Habits.php','model/diagrams/diagrams.php','controller/security/bootstrap.php','controller/config/database.php','controller/diagrams/diagrams.php','view/home/home.php','tests/provision.php','tests/.runtime/mail/']:
   try:urllib.request.urlopen(BASE+'/'+path);raise AssertionError('Private path exposed: '+path)
   except urllib.error.HTTPError as e:check(e.code==404,'HTTP denies '+path)
  subprocess.run([PHP,'tests/constraints.php'],cwd=ROOT,env=env,check=True)

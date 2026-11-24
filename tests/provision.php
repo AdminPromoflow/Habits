@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-require __DIR__.'/../app/bootstrap.php';
+require __DIR__.'/../controller/security/bootstrap.php';
 $name=getenv('RUTINA_DB_NAME');
 if (PHP_SAPI!=='cli' || !preg_match('/^mi_rutina_test_[a-z0-9_]+$/D',$name?:'')) throw new RuntimeException('Only isolated mi_rutina_test_* databases are allowed.');
 $c=config(); $host=$c['db_socket']?'unix_socket='.$c['db_socket']:'host='.$c['db_host'].';port='.$c['db_port'];

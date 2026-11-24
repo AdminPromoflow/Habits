@@ -1,0 +1,34 @@
+.profile-layout {
+  display: grid;
+  grid-template-columns: 290px minmax(0, 1fr);
+  gap: 25px;
+}
+.profile-summary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  height: max-content;
+  padding: 35px 22px;
+}
+.profile-summary h2 {
+  margin: 20px 0 10px;
+}
+.profile-summary > p {
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+  margin-bottom: 15px;
+  max-width: 100%;
+}
+.profile-summary .privacy-line {
+  margin-top: 26px;
+  padding-top: 23px;
+  border-top: 1px solid var(--line);
+  text-align: left;
+}
+.password-card {
+  margin-top: 25px;
+}
+.profile-layout form > .btn {
+  margin-top: 7px;
+}

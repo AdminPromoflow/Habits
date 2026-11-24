@@ -1,5 +1,19 @@
 # Verificación realizada
 
+## Reorganización local y primer nodo del diagrama — 23 de noviembre de 2026
+
+Esta actualización se realizó únicamente en la carpeta local MyRemarkableMind. No se publicó ni se sincronizó con Hostinger o Git remoto.
+
+- 100 comprobaciones HTTP y 7 de esquema/datos completadas en una base aislada. Incluyen los recorridos anteriores, endpoints por módulo, bloqueo de los nuevos archivos internos, propiedad de diagramas, CSRF, nombres válidos, reintentos de creación y conflictos de versión.
+- 4 pruebas de JavaScript completadas para escritura durante un guardado, respuesta perdida de creación, cambio de cuenta con una solicitud pendiente y validación de nombres vacíos.
+- Navegador local: botón centrado, creación inmediata del nodo con foco, nombre editable, guardado y recuperación al recargar; inglés/español; un nombre con etiquetas HTML permanece como texto. Revisados tamaños de 1440 × 1000 y 390 × 844, sin desbordamiento horizontal en Inicio.
+- Revisadas las pantallas personales y administrativas. Comprobado el tablero semanal de Ejercicios y el guardado de un hábito adicional exclusivamente en la base de pruebas. Sin errores de consola durante estos recorridos.
+- Migración `005_diagrams.sql` aplicada a la base local. Los recuentos de registros de 11 tablas anteriores se compararon antes y después y permanecieron iguales.
+
+Capturas locales de prueba: `tests/.runtime/diagram-desktop.jpg` y `tests/.runtime/diagram-mobile.jpg` (fuera de Git). El historial de despliegue que sigue corresponde a revisiones anteriores; esta entrega requiere subir los archivos y ejecutar `php bin/migrate.php` manualmente en el servidor.
+
+## Historial anterior
+
 Fecha: 22 de noviembre de 2026.
 
 ## Automatizada

@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-require __DIR__.'/../app/bootstrap.php';
+require __DIR__.'/../controller/security/bootstrap.php';
 if (PHP_SAPI!=='cli'||!str_starts_with(config('db_name'),'mi_rutina_test_')) throw new RuntimeException('Test database required.');
 $db=database();$checks=0;
 function rejects(callable $fn): void {global $checks;try{$fn();throw new RuntimeException('Constraint did not reject invalid data.');}catch(PDOException $e){$checks++;}}

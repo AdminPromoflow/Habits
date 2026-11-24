@@ -1,0 +1,314 @@
+.auth-layout {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--cream);
+}
+.auth-form-panel {
+  padding: 35px 52px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+.auth-language {
+  position: absolute;
+  top: 42px;
+  right: 45px;
+}
+.auth-form-wrap {
+  width: 100%;
+  max-width: 385px;
+  margin: auto;
+  padding: 75px 0 60px;
+}
+.auth-form-wrap > .eyebrow {
+  font-size: 0.6875rem;
+  letter-spacing: 2px;
+  color: #a38dbb;
+  margin-bottom: 19px;
+}
+.auth-form-wrap h1 {
+  font-size: 2.6rem;
+  line-height: 1.2;
+  letter-spacing: -1.4px;
+}
+.lead {
+  font-size: 0.9375rem;
+  color: var(--muted);
+  margin: 17px 0 27px;
+  line-height: 1.8;
+}
+.auth-form-wrap .field {
+  margin: 21px 0;
+}
+.auth-form-wrap input {
+  min-height: 49px;
+  background: #ffffffa3;
+}
+.auth-form-wrap .btn.full {
+  margin-top: 12px;
+  height: 49px;
+  justify-content: space-between;
+  padding: 0 20px;
+}
+.auth-alternate {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  margin: 25px 0 8px;
+}
+.auth-alternate .text-btn {
+  font-size: 0.8125rem;
+  margin-left: 4px;
+}
+.auth-form-wrap .privacy-line {
+  justify-content: center;
+  margin-top: 30px;
+  padding-top: 25px;
+  border-top: 1px solid var(--line);
+  font-size: 0.75rem;
+}
+.auth-footer {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.625rem;
+  letter-spacing: 0.7px;
+  color: #a69aad;
+}
+.auth-footer > span {
+  font-size: 0.5625rem;
+  letter-spacing: 1.1px;
+}
+.auth-art {
+  background: #eee7f5;
+  margin: 16px 16px 16px 0;
+  border-radius: 22px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  min-height: 750px;
+}
+.art-text {
+  text-align: center;
+  margin: 65px auto 0;
+  max-width: 410px;
+  padding: 0 20px;
+  z-index: 1;
+}
+.art-text > .eyebrow {
+  font-size: 0.625rem;
+  letter-spacing: 1.8px;
+  color: #927ca9;
+}
+.art-text h2 {
+  font-size: 3.1rem;
+  line-height: 1.14;
+  letter-spacing: -1.8px;
+  margin: 24px 0 20px;
+  color: #6f5889;
+}
+.art-text p {
+  font-size: 0.875rem;
+  color: #9a88aa;
+  line-height: 1.8;
+  max-width: 330px;
+  margin: auto;
+}
+.garden {
+  width: 380px;
+  height: 365px;
+  position: relative;
+  margin: auto auto 30px;
+  flex-shrink: 0;
+  transform: scale(0.95);
+  transform-origin: center bottom;
+}
+.garden-sun {
+  width: 245px;
+  height: 245px;
+  border-radius: 50%;
+  background: #f8ecd8;
+  position: absolute;
+  left: 68px;
+  top: 37px;
+}
+.garden-orbit {
+  width: 335px;
+  height: 335px;
+  border: 1px solid #d6c6e1;
+  position: absolute;
+  top: 9px;
+  left: 22px;
+  border-radius: 50%;
+  transform: rotate(-25deg) scaleY(0.8);
+}
+.garden-pot {
+  position: absolute;
+  bottom: 0;
+  left: 131px;
+  width: 124px;
+  height: 106px;
+  background: #c6a0ba;
+  border-radius: 6px 6px 46px 46px;
+  z-index: 4;
+  box-shadow: inset -17px 0 #ba92b0;
+}
+.garden-pot:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -7px;
+  width: 138px;
+  height: 19px;
+  border-radius: 6px;
+  background: #d4b1c9;
+}
+.garden-stem {
+  position: absolute;
+  width: 7px;
+  height: 200px;
+  bottom: 103px;
+  left: 190px;
+  transform: rotate(2deg);
+  background: #9aac93;
+  border-radius: 100px;
+}
+.garden-leaf {
+  position: absolute;
+  width: 92px;
+  height: 46px;
+  background: #c0d2ac;
+  border-radius: 90% 0 90% 0;
+  z-index: 3;
+}
+.leaf-one {
+  left: 100px;
+  top: 136px;
+  transform: rotate(45deg);
+}
+.leaf-two {
+  left: 194px;
+  top: 184px;
+  transform: rotate(-23deg);
+  background: #adbf9c;
+}
+.leaf-three {
+  left: 112px;
+  top: 223px;
+  transform: rotate(35deg);
+  background: #b7c9a8;
+  width: 79px;
+  height: 37px;
+}
+.garden-blossom {
+  position: absolute;
+  top: 2px;
+  left: 137px;
+  font-size: 125px;
+  line-height: 1;
+  color: #b79bcf;
+  z-index: 5;
+  transform: rotate(10deg);
+}
+.garden-blossom:after {
+  content: '';
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  background: #fbedd4;
+  left: 37px;
+  top: 47px;
+  border-radius: 50%;
+}
+.garden-star {
+  position: absolute;
+  color: #ad95c7;
+}
+.star-one {
+  font-size: 39px;
+  right: 32px;
+  top: 93px;
+  transform: rotate(13deg);
+}
+.star-two {
+  font-size: 18px;
+  left: 34px;
+  top: 225px;
+  color: #c5a2b8;
+}
+.floating-note {
+  position: absolute;
+  bottom: 38px;
+  right: -12px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: #fffaf5eb;
+  padding: 15px 18px;
+  border-radius: 12px;
+  z-index: 6;
+  box-shadow: 0 8px 25px #7d609013;
+  transform: rotate(-5deg);
+  color: #8b7a97;
+  font-size: 0.75rem;
+}
+.floating-note > .icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #dfeddf;
+  padding: 5px;
+  color: #91a784;
+}
+.art-bottom {
+  display: flex;
+  justify-content: space-between;
+  padding: 25px 35px;
+  font-size: 0.5625rem;
+  letter-spacing: 1.3px;
+  color: #ad9bba;
+}
+.art-bottom > span {
+  color: #8e78b8;
+}
+.boot,
+.connection-state {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 20px;
+}
+.boot {
+  font-size: 0.875rem;
+  letter-spacing: 4px;
+}
+.boot-flower {
+  color: var(--purple);
+  font-size: 50px;
+  animation: breathe 1.5s infinite;
+}
+.connection-state p {
+  max-width: 450px;
+  text-align: center;
+  color: var(--muted);
+  padding: 0 20px;
+}
+@keyframes breathe {
+  50% {
+    opacity: 0.5;
+    transform: scale(0.9);
+  }
+}
+.auth-notice {
+  padding: 16px 18px;
+  margin: 0 0 24px;
+  background: var(--lavender-wash);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font-size: 0.9375rem;
+  line-height: 1.7;
+}

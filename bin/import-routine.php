@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 if (PHP_SAPI!=='cli') { http_response_code(404); exit; }
-require __DIR__.'/../app/bootstrap.php';
+require __DIR__.'/../controller/security/bootstrap.php';
 $db=database();
 $email=Validate::email($argv[1]??'aleinarossui@gmail.com');
 $file=$argv[2]??__DIR__.'/../database/routine-nov-dec-2026.json';

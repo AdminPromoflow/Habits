@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 if (PHP_SAPI!=='cli') { http_response_code(404); exit; }
-require_once __DIR__.'/../app/bootstrap.php';
+require_once __DIR__.'/../controller/security/bootstrap.php';
 if (PHP_VERSION_ID<80200) { fwrite(STDERR,"PHP 8.2+ required.\n"); exit(1); }
 $db=database();
 $lock=$db->one("SELECT GET_LOCK(CONCAT(DATABASE(),':migrations'),10) AS acquired");

@@ -1,0 +1,95 @@
+.home-page {
+  min-height: calc(100dvh - 207px);
+  display: flex;
+  flex-direction: column;
+}
+
+.home-heading {
+  flex: 0 0 auto;
+}
+
+.mindmap-stage {
+  position: relative;
+  flex: 1;
+  min-height: 380px;
+  display: grid;
+  place-items: center;
+}
+
+.create-diagram {
+  font-size: 1rem;
+  padding: 15px 27px;
+  border-radius: 999px;
+}
+
+.diagram-root {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.diagram-node {
+  width: 178px;
+  height: 178px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--lavender-wash);
+  border: 2px solid var(--lavender);
+  box-shadow: 0 8px 28px #70579512;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.diagram-node:focus-within {
+  border-color: var(--purple);
+  box-shadow: 0 0 0 5px #b8a4d420;
+}
+
+.diagram-node textarea {
+  display: block;
+  width: 144px;
+  height: 100px;
+  padding: 10px 6px;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  box-shadow: none;
+  resize: none;
+  background: transparent;
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.5;
+  text-align: center;
+  align-content: center;
+  overflow-wrap: anywhere;
+}
+
+.diagram-node textarea::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+.diagram-status.is-error {
+  position: absolute;
+  top: calc(100% + 22px);
+  width: min(300px, calc(100vw - 50px));
+  text-align: center;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #a34560;
+}
+
+.diagram-status .text-btn {
+  font-size: inherit;
+}
+
+@media (max-width: 580px) {
+  .home-page {
+    min-height: calc(100dvh - 178px);
+  }
+  .mindmap-stage {
+    min-height: 340px;
+  }
+}

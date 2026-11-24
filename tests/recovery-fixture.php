@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-require __DIR__.'/../app/bootstrap.php';
+require __DIR__.'/../controller/security/bootstrap.php';
 if (PHP_SAPI!=='cli' || !str_starts_with((string)config('db_name'),'mi_rutina_test_')) throw new RuntimeException('Isolated tests only.');
 $email=$argv[2]??'recovery@example.test';
 $db=database();

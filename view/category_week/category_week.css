@@ -1,0 +1,9 @@
+.category-week-board {
+  grid-template-columns: repeat(var(--week-columns), minmax(180px, 1fr));
+}
+
+@media (max-width: 800px) {
+  .category-week-board {
+    grid-template-columns: repeat(var(--week-columns), 195px);
+  }
+}

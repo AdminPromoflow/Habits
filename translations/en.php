@@ -363,4 +363,12 @@ return [
     'coffee' => 'Coffee',
     'music' => 'Music',
     'briefcase' => 'Work',
+    'create_diagram' => 'Create diagram',
+    'diagram_canvas' => 'Diagram canvas',
+    'diagram_name' => 'Diagram name',
+    'diagram_name_required' => 'Give your diagram a name.',
+    'diagram_saving' => 'Saving diagram…',
+    'diagram_saved' => 'Diagram saved',
+    'diagram_retry' => 'Try again',
+    'error_diagram_conflict' => 'This diagram changed in another tab. Reload to see the latest name before editing.',
 ];

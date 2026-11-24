@@ -2,7 +2,10 @@ Options -Indexes
 DirectoryIndex index.php
 <IfModule mod_rewrite.c>
 RewriteEngine On
-RewriteRule ^(?:app|config|database|bin|tests|docs|storage|tmp|translations)(?:/|$) - [F,L,NC]
+RewriteRule ^(?:app|model|config|database|bin|tests|docs|storage|tmp|translations)(?:/|$) - [F,L,NC]
+RewriteRule ^controller/(?:dashboard|users|habits|categories|routines|sharing|profile|admin|diagrams)/index\.php$ - [L]
+RewriteRule ^controller(?:/|$) - [F,L,NC]
+RewriteRule ^view/.*\.php$ - [F,L,NC]
 RewriteRule (^|/)\. - [F,L]
 RewriteRule ^(?:README\.md|router\.php|composer\.(?:json|lock))$ - [F,L,NC]
 </IfModule>

@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 if (PHP_SAPI!=='cli') { http_response_code(404); exit; }
-require __DIR__.'/../app/bootstrap.php';
+require __DIR__.'/../controller/security/bootstrap.php';
 $db=database();
 $path=$argv[1]??__DIR__.'/../storage/hostinger-mi-rutina.sql';
 $tables=array_column($db->all('SHOW TABLES'),array_key_first($db->all('SHOW TABLES')[0]));
