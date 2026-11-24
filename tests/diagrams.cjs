@@ -137,10 +137,12 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
     t: (key) => key === 'diagram_default_name' ? 'Nuevo diagrama' : key,
     esc: String,
     icon: () => '',
+    toast: () => {},
     renderTemplate: (template, values) => JSON.stringify({ template, ...values }),
     setTimeout: (callback) => { const id = ++nextTimer; timers.set(id, callback); return id; },
     clearTimeout: (id) => timers.delete(id),
   });
+  vm.runInContext(fs.readFileSync('view/home/diagram-node-tools.js', 'utf8'), context);
   const HomePage = vm.runInContext(fs.readFileSync('view/home/home.js', 'utf8') + '\nHomePage;', context);
   const home = new HomePage();
   if (draft) {

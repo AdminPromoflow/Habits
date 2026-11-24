@@ -1,5 +1,12 @@
 # Verificación realizada
 
+## Múltiples diagramas y recarga al seleccionarlos — 23 de noviembre de 2026
+
+- Selector «Mis diagramas» y botón persistente «Crear diagrama», sin límite de cantidad impuesto por la interfaz. Cada creación conserva los árboles anteriores y reinicia el lienzo; las pulsaciones durante una creación en curso no la duplican.
+- Seleccionar un diagrama guarda primero las ediciones pendientes, incluidos los cambios hechos durante otra solicitud. Después navega al documento con `?diagram=ID`; recargar conserva ese diagrama aunque otro sea más reciente. Solo se seleccionan identificadores de la lista privada de la cuenta. Los errores de guardado o de validación mantienen abierto el editor actual.
+- 122 pruebas JavaScript aprobadas, incluidas creación consecutiva de doce diagramas, selección por URL, navegación, guardado en curso, fallo de conexión y cambio de cuenta. La suite completa posterior pasó 130 comprobaciones HTTP y 7 de esquema/fuentes en una base aislada.
+- Navegador: creación de dos diagramas adicionales, nombre independiente, selección de un diagrama anterior mediante navegación completa y recuperación de la misma selección al recargar; sin errores de consola. Captura: `tests/.runtime/multiple-diagrams.jpg`.
+
 ## Reparación del guardado de anchos y estilos en Hostinger — 23 de noviembre de 2026
 
 - Diagnóstico en Chrome/phpMyAdmin: la columna `diagram_nodes.node_width` y la migración 007 no existían. Todos los guardados del árbol incluyen esa columna, por lo que fallaban también los cambios de estilo e hijos.

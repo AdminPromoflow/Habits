@@ -4,7 +4,7 @@ Plataforma bilingüe de ideas, diagramas, hábitos, rutinas y colaboración. PHP
 
 ## Estructura por módulos
 
-El proyecto sigue la separación de vistas, controladores, seguridad y modelos de Dot63. Cada pantalla tiene su plantilla PHP/HTML, su JavaScript y sus estilos en `view/`. El HTML está en plantillas `<template>`: los cambios de pantalla y el editor del diagrama se dibujan en la página actual, sin navegación ni recarga.
+El proyecto sigue la separación de vistas, controladores, seguridad y modelos de Dot63. Cada pantalla tiene su plantilla PHP/HTML, su JavaScript y sus estilos en `view/`. El HTML está en plantillas `<template>`: los cambios de pantalla y la edición del diagrama se dibujan en la página actual. Seleccionar otro diagrama recarga el documento completo para abrir el elegido.
 
 ```text
 index.php                         Entrada de la aplicación
@@ -58,6 +58,8 @@ Los constructores JavaScript registran las acciones una sola vez. Los eventos co
 `api.php` y `app/bootstrap.php` se conservan como entradas de compatibilidad; la implementación está en las carpetas nuevas. Solo los `index.php` de controladores enumerados son endpoints públicos. Los modelos, la configuración y los archivos internos de seguridad están bloqueados por el router local y `.htaccess`.
 
 ## Editor de diagramas
+
+Se pueden crear múltiples diagramas, sin un límite de cantidad impuesto por la aplicación. **Mis diagramas** permite elegir cualquiera de los guardados y **Crear diagrama** permanece disponible junto al selector. Cada selección guarda los cambios pendientes y recarga la página con el diagrama elegido; su identificador queda en la URL para conservarlo al volver a recargar. Si el guardado falla, se mantiene abierto el diagrama actual para reintentar. Cada creación empieza con un lienzo independiente y conserva los diagramas anteriores.
 
 En Inicio, **Crear diagrama** muestra inmediatamente un rectángulo con esquinas redondeadas en el centro y guarda su creación como «Nuevo diagrama». Queda seleccionado, con cinco símbolos alrededor. **Un clic** selecciona el cuadro; **doble clic** habilita la edición con el cursor al final del texto, sin seleccionarlo. Los iconos exteriores miden 28 px. Los tres puntos abren el panel de herramientas; el símbolo de ramas abre el selector central de distribución. El botón «+» añade una idea hija al cuadro seleccionado. Las demás herramientas siguen pendientes de definir. Pulsar fuera del cuadro oculta los símbolos y guarda la edición. También se puede usar Tab para enfocar el nodo y Enter o F2 para editarlo.
 

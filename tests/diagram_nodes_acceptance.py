@@ -26,6 +26,10 @@ def run(owner, other, guest, diagram_id, check):
              dict(id=a, parent_id='root', text='Rama uno\nSegunda línea', layout=None, x=None, y=None, width=160.25),
              dict(id=b, parent_id=a, text='Subrama', layout=dict(mode='vertical', direction='bottom', vertical='auto', horizontal='auto'), x=41.25, y=-73.5, width=None),
              dict(id=c, parent_id=b, text='Nieto', layout=None, x=None, y=None, width=440)]
+    for node in nodes:
+        node.setdefault('image', None)
+        node.setdefault('labels', [])
+        node.setdefault('checkbox', None)
     first = persist(nodes, name='Mi mapa independiente')
     check(first['name'] == 'Mi mapa independiente' and first['nodes'] == nodes, 'Independent title, root text, styles, line breaks, positions and widths round-trip exactly')
     reloaded = owner.boot()['data']['diagrams'][0]
@@ -70,6 +74,25 @@ def run(owner, other, guest, diagram_id, check):
     changed = persist(nodes)
     persist(renamed['nodes'], 409, version=renamed['version'])
     check(saved()['name'] == 'Proyecto de aprendizaje' and saved()['nodes'] == changed['nodes'], 'Style changes preserve the title and optimistic locking rejects stale snapshots')
+    nodes = saved()['nodes']
+    nodes[0]['checkbox'] = True
+    nodes[1]['checkbox'] = False
+    nodes[2]['checkbox'] = None
+    checked = persist(nodes)
+    check([node['checkbox'] for node in checked['nodes']] == [True, False, None, None], 'Checked, unchecked and absent checkboxes persist independently on root and child nodes')
+    check(owner.boot()['data']['diagrams'][0]['nodes'] == checked['nodes'], 'Checkbox states survive a fresh bootstrap with text, layout and widths intact')
+    legacy = copy.deepcopy(nodes)
+    for node in legacy:
+        node.pop('checkbox')
+    check(persist(legacy)['nodes'] == checked['nodes'], 'Older clients omitting checkbox preserve all existing task states')
+    nodes[0]['checkbox'] = False
+    nodes[1]['checkbox'] = True
+    toggled = persist(nodes)
+    persist(checked['nodes'], 409, version=checked['version'])
+    check(saved()['nodes'] == toggled['nodes'], 'Toggling task states persists and stale snapshots cannot undo completion')
+    nodes[1]['checkbox'] = None
+    removed = persist(nodes)
+    check(removed['nodes'][1]['checkbox'] is None and removed['nodes'][0]['checkbox'] is False, 'Removing one checkbox leaves other task states intact')
     before = saved()
 
     def reject(mutator):
@@ -77,6 +100,10 @@ def run(owner, other, guest, diagram_id, check):
         mutator(bad)
         persist(bad, 422)
         assert saved() == before, 'Rejected snapshot modified persisted data'
+
+    for value in [0, 1, -1, 2, 'true', 'false', '', [], {}]:
+        reject(lambda n, value=value: n[1].update(checkbox=value))
+    check(True, 'Checkbox validation rejects non-boolean values atomically')
 
     reject(lambda n: n.append(copy.deepcopy(n[1])))
     reject(lambda n: n[1].update(parent_id=c))
@@ -117,3 +144,5 @@ def run(owner, other, guest, diagram_id, check):
     check(created['name'] == 'Second tree' and created['nodes'][0]['text'] == 'Another central idea', 'A new diagram can start with a title different from its central idea')
     repeated = owner.request('saveDiagram', dict(client_key=creation_key, name='Different retry', nodes=[dict(id='root', parent_id=None, text='Different retry', layout=None)]), module='diagrams')
     check(created == repeated, 'Idempotent creation retries cannot replace an existing root or its style')
+    from diagram_content_acceptance import run as test_content
+    test_content(owner, other, guest, check)

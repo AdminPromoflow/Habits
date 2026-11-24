@@ -158,7 +158,6 @@ class DiagramNodeTools {
     };
     const update = () => form.querySelectorAll('[data-label-add]').forEach((button) => { button.disabled = rows.children.length >= 10; });
     for (const label of node.labels || []) add(label);
-    if (!rows.children.length) add();
     form.querySelectorAll('[data-label-add]').forEach((button) => button.addEventListener('click', () => {
       add({ text: '', position: button.dataset.labelAdd })?.querySelector('input').focus();
     }));
