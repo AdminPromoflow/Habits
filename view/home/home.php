@@ -60,9 +60,11 @@
       <span class="diagram-handle diagram-handle-star" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="M12 2v20M3 7l18 10M3 17 21 7"/></svg>
       </span>
-      <span class="diagram-handle diagram-handle-arrows" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="m9 3-8 9 8 9zm6 0 8 9-8 9z"/></svg>
-      </span>
+      <button type="button" class="diagram-handle diagram-handle-arrows" id="diagram-width{{suffix}}"
+        role="slider" aria-label="{{widthLabel}}" title="{{widthHint}}"
+        aria-orientation="horizontal" aria-valuemin="100" aria-valuemax="600" aria-valuenow="{{width}}">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="m9 3-8 9 8 9zm6 0 8 9-8 9z"/></svg>
+      </button>
     </div>
     <div class="diagram-menu" id="diagram-menu{{suffix}}" role="menu" aria-label="{{menuLabel}}" hidden>
       <div class="diagram-menu-row" role="presentation">

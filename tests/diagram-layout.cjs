@@ -213,6 +213,57 @@ test('node size measurements include multiline names and measured values', () =>
   assert.ok(Number.isFinite(plan.width) && Number.isFinite(plan.height));
 });
 
+for (const mode of Layout.modes) {
+  test(`${mode} respects individual widths and keeps nodes and connectors aligned`, () => {
+    const nodes = fixture(mode);
+    nodes.forEach((item, index) => { item.width = index % 2 ? 600 : 100; });
+    const saved = JSON.stringify(nodes);
+    const plan = Layout.arrange(nodes);
+    for (const item of nodes) {
+      assert.equal(plan.nodes.find((box) => box.id === item.id).width, item.width);
+    }
+    noOverlaps(plan);
+    for (const edge of plan.edges) {
+      const endpoints = assertRoundedOrthogonal(edge.path);
+      assert.ok(onBoundary(endpoints.start, plan.nodes.find((item) => item.id === edge.from)));
+      assert.ok(onBoundary(endpoints.end, plan.nodes.find((item) => item.id === edge.to)));
+    }
+    assert.equal(JSON.stringify(nodes), saved);
+  });
+}
+
+test('saved widths are used without DOM measurements and measured widths may override them', () => {
+  const nodes = [node('root', null, null, { width: 350.5 }), node('child', 'root')];
+  let plan = Layout.arrange(nodes);
+  assert.equal(plan.nodes[0].width, 350.5);
+  assert.equal(plan.nodes[1].width, 180);
+  plan = Layout.arrange(nodes, { root: { height: 144 } });
+  assert.equal(plan.nodes[0].width, 350.5);
+  assert.equal(plan.nodes[0].height, 144);
+  plan = Layout.arrange(nodes, { root: { width: 600 } });
+  assert.equal(plan.nodes[0].width, 600);
+  nodes[0].width = null;
+  assert.equal(Layout.arrange(nodes).nodes[0].width, 220);
+  nodes[0].width = 10;
+  assert.equal(Layout.arrange(nodes).nodes[0].width, 100);
+  nodes[0].width = 700;
+  assert.equal(Layout.arrange(nodes).nodes[0].width, 600);
+});
+
+test('matrix auto headers expand, while a resized header retains its own width', () => {
+  const nodes = [node('root', null, Layout.defaults('matrix')), node('branch', 'root', null, { width: 600 }), node('leaf', 'branch')];
+  let plan = Layout.arrange(nodes);
+  assert.ok(plan.nodes[0].width > 600);
+  assert.equal(plan.nodes[1].width, 600);
+  nodes[0].width = 100;
+  plan = Layout.arrange(nodes);
+  assert.equal(plan.nodes[0].width, 100);
+  assert.equal(plan.nodes[1].width, 600);
+  noOverlaps(plan);
+  nodes[0].width = null;
+  assert.ok(Layout.arrange(nodes).nodes[0].width > 600);
+});
+
 test('invalid trees are rejected instead of looping or leaking partial layouts', () => {
   const bad = [
     [node('root'), node('root')],

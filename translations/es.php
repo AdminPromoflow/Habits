@@ -386,6 +386,8 @@ return [
     'diagram_saved' => 'Diagrama guardado',
     'diagram_retry' => 'Reintentar',
     'diagram_add_child' => 'Añadir idea hija',
+    'diagram_node_width' => 'Ancho del cuadro',
+    'diagram_node_width_hint' => 'Mantén presionado y arrastra para cambiar el ancho. También puedes usar las flechas izquierda y derecha.',
     'diagram_child_name' => 'Nueva idea',
     'diagram_node_limit' => 'Has alcanzado el límite de 200 ideas.',
     'diagram_depth_limit' => 'Has alcanzado el límite de 30 niveles de ideas.',

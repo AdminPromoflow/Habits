@@ -989,3 +989,182 @@ test('account reset cancels an unfinished drag without saving it to the next acc
   assert.equal(root.hasPointerCapture(1), false);
   assert.equal(home.active, null);
 });
+
+test('resizing one selected node accounts for zoom, preserves its branch, and persists after reload', async () => {
+  const { home, state, branch, click, pointer } = branchDragEditor();
+  home.viewport.scale = 2;
+  const otherNodes = JSON.parse(JSON.stringify(home.nodes.filter((node) => node.id !== 'branch')));
+  let requests = 0;
+  home.makeRequest = async (action, data) => {
+    requests++;
+    return { id: data.id, name: data.name, nodes: JSON.parse(JSON.stringify(data.nodes)), version: data.version + 1 };
+  };
+  click(branch.node);
+  pointer('pointerdown', branch.widthHandle);
+  pointer('pointermove', branch.widthHandle, { clientX: 180, clientY: 160 });
+  assert.equal(home.nodes.find((node) => node.id === 'branch').width, 260);
+  assert.equal(home.nodes.find((node) => node.id === 'branch').x, 100);
+  assert.equal(home.nodes.find((node) => node.id === 'branch').y, 50);
+  assert.deepEqual(JSON.parse(JSON.stringify(home.nodes.filter((node) => node.id !== 'branch'))), otherNodes);
+  assert.equal(branch.root.classList.contains('is-resizing'), true);
+  assert.equal(home.drag, null, 'the width handle must not start moving the node');
+  assert.equal(home.viewport.options.canInteract(), false, 'camera gestures wait for the resize to finish');
+  assert.equal(home.isEditing(), true, 'polling cannot replace the node during a resize');
+  assert.equal(branch.field.readOnly, true);
+  assert.equal(requests, 0, 'pointer moves do not save on every frame');
+  pointer('pointerup', branch.widthHandle);
+  await new Promise(setImmediate);
+  assert.equal(requests, 1);
+  assert.equal(home.resizing, null);
+  assert.equal(home.selectedKey, 'branch');
+  assert.equal(home.selected, true);
+  assert.equal(branch.root.classList.contains('is-resizing'), false);
+  assert.equal(branch.widthHandle.hasPointerCapture(1), false);
+  assert.equal(branch.root.hasPointerCapture(1), false);
+  assert.equal(home.hasChanges(), false);
+  const restored = editor({ draft: false, state: JSON.parse(JSON.stringify(state)) });
+  restored.home.render();
+  assert.equal(restored.home.nodes.find((node) => node.id === 'branch').width, 260);
+});
+
+test('width resize clamps to readable limits and ignores unrelated pointers', async () => {
+  const { home, widthHandle, click, pointer } = savedEditor();
+  home.positionTree = () => {};
+  let requests = 0;
+  home.makeRequest = async (action, data) => {
+    requests++;
+    return { id: data.id, name: data.name, nodes: JSON.parse(JSON.stringify(data.nodes)), version: data.version + 1 };
+  };
+  click();
+  pointer('pointerdown', widthHandle);
+  pointer('pointermove', widthHandle, { pointerId: 2, clientX: 2000 });
+  assert.equal(home.nodes[0].width ?? null, null);
+  pointer('pointermove', widthHandle, { clientX: -2000 });
+  assert.equal(home.nodes[0].width, 100);
+  pointer('pointermove', widthHandle, { clientX: 2000 });
+  assert.equal(home.nodes[0].width, 600);
+  pointer('pointerup', widthHandle, { pointerId: 2 });
+  assert.notEqual(home.resizing, null);
+  assert.equal(requests, 0);
+  pointer('pointerup', widthHandle);
+  await new Promise(setImmediate);
+  assert.equal(requests, 1);
+  assert.equal(home.active.nodes[0].width, 600);
+});
+
+test('width controls require selection and do not compete with editing, layout, or camera gestures', () => {
+  const { home, widthHandle, click, pointer } = savedEditor();
+  home.makeRequest = () => { throw new Error('Unavailable resizing must not save'); };
+  pointer('pointerdown', widthHandle);
+  assert.equal(home.resizing, null);
+  click();
+  for (const [object, field] of [[home, 'editing'], [home, 'layoutOpen'], [home.viewport, 'interacting']]) {
+    object[field] = true;
+    pointer('pointerdown', widthHandle);
+    assert.equal(home.resizing, null, field);
+    object[field] = false;
+  }
+  home.drag = { key: 'root' };
+  pointer('pointerdown', widthHandle);
+  assert.equal(home.resizing, null, 'node drag');
+  home.drag = null;
+  pointer('pointerdown', widthHandle, { button: 2 });
+  assert.equal(home.resizing, null);
+  pointer('pointerdown', widthHandle, { isPrimary: false });
+  assert.equal(home.resizing, null);
+});
+
+test('clicking the width handle without changing its width does not save', async () => {
+  const { home, widthHandle, click, pointer } = savedEditor();
+  home.positionTree = () => {};
+  home.makeRequest = () => { throw new Error('An unchanged width must not save'); };
+  click();
+  pointer('pointerdown', widthHandle);
+  pointer('pointermove', widthHandle, { clientY: 180 });
+  pointer('pointerup', widthHandle);
+  await new Promise(setImmediate);
+  assert.equal(home.resizing, null);
+  assert.equal(home.hasChanges(), false);
+});
+
+test('width handle keyboard controls resize in steps and retain the selected node', async () => {
+  const { home, widthHandle, handleKey, click } = savedEditor();
+  let requests = 0;
+  home.makeRequest = async (action, data) => {
+    requests++;
+    return { id: data.id, name: data.name, nodes: JSON.parse(JSON.stringify(data.nodes)), version: data.version + 1 };
+  };
+  click();
+  for (const [key, shiftKey, expected] of [
+    ['ArrowRight', false, 230], ['ArrowLeft', true, 180], ['Home', false, 100], ['End', false, 600],
+  ]) {
+    const event = handleKey(key, widthHandle, { shiftKey });
+    await new Promise(setImmediate);
+    assert.equal(event.prevented, true, key);
+    assert.equal(home.active.nodes[0].width, expected, key);
+    assert.equal(home.selectedKey, 'root', key);
+    assert.equal(home.selected, true, key);
+  }
+  assert.equal(requests, 4);
+  handleKey('ArrowRight');
+  await new Promise(setImmediate);
+  assert.equal(requests, 4, 'the upper boundary is already reached');
+});
+
+test('pointer cancellation and focus loss finish width resizing and save once', async () => {
+  for (const ending of ['pointercancel', 'lostpointercapture', 'blur']) {
+    const { home, root, widthHandle, click, pointer, windowListeners } = savedEditor();
+    home.positionTree = () => {};
+    let requests = 0;
+    home.makeRequest = async (action, data) => {
+      requests++;
+      return { id: data.id, name: data.name, nodes: JSON.parse(JSON.stringify(data.nodes)), version: data.version + 1 };
+    };
+    click();
+    pointer('pointerdown', widthHandle);
+    pointer('pointermove', widthHandle, { clientX: 160 });
+    if (ending === 'blur') windowListeners.get('blur')();
+    else pointer(ending, widthHandle);
+    pointer('pointerup', widthHandle);
+    await new Promise(setImmediate);
+    assert.equal(home.resizing, null, ending);
+    assert.equal(root.classList.contains('is-resizing'), false, ending);
+    assert.equal(root.hasPointerCapture(1), false, ending);
+    assert.equal(widthHandle.hasPointerCapture(1), false, ending);
+    assert.equal(requests, 1, ending);
+    assert.equal(home.active.nodes[0].width, 280, ending);
+  }
+});
+
+test('account reset cancels unfinished width resizing without saving to another account', () => {
+  const { home, root, widthHandle, click, pointer } = savedEditor();
+  home.positionTree = () => {};
+  home.makeRequest = () => { throw new Error('Account reset must not save an unfinished resize'); };
+  click();
+  pointer('pointerdown', widthHandle);
+  pointer('pointermove', widthHandle, { clientX: 160 });
+  home.reset();
+  pointer('pointerup', widthHandle);
+  assert.equal(home.resizing, null);
+  assert.equal(root.classList.contains('is-resizing'), false);
+  assert.equal(root.hasPointerCapture(1), false);
+  assert.equal(widthHandle.hasPointerCapture(1), false);
+  assert.equal(home.active, null);
+});
+
+test('changing a branch or entire diagram layout preserves each individual node width', async () => {
+  const { home, state } = branchDragEditor();
+  home.nodes.forEach((node, index) => { node.width = index === 0 ? null : 100 + index * 70; });
+  home.active.nodes = JSON.parse(JSON.stringify(home.nodes));
+  const widths = home.nodes.map(({ id, width }) => ({ id, width }));
+  const layout = { mode: 'matrix', direction: 'auto', vertical: 'bottom', horizontal: 'rtl' };
+  for (const scope of ['branch', 'diagram']) {
+    home.applyLayout('branch', layout, scope);
+    await new Promise(setImmediate);
+    assert.deepEqual(home.nodes.map(({ id, width }) => ({ id, width })), widths);
+    assert.equal(home.hasChanges(), false);
+  }
+  const restored = editor({ draft: false, state: JSON.parse(JSON.stringify(state)) });
+  restored.home.render();
+  assert.deepEqual(JSON.parse(JSON.stringify(restored.home.nodes.map(({ id, width }) => ({ id, width })))), widths);
+});

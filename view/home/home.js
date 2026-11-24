@@ -5,7 +5,7 @@ class HomePage extends PageController {
     super(['create-diagram', 'retry-diagram', 'toggle-diagram-menu', 'diagram-layout', 'add-diagram-child']);
     this.generation = 0;
     this.viewport = new DiagramViewport({
-      canInteract: () => !this.drag && !this.layoutOpen,
+      canInteract: () => !this.drag && !this.resizing && !this.layoutOpen,
       onInteractionStart: () => {
         this.menuOpen = false;
         this.syncNodeState();
@@ -109,6 +109,7 @@ class HomePage extends PageController {
     });
     window.addEventListener('resize', () => { this.resizeNode(); this.positionTree(); });
     this.bindDragging();
+    this.bindResizing();
     window.addEventListener('beforeunload', (event) => {
       if (this.saving || this.hasChanges()) {
         event.preventDefault();
@@ -121,6 +122,7 @@ class HomePage extends PageController {
     clearTimeout(this.timer);
     this.generation++;
     this.finishNodeDrag(false);
+    this.finishNodeResize(false);
     this.viewport?.reset();
     this.suppressNodeClick = false;
     this.layoutPanel?.close();
@@ -130,6 +132,7 @@ class HomePage extends PageController {
     this.selectedKey = 'root';
     this.plan = null;
     this.drag = null;
+    this.resizing = null;
     this.active = null;
     this.draft = null;
     this.name = '';
@@ -182,6 +185,9 @@ class HomePage extends PageController {
       nodeKey: esc(node.id),
       suffix: node.id === 'root' ? '' : `-${esc(node.id)}`,
       addChildLabel: esc(t('diagram_add_child')),
+      widthLabel: esc(t('diagram_node_width')),
+      widthHint: esc(t('diagram_node_width_hint')),
+      width: this.nodeWidth(node),
       label: t('diagram_name'),
       placeholder: t('diagram_name'),
       hint: t('diagram_interaction_hint'),
@@ -212,7 +218,7 @@ class HomePage extends PageController {
 
   treeFor(diagram) {
     return diagram?.nodes?.length ? JSON.parse(JSON.stringify(diagram.nodes)) : [{
-      id: 'root', parent_id: null, text: diagram?.name || '', layout: null, x: null, y: null,
+      id: 'root', parent_id: null, text: diagram?.name || '', layout: null, x: null, y: null, width: null,
     }];
   }
 
@@ -250,6 +256,7 @@ class HomePage extends PageController {
         vertical: node.layout.vertical, horizontal: node.layout.horizontal,
       } : null,
       x: node.x ?? null, y: node.y ?? null,
+      width: node.width ?? null,
     })).sort((a, b) => a.id.localeCompare(b.id)));
   }
 
@@ -288,12 +295,14 @@ class HomePage extends PageController {
       const controls = this.element('controls', item.id);
       const menu = this.element('menu', item.id);
       const more = this.element('more', item.id);
+      const widthHandle = this.element('width', item.id);
       const menuVisible = selected && this.menuOpen;
       root?.classList.toggle('is-selected', selected);
       root?.classList.toggle('is-editing', editing);
       if (controls) controls.hidden = !selected;
       if (menu) menu.hidden = !menuVisible;
       more?.setAttribute('aria-expanded', String(menuVisible));
+      widthHandle?.setAttribute('aria-valuenow', String(this.nodeWidth(item)));
       if (node) {
         node.tabIndex = editing ? -1 : 0;
         node.setAttribute('role', editing ? 'group' : 'button');
@@ -316,6 +325,30 @@ class HomePage extends PageController {
     if (relayout && (this.active || this.draft)) this.positionTree();
   }
 
+  nodeWidth(node) {
+    return Number.isFinite(node?.width) ? Math.max(100, Math.min(600, node.width)) : 220;
+  }
+
+  setNodeWidth(key, width) {
+    const node = this.ensureTree().find((item) => item.id === key);
+    if (!node || !Number.isFinite(width)) return false;
+    const next = Math.round(Math.max(100, Math.min(600, width)) * 100) / 100;
+    if (node.width === next) return false;
+    const box = this.element('node', key);
+    const before = box?.getBoundingClientRect?.();
+    node.width = next;
+    this.positionTree();
+    // Keep the node's upper-left corner in place while the layout reflows.
+    const after = box?.getBoundingClientRect?.();
+    if (before && after) {
+      this.viewport.x += before.left - after.left;
+      this.viewport.y += before.top - after.top;
+      this.viewport.render();
+    }
+    this.syncNodeState();
+    return true;
+  }
+
   normalizedName(value = this.name) {
     // Keep intentional newlines, including an empty first or last line.
     return value.replace(/^[^\S\r\n]+|[^\S\r\n]+$/g, '');
@@ -333,6 +366,14 @@ class HomePage extends PageController {
     const enabled = !!(this.active || this.draft);
     stage?.classList.toggle('has-diagram', enabled);
     stage?.classList.toggle('has-tree', this.ensureTree().length > 1);
+    const sizes = Object.fromEntries(this.ensureTree().map((node) => {
+      const box = this.element('node', node.id);
+      const input = this.element('name', node.id);
+      const width = this.nodeWidth(node);
+      if (box) { box.style.width = `${width}px`; box.style.minHeight = '0px'; }
+      this.resizeNode(input, false);
+      return [node.id, { width, height: Math.max(48, (input?.scrollHeight || 24) + 24) }];
+    }));
     if (!scene) {
       const root = this.element('root', 'root');
       const node = this.ensureTree().find((item) => item.id === 'root');
@@ -343,10 +384,6 @@ class HomePage extends PageController {
       return;
     }
     this.commitName();
-    const sizes = Object.fromEntries(this.nodes.map((node) => {
-      const input = this.element('name', node.id);
-      return [node.id, { width: 220, height: Math.max(48, (input?.scrollHeight || 24) + 24) }];
-    }));
     this.plan = DiagramLayout.arrange(this.nodes, sizes);
     scene.style.width = `${this.plan.width}px`;
     scene.style.height = `${this.plan.height}px`;
@@ -392,7 +429,7 @@ class HomePage extends PageController {
     }
     const child = {
       id: crypto.randomUUID(), parent_id: this.selectedKey,
-      text: t('diagram_child_name'), layout: null, x: null, y: null,
+      text: t('diagram_child_name'), layout: null, x: null, y: null, width: null,
     };
     nodes.push(child);
     this.selectedKey = child.id;
@@ -480,7 +517,7 @@ class HomePage extends PageController {
       this.suppressNodeClick = false;
       const box = event.target.closest?.('.diagram-node');
       const root = box?.closest('.diagram-root');
-      if (event.button !== 0 || event.isPrimary === false || !root || this.editing ||
+      if (event.button !== 0 || event.isPrimary === false || !root || this.editing || this.resizing ||
           this.layoutOpen || this.viewport.isInteracting()) return;
       const key = this.keyFor(root);
       if (!this.selected || key !== this.selectedKey) return;
@@ -529,6 +566,71 @@ class HomePage extends PageController {
     window.addEventListener('blur', () => this.finishNodeDrag());
   }
 
+  finishNodeResize(save = true) {
+    const resize = this.resizing;
+    if (!resize) return;
+    this.resizing = null;
+    resize.root.classList.remove('is-resizing');
+    if (resize.handle.hasPointerCapture?.(resize.pointerId)) resize.handle.releasePointerCapture(resize.pointerId);
+    if (resize.changed && save) {
+      this.suppressNodeClick = true;
+      void this.save();
+    }
+  }
+
+  bindResizing() {
+    document.addEventListener('pointerdown', (event) => {
+      const handle = event.target.closest?.('.diagram-handle-arrows');
+      if (!handle || event.button !== 0 || event.isPrimary === false || this.editing ||
+          this.layoutOpen || this.drag || this.resizing || this.viewport.isInteracting()) return;
+      const key = this.keyFor(handle);
+      if (!this.selected || key !== this.selectedKey) return;
+      event.preventDefault();
+      clearTimeout(this.timer);
+      this.menuOpen = false;
+      this.syncNodeState();
+      handle.focus({ preventScroll: true });
+      handle.setPointerCapture(event.pointerId);
+      const node = this.ensureTree().find((item) => item.id === key);
+      this.resizing = {
+        key, handle, root: this.element('root', key), pointerId: event.pointerId,
+        startX: event.clientX, width: this.element('node', key)?.offsetWidth || this.nodeWidth(node),
+        originalWidth: node.width ?? null, scale: this.viewport.scale, changed: false,
+      };
+      this.resizing.root.classList.add('is-resizing');
+    });
+    document.addEventListener('pointermove', (event) => {
+      const resize = this.resizing;
+      if (!resize || event.pointerId !== resize.pointerId) return;
+      const delta = event.clientX - resize.startX;
+      if (!resize.changed && Math.abs(delta) < 3) return;
+      event.preventDefault();
+      this.setNodeWidth(resize.key, resize.width + delta / resize.scale);
+      resize.changed = this.nodes.find((node) => node.id === resize.key).width !== resize.originalWidth;
+    });
+    const finish = (event) => {
+      if (this.resizing && event.pointerId === this.resizing.pointerId) this.finishNodeResize();
+    };
+    document.addEventListener('pointerup', finish);
+    document.addEventListener('pointercancel', finish);
+    document.addEventListener('lostpointercapture', finish);
+    window.addEventListener('blur', () => this.finishNodeResize());
+    document.addEventListener('keydown', (event) => {
+      const handle = event.target.closest?.('.diagram-handle-arrows');
+      if (!handle || event.isComposing || this.editing || this.layoutOpen || this.drag ||
+          this.resizing || this.viewport.isInteracting()) return;
+      const key = this.keyFor(handle);
+      if (!this.selected || key !== this.selectedKey) return;
+      const node = this.ensureTree().find((item) => item.id === key);
+      const width = this.element('node', key)?.offsetWidth || this.nodeWidth(node);
+      const step = event.shiftKey ? 50 : 10;
+      const next = { ArrowLeft: width - step, ArrowRight: width + step, Home: 100, End: 600 }[event.key];
+      if (next === undefined) return;
+      event.preventDefault();
+      if (this.setNodeWidth(key, next)) void this.save();
+    });
+  }
+
   async handleAction(action, button) {
     if (action === 'retry-diagram') return this.save();
     if (button?.closest?.('.diagram-root')) this.selectNode(this.keyFor(button));
@@ -562,6 +664,7 @@ class HomePage extends PageController {
       this.error ||
       this.layoutOpen ||
       this.drag ||
+      this.resizing ||
       this.viewport.isInteracting() ||
       this.hasChanges()
     );

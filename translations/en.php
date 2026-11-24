@@ -386,6 +386,8 @@ return [
     'diagram_saved' => 'Diagram saved',
     'diagram_retry' => 'Try again',
     'diagram_add_child' => 'Add child idea',
+    'diagram_node_width' => 'Node width',
+    'diagram_node_width_hint' => 'Press and drag to change the width. You can also use the left and right arrow keys.',
     'diagram_child_name' => 'New idea',
     'diagram_node_limit' => 'You have reached the limit of 200 ideas.',
     'diagram_depth_limit' => 'You have reached the limit of 30 idea levels.',
