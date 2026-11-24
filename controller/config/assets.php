@@ -28,6 +28,7 @@ return [
         'view/auth/auth.js',
         'view/home/diagram-layout.js',
         'view/home/diagram-layout-panel.js',
+        'view/home/diagram-viewport.js',
         'view/home/home.js',
         'view/habits/habits.js',
         'view/categories/categories.js',

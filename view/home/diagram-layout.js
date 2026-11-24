@@ -232,15 +232,15 @@ const DiagramLayout = (() => {
 
     const raw = build(root).entries;
     const byId = new Map(raw.map((entry) => [entry.id, entry]));
-    function manualPositions(item, inheritedX = 0, inheritedY = 0, parentLayout = null) {
+    function manualPositions(item, inheritedX = 0, inheritedY = 0) {
       const entry = byId.get(item.node.id);
       entry.x += inheritedX;
       entry.y += inheritedY;
       let dx = inheritedX;
       let dy = inheritedY;
-      const movable = parentLayout?.mode === 'free' || parentLayout?.direction === 'manual' ||
-        (item.node.parent_id == null && item.layout.mode === 'free');
-      if (movable && finite(item.node.x) && finite(item.node.y)) {
+      // A direct drag is an explicit position, independent of the chosen layout.
+      // Unpositioned descendants follow the branch; positioned ones retain theirs.
+      if (finite(item.node.x) && finite(item.node.y)) {
         const wantedX = Math.max(-1000000, Math.min(1000000, item.node.x));
         const wantedY = Math.max(-1000000, Math.min(1000000, item.node.y));
         dx += wantedX - entry.x;
@@ -248,7 +248,7 @@ const DiagramLayout = (() => {
         entry.x = wantedX;
         entry.y = wantedY;
       }
-      item.children.forEach((child) => manualPositions(child, dx, dy, item.layout));
+      item.children.forEach((child) => manualPositions(child, dx, dy));
     }
     manualPositions(root);
     const frame = bounds(raw);
@@ -257,7 +257,7 @@ const DiagramLayout = (() => {
     const edges = nodes.filter((node) => node.parent_id != null).map((node) => {
       const from = byId.get(node.parent_id);
       const to = byId.get(node.id);
-      return { from: from.id, to: to.id, path: edgePath(from, to) };
+      return { from: from.id, to: to.id, path: edgePath(from, to, raw) };
     });
     return {
       nodes: raw,
@@ -268,25 +268,88 @@ const DiagramLayout = (() => {
     };
   }
 
-  function edgePath(from, to) {
+  function edgePath(from, to, nodes) {
     const ax = from.x + from.width / 2;
     const ay = from.y + from.height / 2;
     const bx = to.x + to.width / 2;
     const by = to.y + to.height / 2;
-    const horizontal = Math.abs(bx - ax) / ((from.width + to.width) / 2) >=
+    const separatedX = Math.abs(bx - ax) >= (from.width + to.width) / 2;
+    const separatedY = Math.abs(by - ay) >= (from.height + to.height) / 2;
+    const horizontal = separatedX && !separatedY || separatedX === separatedY &&
+      Math.abs(bx - ax) / ((from.width + to.width) / 2) >=
       Math.abs(by - ay) / ((from.height + to.height) / 2);
     if (horizontal) {
       const sign = bx >= ax ? 1 : -1;
       const startX = ax + sign * from.width / 2;
       const endX = bx - sign * to.width / 2;
       const middle = (startX + endX) / 2;
-      return `M${startX},${ay} C${middle},${ay} ${middle},${by} ${endX},${by}`;
+      const direct = [[startX, ay], [middle, ay], [middle, by], [endX, by]];
+      const frame = bounds(nodes);
+      const lanes = [frame.minY - 16, frame.maxY + 16].map((lane) => [
+        [startX, ay], [startX + sign * 4, ay], [startX + sign * 4, lane],
+        [endX - sign * 4, lane], [endX - sign * 4, by], [endX, by],
+      ]);
+      return roundedOrthogonal(clearRoute(direct, lanes, nodes, from, to));
     }
     const sign = by >= ay ? 1 : -1;
     const startY = ay + sign * from.height / 2;
     const endY = by - sign * to.height / 2;
     const middle = (startY + endY) / 2;
-    return `M${ax},${startY} C${ax},${middle} ${bx},${middle} ${bx},${endY}`;
+    const direct = [[ax, startY], [ax, middle], [bx, middle], [bx, endY]];
+    const frame = bounds(nodes);
+    const lanes = [frame.minX - 16, frame.maxX + 16].map((lane) => [
+      [ax, startY], [ax, startY + sign * 4], [lane, startY + sign * 4],
+      [lane, endY - sign * 4], [bx, endY - sign * 4], [bx, endY],
+    ]);
+    return roundedOrthogonal(clearRoute(direct, lanes, nodes, from, to));
+  }
+
+  function clearRoute(direct, alternatives, nodes, from, to) {
+    const obstacles = nodes.filter((node) => node.id !== from.id && node.id !== to.id);
+    const clear = (points) => points.slice(1).every((b, index) => {
+      const a = points[index];
+      return obstacles.every((node) => {
+        if (a[0] === b[0]) return !(a[0] > node.x - 2 && a[0] < node.x + node.width + 2 &&
+          Math.max(a[1], b[1]) > node.y - 2 && Math.min(a[1], b[1]) < node.y + node.height + 2);
+        return !(a[1] > node.y - 2 && a[1] < node.y + node.height + 2 &&
+          Math.max(a[0], b[0]) > node.x - 2 && Math.min(a[0], b[0]) < node.x + node.width + 2);
+      });
+    });
+    if (clear(direct)) return direct;
+    const length = (points) => points.slice(1).reduce((total, b, index) =>
+      total + Math.abs(b[0] - points[index][0]) + Math.abs(b[1] - points[index][1]), 0);
+    return alternatives.filter(clear).sort((a, b) => length(a) - length(b))[0] || direct;
+  }
+
+  function roundedOrthogonal(waypoints) {
+    const points = [];
+    for (const point of waypoints) {
+      const previous = points[points.length - 1];
+      if (previous && point[0] === previous[0] && point[1] === previous[1]) continue;
+      while (points.length > 1) {
+        const a = points[points.length - 2];
+        const b = points[points.length - 1];
+        if (!(a[0] === b[0] && b[0] === point[0]) && !(a[1] === b[1] && b[1] === point[1])) break;
+        points.pop();
+      }
+      points.push(point);
+    }
+    let path = `M${points[0][0]},${points[0][1]}`;
+    for (let index = 1; index < points.length - 1; index++) {
+      const previous = points[index - 1];
+      const corner = points[index];
+      const next = points[index + 1];
+      const beforeLength = Math.hypot(corner[0] - previous[0], corner[1] - previous[1]);
+      const afterLength = Math.hypot(next[0] - corner[0], next[1] - corner[1]);
+      const radius = Math.min(6, beforeLength / 2, afterLength / 2);
+      const before = [corner[0] + (previous[0] - corner[0]) * radius / beforeLength,
+        corner[1] + (previous[1] - corner[1]) * radius / beforeLength];
+      const after = [corner[0] + (next[0] - corner[0]) * radius / afterLength,
+        corner[1] + (next[1] - corner[1]) * radius / afterLength];
+      path += ` L${before[0]},${before[1]} Q${corner[0]},${corner[1]} ${after[0]},${after[1]}`;
+    }
+    const end = points[points.length - 1];
+    return `${path} L${end[0]},${end[1]}`;
   }
 
   function preview(mode) {

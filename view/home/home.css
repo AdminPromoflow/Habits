@@ -229,7 +229,7 @@ button.diagram-handle {
 
 .mindmap-stage.has-tree {
   display: block;
-  overflow: auto;
+  overflow: hidden;
   min-height: 460px;
   height: calc(100dvh - 220px);
   border: 1px solid var(--line);
@@ -238,8 +238,10 @@ button.diagram-handle {
 }
 
 .diagram-scene {
-  position: relative;
-  margin: 180px auto 90px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
 }
 
 .diagram-scene > .diagram-root {
@@ -252,5 +254,25 @@ button.diagram-handle {
 .diagram-scene .diagram-node { width: 220px; }
 .diagram-connections { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
 .diagram-connections path { fill: none; stroke: var(--lavender); stroke-width: 2; }
-.diagram-root[data-draggable="true"] .diagram-node { cursor: grab; touch-action: none; }
+.diagram-root.is-selected:not(.is-editing) .diagram-node { cursor: grab; touch-action: none; }
 .diagram-root.is-dragging .diagram-node { cursor: grabbing; }
+
+.mindmap-stage.has-diagram {
+  display: block;
+  overflow: hidden;
+  overflow: clip;
+  cursor: grab;
+  touch-action: none;
+  overscroll-behavior: contain;
+}
+.mindmap-stage.has-diagram > .diagram-root {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+.mindmap-stage.is-panning,
+.mindmap-stage.is-panning * { cursor: grabbing !important; user-select: none; }
+.diagram-root.is-dragging,
+.diagram-root.is-dragging * { cursor: grabbing !important; user-select: none; }
+.diagram-root.is-editing .diagram-node { cursor: text; }

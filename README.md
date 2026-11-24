@@ -65,7 +65,7 @@ El nodo tiene 10 px de espacio interior y ajusta su altura al texto: durante la 
 
 El selector ofrece distribución libre, horizontal, vertical, lista, de arriba abajo, lineal y matriz, con las direcciones correspondientes. Radial aparece deshabilitado, como en la referencia. Aplicar guarda la elección; Cancelar o Escape la descartan. «Del padre» hereda el estilo del ancestro más cercano; una rama con estilo propio lo transmite a sus descendientes y conserva esa excepción cuando cambia el padre. La raíz sin estilo propio usa horizontal.
 
-Los cuadros y sus conexiones se redistribuyen en el mismo lienzo, sin recargar. En modo libre o con dirección manual se pueden arrastrar los hijos; sus posiciones se guardan. Cada diagrama admite hasta 200 ideas. El editor no depende de servicios externos de SimpleMind.
+Los cuadros y sus conexiones se redistribuyen en el mismo lienzo, sin recargar. Un clic selecciona un cuadro y muestra la manito; mantener el clic y arrastrar mueve el cuadro y su rama en cualquier distribución, guardando su posición. Al aplicar otro estilo se redistribuye esa rama y se conservan los estilos propios de sus subramas. Los conectores tienen tramos horizontales y verticales con giros suavizados de hasta 6 px. El fondo se desplaza manteniendo el clic y arrastrando, o deslizando dos dedos en el trackpad. Separar o juntar dos dedos acerca o aleja el lienzo entre 20 % y 300 %, tomando como referencia el cursor. El desplazamiento y el zoom son ajustes de la vista y no modifican los datos del diagrama. Cada diagrama admite hasta 200 ideas. El editor no depende de servicios externos de SimpleMind.
 
 ## Actualizar una instalación existente
 
@@ -119,7 +119,7 @@ El importador utiliza identificadores de origen para no duplicar rutinas ni ejer
 
 ```sh
 PHP_BIN=/opt/homebrew/bin/php python3 tests/functional.py
-node --test tests/diagrams.cjs tests/diagram-layout.cjs
+node --test tests/diagrams.cjs tests/diagram-layout.cjs tests/diagram-viewport.cjs
 ```
 
 Requiere Python 3, PHP con PDO MySQL y un usuario de MySQL autorizado para crear una base aislada `mi_rutina_test_*`. Configura `RUTINA_TEST_DB_USER` y `RUTINA_TEST_DB_PASSWORD` según tu entorno; el valor predeterminado `root` sin contraseña corresponde únicamente al XAMPP local. No usa la base real de Aleina.

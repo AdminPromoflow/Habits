@@ -19,8 +19,13 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
   function element(id, className = '', parentElement = null) {
     const classes = new Set(className.split(' ').filter(Boolean));
     const attributes = new Map();
+    const pointers = new Set();
     const item = {
-      id, parentElement, style: {}, hidden: false, tabIndex: 0,
+      id, parentElement, style: {}, dataset: {}, hidden: false, tabIndex: 0,
+      isConnected: true, offsetWidth: 220, offsetHeight: 48,
+      setPointerCapture: (id) => pointers.add(id),
+      hasPointerCapture: (id) => pointers.has(id),
+      releasePointerCapture: (id) => pointers.delete(id),
       classList: {
         contains: (name) => classes.has(name),
         add: (...names) => names.forEach((name) => classes.add(name)),
@@ -62,6 +67,7 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
   }
   const stage = element('mindmap-stage');
   const root = element('diagram-root', 'diagram-root', stage);
+  root.dataset.nodeKey = 'root';
   const node = element('diagram-node', 'diagram-node', root);
   const controls = element('diagram-controls', 'diagram-controls', root);
   const tool = element('diagram-tool', 'diagram-tool', controls);
@@ -90,6 +96,13 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
   });
   const context = vm.createContext({
     PageController: class {}, document,
+    DiagramViewport: class {
+      constructor(options) { this.options = options; this.reset(); }
+      reset() { this.x = 0; this.y = 0; this.scale = 1; this.interacting = false; }
+      mount(stage, content, anchor) { this.stage = stage; this.content = content; this.anchor = anchor; }
+      reveal(target) { this.revealed = target; }
+      isInteracting() { return this.interacting; }
+    },
     window: { addEventListener: (name, callback) => windowListeners.set(name, callback) },
     crypto: { randomUUID },
     S: state,
@@ -107,6 +120,8 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
     const event = {
       target, prevented: false,
       preventDefault() { this.prevented = true; },
+      stopPropagation() { this.propagationStopped = true; },
+      stopImmediatePropagation() { this.propagationStopped = true; },
       ...options,
     };
     documentListeners.get(name)(event);
@@ -114,6 +129,20 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
   }
   return {
     home, state, timers, stage, field, root, node, controls, tool, more, menu, menuItem, outside, document, windowListeners,
+    addNodeElement(id, value = '') {
+      const root = element(`diagram-root-${id}`, 'diagram-root', stage);
+      root.dataset.nodeKey = id;
+      const node = element(`diagram-node-${id}`, 'diagram-node', root);
+      const field = Object.assign(element(`diagram-name-${id}`, '', node), {
+        value, readOnly: true, scrollHeight: 24,
+        setSelectionRange(start, end) { this.selectionStart = start; this.selectionEnd = end; },
+      });
+      return { root, node, field };
+    },
+    pointer: (name, target = node, options = {}) => dispatch(name, target, {
+      button: 0, buttons: 1, pointerId: 1, pointerType: 'mouse', isPrimary: true,
+      clientX: 100, clientY: 100, ...options,
+    }),
     typeName(value) {
       field.value = value;
       documentListeners.get('input')({ target: field });
@@ -699,4 +728,190 @@ test('server node ordering does not create a perpetual save loop', async () => {
   await home.addChild();
   assert.equal(home.hasChanges(), false);
   assert.equal(timers.size, 0);
+});
+
+test('moving or zooming the camera is not a diagram edit and survives a redraw', () => {
+  const { home, windowListeners } = savedEditor();
+  home.makeRequest = () => { throw new Error('Camera movement must not save diagram data'); };
+  home.viewport.x = 140;
+  home.viewport.y = -85;
+  home.viewport.scale = 1.75;
+  home.drawStage();
+  assert.equal(home.viewport.x, 140);
+  assert.equal(home.viewport.y, -85);
+  assert.equal(home.viewport.scale, 1.75);
+  assert.equal(home.hasChanges(), false);
+  const beforeUnload = { preventDefault() { this.prevented = true; } };
+  windowListeners.get('beforeunload')(beforeUnload);
+  assert.equal(beforeUnload.prevented, undefined);
+  home.viewport.interacting = true;
+  assert.equal(home.isEditing(), true, 'polling must not replace the canvas during a gesture');
+  home.viewport.interacting = false;
+  assert.equal(home.isEditing(), false);
+  home.reset();
+  assert.equal(home.viewport.x, 0);
+  assert.equal(home.viewport.y, 0);
+  assert.equal(home.viewport.scale, 1);
+});
+
+test('a node must be selected before dragging, and a click without movement never saves', () => {
+  const { home, node, root, pointer, click } = savedEditor();
+  home.makeRequest = () => { throw new Error('Selection and clicks must not save'); };
+  pointer('pointerdown');
+  pointer('pointermove', node, { clientX: 180, clientY: 150 });
+  assert.equal(home.drag, null);
+  assert.equal(home.nodes[0].x, null);
+  click();
+  pointer('pointerdown');
+  assert.equal(home.drag.key, 'root');
+  pointer('pointermove', node, { clientX: 102, clientY: 101 });
+  assert.equal(home.drag.moving, false);
+  pointer('pointerup');
+  assert.equal(home.drag, null);
+  assert.equal(root.hasPointerCapture(1), false);
+  assert.equal(root.classList.contains('is-dragging'), false);
+  assert.equal(home.hasChanges(), false);
+});
+
+test('a selected root moves by screen distance divided by zoom and persists after reload', async () => {
+  const { home, state, node, root, field, click, pointer } = savedEditor();
+  home.viewport.scale = 2;
+  home.positionTree = () => {};
+  let requests = 0;
+  home.makeRequest = async (action, data) => {
+    requests++;
+    return { id: data.id, name: data.name, nodes: JSON.parse(JSON.stringify(data.nodes)), version: data.version + 1 };
+  };
+  click();
+  pointer('pointerdown');
+  pointer('pointermove', node, { clientX: 180, clientY: 60 });
+  assert.equal(root.classList.contains('is-dragging'), true);
+  assert.equal(root.hasPointerCapture(1), true);
+  assert.equal(field.readOnly, true);
+  assert.equal(home.viewport.options.canInteract(), false, 'panning must not compete with a node drag');
+  assert.equal(home.nodes[0].x, 40);
+  assert.equal(home.nodes[0].y, -20);
+  assert.equal(requests, 0, 'pointermove updates the view without writing on every frame');
+  pointer('pointerup');
+  await new Promise(setImmediate);
+  assert.equal(requests, 1);
+  assert.equal(root.classList.contains('is-dragging'), false);
+  assert.equal(root.hasPointerCapture(1), false);
+  assert.equal(home.viewport.options.canInteract(), true);
+  const restored = editor({ draft: false, state: JSON.parse(JSON.stringify(state)) });
+  restored.home.render();
+  assert.equal(restored.home.nodes[0].x, 40);
+  assert.equal(restored.home.nodes[0].y, -20);
+});
+
+test('editing, a modal, or an active camera gesture prevents node dragging', () => {
+  const { home, pointer, click, doubleClick } = savedEditor();
+  click();
+  home.layoutOpen = true;
+  pointer('pointerdown');
+  assert.equal(home.drag, null);
+  home.layoutOpen = false;
+  home.viewport.interacting = true;
+  pointer('pointerdown');
+  assert.equal(home.drag, null);
+  home.viewport.interacting = false;
+  doubleClick();
+  pointer('pointerdown');
+  assert.equal(home.drag, null);
+});
+
+function branchDragEditor() {
+  const fixture = savedEditor();
+  const layout = { mode: 'horizontal', direction: 'auto', vertical: 'auto', horizontal: 'auto' };
+  fixture.home.nodes = [
+    { id: 'root', parent_id: null, text: 'Idea guardada', layout, x: 0, y: 0 },
+    { id: 'branch', parent_id: 'root', text: 'Rama', layout: null, x: 100, y: 50 },
+    { id: 'leaf', parent_id: 'branch', text: 'Idea', layout: { ...layout, mode: 'vertical' }, x: 300, y: 100 },
+    { id: 'inherited', parent_id: 'branch', text: 'Automática', layout: null, x: null, y: null },
+    { id: 'sibling', parent_id: 'root', text: 'Otra rama', layout: null, x: -80, y: 20 },
+  ];
+  fixture.home.active.nodes = JSON.parse(JSON.stringify(fixture.home.nodes));
+  fixture.home.plan = { origin: { x: 72, y: 72 }, nodes: [{ id: 'branch', x: 172, y: 122 }] };
+  const branch = fixture.addNodeElement('branch', 'Rama');
+  fixture.home.positionTree = () => {};
+  fixture.home.makeRequest = async (action, data) => ({
+    id: data.id, name: data.name, nodes: JSON.parse(JSON.stringify(data.nodes)), version: data.version + 1,
+  });
+  return { ...fixture, branch };
+}
+
+test('moving a branch carries its manually positioned descendants without changing sibling branches', async () => {
+  const { home, branch, pointer, click } = branchDragEditor();
+  home.viewport.scale = 2;
+  click(branch.node);
+  pointer('pointerdown', branch.node);
+  pointer('pointermove', branch.node, { clientX: 120, clientY: 110 });
+  pointer('pointermove', branch.node, { clientX: 180, clientY: 140 });
+  const byId = (id) => home.nodes.find((node) => node.id === id);
+  assert.equal(byId('branch').x, 140);
+  assert.equal(byId('branch').y, 70);
+  assert.equal(byId('leaf').x, 340);
+  assert.equal(byId('leaf').y, 120);
+  assert.equal(byId('inherited').x, null, 'automatic descendants are placed by the layout engine');
+  assert.equal(byId('sibling').x, -80);
+  assert.equal(byId('sibling').y, 20);
+  pointer('pointerup', branch.node);
+  await new Promise(setImmediate);
+  assert.equal(home.hasChanges(), false);
+});
+
+test('changing a branch layout clears only its manual positions and preserves nested style choices', async () => {
+  const { home } = branchDragEditor();
+  const originalNested = JSON.parse(JSON.stringify(home.nodes.find((node) => node.id === 'leaf').layout));
+  const layout = { mode: 'list', direction: 'auto', vertical: 'bottom', horizontal: 'ltr' };
+  home.applyLayout('branch', layout);
+  await new Promise(setImmediate);
+  for (const id of ['branch', 'leaf', 'inherited']) {
+    const node = home.nodes.find((node) => node.id === id);
+    assert.equal(node.x, null);
+    assert.equal(node.y, null);
+  }
+  assert.deepEqual(JSON.parse(JSON.stringify(home.nodes.find((node) => node.id === 'leaf').layout)), originalNested);
+  assert.equal(home.nodes.find((node) => node.id === 'sibling').x, -80);
+  assert.equal(home.nodes.find((node) => node.id === 'root').x, 0);
+  assert.equal(home.hasChanges(), false);
+});
+
+test('pointer cancellation and window blur release node capture and save the final moved position once', async () => {
+  for (const ending of ['pointercancel', 'lostpointercapture', 'blur']) {
+    const { home, node, root, pointer, click, windowListeners } = savedEditor();
+    home.positionTree = () => {};
+    let requests = 0;
+    home.makeRequest = async (action, data) => {
+      requests++;
+      return { id: data.id, name: data.name, nodes: JSON.parse(JSON.stringify(data.nodes)), version: data.version + 1 };
+    };
+    click();
+    pointer('pointerdown');
+    pointer('pointermove', node, { clientX: 130, clientY: 120 });
+    if (ending === 'blur') windowListeners.get('blur')();
+    else pointer(ending);
+    pointer('pointerup');
+    await new Promise(setImmediate);
+    assert.equal(home.drag, null, ending);
+    assert.equal(root.hasPointerCapture(1), false, ending);
+    assert.equal(root.classList.contains('is-dragging'), false, ending);
+    assert.equal(requests, 1, ending);
+    assert.equal(home.active.nodes[0].x, 30, ending);
+    assert.equal(home.active.nodes[0].y, 20, ending);
+  }
+});
+
+test('account reset cancels an unfinished drag without saving it to the next account', () => {
+  const { home, node, root, pointer, click } = savedEditor();
+  home.positionTree = () => {};
+  home.makeRequest = () => { throw new Error('Account reset must not save an in-progress drag'); };
+  click();
+  pointer('pointerdown');
+  pointer('pointermove', node, { clientX: 130, clientY: 120 });
+  home.reset();
+  pointer('pointerup');
+  assert.equal(home.drag, null);
+  assert.equal(root.hasPointerCapture(1), false);
+  assert.equal(home.active, null);
 });

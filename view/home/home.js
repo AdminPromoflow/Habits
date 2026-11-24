@@ -4,13 +4,26 @@ class HomePage extends PageController {
   constructor() {
     super(['create-diagram', 'retry-diagram', 'toggle-diagram-menu', 'diagram-layout', 'add-diagram-child']);
     this.generation = 0;
+    this.viewport = new DiagramViewport({
+      canInteract: () => !this.drag && !this.layoutOpen,
+      onInteractionStart: () => {
+        this.menuOpen = false;
+        this.syncNodeState();
+      },
+    });
     this.reset();
     document.addEventListener('click', (event) => {
+      if (this.suppressNodeClick) {
+        this.suppressNodeClick = false;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return;
+      }
       const node = event.target.closest?.('.diagram-node');
       if (node) {
         this.menuOpen = false;
         this.selectNode(this.keyFor(node));
-        if (!this.editing) node.focus();
+        if (!this.editing) node.focus({ preventScroll: true });
       } else if (this.selected && !event.target.closest?.('.diagram-root')) {
         this.element('name')?.blur();
         this.selected = false;
@@ -31,7 +44,10 @@ class HomePage extends PageController {
       this.scheduleSave();
     });
     document.addEventListener('focusin', (event) => {
-      if (event.target.classList?.contains('diagram-node')) this.selectNode(this.keyFor(event.target));
+      if (event.target.classList?.contains('diagram-node')) {
+        this.selectNode(this.keyFor(event.target));
+        if (event.target.matches?.(':focus-visible')) this.viewport.reveal(event.target);
+      }
       if (this.isNameField(event.target) && !event.target.readOnly) {
         this.selected = true;
         this.editing = true;
@@ -50,7 +66,7 @@ class HomePage extends PageController {
         event.preventDefault();
         this.menuOpen = false;
         this.syncNodeState();
-        this.element('more')?.focus();
+        this.element('more')?.focus({ preventScroll: true });
         return;
       }
       if (event.target.classList?.contains('diagram-node')) {
@@ -73,7 +89,7 @@ class HomePage extends PageController {
         if (!this.name.trim()) this.showStatus(t('diagram_name_required'), true);
         else {
           event.target.blur();
-          this.element('node')?.focus();
+          this.element('node')?.focus({ preventScroll: true });
         }
       } else if (event.key === 'Escape') {
         event.preventDefault();
@@ -88,7 +104,7 @@ class HomePage extends PageController {
         this.drawStage();
         const target = this.element('node') ||
           document.querySelector('[data-action="create-diagram"]');
-        target?.focus();
+        target?.focus({ preventScroll: true });
       }
     });
     window.addEventListener('resize', () => { this.resizeNode(); this.positionTree(); });
@@ -104,6 +120,9 @@ class HomePage extends PageController {
   reset() {
     clearTimeout(this.timer);
     this.generation++;
+    this.finishNodeDrag(false);
+    this.viewport?.reset();
+    this.suppressNodeClick = false;
     this.layoutPanel?.close();
     this.layoutPanel = null;
     this.layoutOpen = false;
@@ -255,7 +274,7 @@ class HomePage extends PageController {
     this.editing = true;
     this.syncNodeState();
     const input = this.element('name');
-    input?.focus();
+    input?.focus({ preventScroll: true });
     input?.setSelectionRange(input.value.length, input.value.length);
   }
 
@@ -294,7 +313,7 @@ class HomePage extends PageController {
     if (!input) return;
     input.style.height = 'auto';
     input.style.height = `${input.scrollHeight}px`;
-    if (relayout && this.nodes?.length > 1) this.positionTree();
+    if (relayout && (this.active || this.draft)) this.positionTree();
   }
 
   normalizedName(value = this.name) {
@@ -311,8 +330,18 @@ class HomePage extends PageController {
   positionTree() {
     const stage = document.getElementById('mindmap-stage');
     const scene = document.getElementById('diagram-scene');
+    const enabled = !!(this.active || this.draft);
+    stage?.classList.toggle('has-diagram', enabled);
     stage?.classList.toggle('has-tree', this.ensureTree().length > 1);
-    if (!scene) return;
+    if (!scene) {
+      const root = this.element('root', 'root');
+      const node = this.ensureTree().find((item) => item.id === 'root');
+      this.viewport.mount(stage, enabled ? root : null, {
+        anchorX: (root?.offsetWidth || 220) / 2 - (node?.x || 0),
+        anchorY: (root?.offsetHeight || 48) / 2 - (node?.y || 0),
+      });
+      return;
+    }
     this.commitName();
     const sizes = Object.fromEntries(this.nodes.map((node) => {
       const input = this.element('name', node.id);
@@ -336,11 +365,12 @@ class HomePage extends PageController {
         box.style.width = `${position.width}px`;
         box.style.minHeight = `${position.height}px`;
       }
-      const node = this.nodes.find((item) => item.id === position.id);
-      const parentLayout = DiagramLayout.effective(this.nodes, node.parent_id || node.id);
-      root.dataset.draggable = String(!!node.parent_id &&
-        (parentLayout.mode === 'free' || parentLayout.direction === 'manual'));
     }
+    const rootPosition = this.plan.nodes.find((node) => node.id === 'root');
+    this.viewport.mount(stage, scene, {
+      anchorX: this.plan.origin.x + rootPosition.width / 2,
+      anchorY: this.plan.origin.y + rootPosition.height / 2,
+    });
   }
 
   async addChild() {
@@ -372,7 +402,7 @@ class HomePage extends PageController {
     this.menuOpen = false;
     this.drawStage();
     this.element('node')?.focus({ preventScroll: true });
-    this.element('root')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    this.viewport.reveal(this.element('root'));
     await this.save();
   }
 
@@ -393,7 +423,7 @@ class HomePage extends PageController {
       },
       onClose: () => {
         this.layoutOpen = false;
-        this.element('more')?.focus();
+        this.element('more')?.focus({ preventScroll: true });
       },
     });
     this.layoutPanel.open({
@@ -409,22 +439,56 @@ class HomePage extends PageController {
     const node = this.ensureTree().find((item) => item.id === key);
     if (!node) return;
     node.layout = layout ? { ...layout } : null;
+    // Choosing a distribution arranges this branch again; nested styles remain.
+    for (const item of this.branchNodes(key)) { item.x = null; item.y = null; }
     this.positionTree();
     void this.save();
   }
 
+  branchNodes(key) {
+    const ids = new Set([key]);
+    const nodes = this.ensureTree();
+    let added;
+    do {
+      added = false;
+      for (const node of nodes) {
+        if (ids.has(node.parent_id) && !ids.has(node.id)) { ids.add(node.id); added = true; }
+      }
+    } while (added);
+    return nodes.filter((node) => ids.has(node.id));
+  }
+
+  finishNodeDrag(save = true) {
+    const drag = this.drag;
+    if (!drag) return;
+    this.drag = null;
+    drag.root.classList.remove('is-dragging');
+    if (drag.root.hasPointerCapture?.(drag.pointerId)) drag.root.releasePointerCapture(drag.pointerId);
+    if (drag.moving && save) {
+      this.suppressNodeClick = true;
+      void this.save();
+    }
+  }
+
   bindDragging() {
     document.addEventListener('pointerdown', (event) => {
-      const node = event.target.closest?.('.diagram-node');
-      const root = node?.closest('.diagram-root');
-      if (event.button !== 0 || !root || root.dataset.draggable !== 'true' || this.editing) return;
-      this.selectNode(root.dataset.nodeKey);
-      const position = this.plan?.nodes.find((item) => item.id === this.selectedKey);
-      if (!position) return;
+      this.suppressNodeClick = false;
+      const box = event.target.closest?.('.diagram-node');
+      const root = box?.closest('.diagram-root');
+      if (event.button !== 0 || event.isPrimary === false || !root || this.editing ||
+          this.layoutOpen || this.viewport.isInteracting()) return;
+      const key = this.keyFor(root);
+      if (!this.selected || key !== this.selectedKey) return;
+      const node = this.ensureTree().find((item) => item.id === key);
+      const position = this.plan?.nodes.find((item) => item.id === key);
       this.drag = {
-        key: this.selectedKey, root, pointerId: event.pointerId,
+        key, root, pointerId: event.pointerId,
         startX: event.clientX, startY: event.clientY,
-        x: position.x - this.plan.origin.x, y: position.y - this.plan.origin.y,
+        x: position ? position.x - this.plan.origin.x : node.x || 0,
+        y: position ? position.y - this.plan.origin.y : node.y || 0,
+        scale: this.viewport.scale,
+        descendants: this.branchNodes(key).filter((item) => item.id !== key &&
+          Number.isFinite(item.x) && Number.isFinite(item.y)).map((item) => ({ id: item.id, x: item.x, y: item.y })),
         moving: false,
       };
     });
@@ -437,22 +501,27 @@ class HomePage extends PageController {
       event.preventDefault();
       if (!drag.moving) drag.root.setPointerCapture(event.pointerId);
       drag.moving = true;
+      this.menuOpen = false;
+      this.syncNodeState();
       drag.root.classList.add('is-dragging');
       const node = this.nodes.find((item) => item.id === drag.key);
-      node.x = Math.round(Math.max(-50000, Math.min(50000, drag.x + dx)));
-      node.y = Math.round(Math.max(-50000, Math.min(50000, drag.y + dy)));
+      const limit = (value) => Math.round(Math.max(-1000000, Math.min(1000000, value)) * 100) / 100;
+      node.x = limit(drag.x + dx / drag.scale);
+      node.y = limit(drag.y + dy / drag.scale);
+      for (const old of drag.descendants) {
+        const child = this.nodes.find((item) => item.id === old.id);
+        child.x = limit(old.x + node.x - drag.x);
+        child.y = limit(old.y + node.y - drag.y);
+      }
       this.positionTree();
     });
     const finish = (event) => {
-      const drag = this.drag;
-      if (!drag || event.pointerId !== drag.pointerId) return;
-      this.drag = null;
-      drag.root.classList.remove('is-dragging');
-      if (drag.root.hasPointerCapture?.(event.pointerId)) drag.root.releasePointerCapture(event.pointerId);
-      if (drag.moving) void this.save();
+      if (this.drag && event.pointerId === this.drag.pointerId) this.finishNodeDrag();
     };
     document.addEventListener('pointerup', finish);
     document.addEventListener('pointercancel', finish);
+    document.addEventListener('lostpointercapture', finish);
+    window.addEventListener('blur', () => this.finishNodeDrag());
   }
 
   async handleAction(action, button) {
@@ -474,7 +543,7 @@ class HomePage extends PageController {
     this.selected = true;
     this.editing = false;
     this.drawStage();
-    this.element('node')?.focus();
+    this.element('node')?.focus({ preventScroll: true });
     // Persist the creation itself, even when the user has not named it yet.
     await this.save();
   }
@@ -487,6 +556,8 @@ class HomePage extends PageController {
       this.saving ||
       this.error ||
       this.layoutOpen ||
+      this.drag ||
+      this.viewport.isInteracting() ||
       this.hasChanges()
     );
   }

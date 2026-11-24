@@ -1,5 +1,14 @@
 # Verificación realizada
 
+## Desplazamiento, zoom, manito y conectores — 23 de noviembre de 2026
+
+- Cámara independiente de los datos: arrastre del fondo con clic mantenido, desplazamiento horizontal/vertical con trackpad y zoom de pinza (20 %–300 %) anclado al cursor. Se atienden eventos wheel de Chromium y gestos acumulativos de Safari, evitando procesar el mismo zoom dos veces. La cámara se conserva durante los redibujados de la página y se reinicia al cambiar de cuenta.
+- El cuadro seleccionado muestra cursor de mano abierta, y mano cerrada al arrastrar. Raíces y ramas se pueden mover en cualquier distribución. Las coordenadas consideran el zoom, se guardan, y los hijos acompañan a la rama. Aplicar una nueva distribución limpia las posiciones manuales del subárbol y conserva sus estilos propios.
+- Conectores con tramos ortogonales y giros redondeados de hasta 6 px. Los conectores alineados permanecen rectos; se usan rutas exteriores cuando la ruta habitual atraviesa otro cuadro.
+- 78 pruebas JavaScript aprobadas: 36 del editor, 31 de distribución/conectores y 11 de cámara. Cubren herencia, posiciones, zoom y anclaje, normalización de la rueda, selección, guardado, cancelación/captura, pérdida de foco, cambio de cuenta y conservación de la cámara.
+- Navegador local sobre base aislada: arrastre del fondo en ambos ejes sin mover la página, desplazamiento vertical/horizontal por rueda, cursor grab, arrastre y guardado de raíz, recuperación después de recargar, zoom 125 % y arrastre equivalente (50 px en pantalla a 125 % = 40 unidades del diagrama). Eventos de pinza Safari simulados mediante controles locales temporales: ampliación 150 % y retorno al 100 %; los controles se eliminaron tras la prueba. No se simularon gestos físicos del hardware.
+- Cambios guardados únicamente en archivos locales; sin publicación ni modificación del esquema de la base de datos.
+
 ## Reparación de Hostinger y comprobación local — 23 de noviembre de 2026
 
 - En Hostinger faltaba `diagram_nodes`; `schema_migrations` solo incluía las versiones 001–005. Se aplicó exactamente `006_diagram_nodes.sql` en la base del proyecto mediante Chrome/phpMyAdmin y se registró el checksum `8252174bd6ea4d20893b9e3366db05aa9a9a8ac767e93f8ce8814eb697ed867b`.

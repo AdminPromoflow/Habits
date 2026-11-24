@@ -152,14 +152,54 @@ test('moving a free-form branch carries descendants that have no explicit positi
   }
 });
 
-test('stored positions are ignored in automatic layouts and honored in manual direction', () => {
-  const nodes = [node('root', null, Layout.defaults('horizontal')), node('a', 'root', null, { x: -500, y: 400 })];
-  let plan = Layout.arrange(nodes);
-  assert.notEqual(plan.nodes[1].x - plan.origin.x, -500);
-  nodes[0].layout.direction = 'manual';
-  plan = Layout.arrange(nodes);
-  assert.equal(plan.nodes[1].x - plan.origin.x, -500);
-  assert.equal(plan.nodes[1].y - plan.origin.y, 400);
+for (const mode of Layout.modes) {
+  test(`${mode} retains a directly dragged node and carries its unpositioned descendants`, () => {
+    const nodes = fixture(mode);
+    const before = Layout.arrange(nodes);
+    const a = before.nodes.find((item) => item.id === 'a');
+    Object.assign(nodes.find((item) => item.id === 'a'), {
+      x: a.x - before.origin.x + 113, y: a.y - before.origin.y - 57,
+    });
+    const after = Layout.arrange(nodes);
+    for (const id of ['a', 'a1', 'a2', 'a11']) {
+      const old = before.nodes.find((item) => item.id === id);
+      const moved = after.nodes.find((item) => item.id === id);
+      assert.ok(Math.abs(moved.x - after.origin.x - (old.x - before.origin.x) - 113) < 0.001);
+      assert.ok(Math.abs(moved.y - after.origin.y - (old.y - before.origin.y) + 57) < 0.001);
+    }
+    const sibling = after.nodes.find((item) => item.id === 'b');
+    const oldSibling = before.nodes.find((item) => item.id === 'b');
+    assert.ok(Math.abs(sibling.x - after.origin.x - (oldSibling.x - before.origin.x)) < 0.001);
+    assert.ok(Math.abs(sibling.y - after.origin.y - (oldSibling.y - before.origin.y)) < 0.001);
+    assert.deepEqual(plain(Layout.arrange(plain(nodes))), plain(after));
+  });
+}
+
+test('moving the root remains visible in raw coordinates and preserves branch geometry', () => {
+  const nodes = fixture('topdown');
+  const before = Layout.arrange(nodes);
+  nodes[0].x = -385;
+  nodes[0].y = 177;
+  const after = Layout.arrange(nodes);
+  for (const old of before.nodes) {
+    const moved = after.nodes.find((item) => item.id === old.id);
+    assert.ok(Math.abs(moved.x - after.origin.x - (old.x - before.origin.x) + 385) < 0.001);
+    assert.ok(Math.abs(moved.y - after.origin.y - (old.y - before.origin.y) - 177) < 0.001);
+  }
+  assert.equal(after.width, before.width);
+  assert.equal(after.height, before.height);
+  assert.equal(after.nodes[0].x - after.origin.x, -385);
+  assert.equal(after.nodes[0].y - after.origin.y, 177);
+});
+
+test('explicit descendant positions remain fixed when a parent is dragged', () => {
+  const nodes = fixture('horizontal');
+  Object.assign(nodes.find((item) => item.id === 'a1'), { x: 1234, y: -256 });
+  Object.assign(nodes.find((item) => item.id === 'a'), { x: -430, y: 610 });
+  const plan = Layout.arrange(nodes);
+  const child = plan.nodes.find((item) => item.id === 'a1');
+  assert.equal(child.x - plan.origin.x, 1234);
+  assert.equal(child.y - plan.origin.y, -256);
 });
 
 test('node size measurements include multiline names and measured values', () => {
@@ -197,4 +237,87 @@ test('each preview is a distinct safe standalone SVG with no external assets', (
     assert.ok(!/<script|onload=|href=|NaN|Infinity/.test(svg));
   }
   assert.ok(!Layout.preview('<script>alert(1)</script>').includes('<script>'));
+});
+
+function pathCommands(path) {
+  return [...path.matchAll(/([MLQ])([^MLQ]*)/g)].map((match) => ({
+    command: match[1], numbers: (match[2].match(/[-+]?(?:\d*\.)?\d+(?:e[-+]?\d+)?/gi) || []).map(Number),
+  }));
+}
+
+function assertRoundedOrthogonal(path) {
+  assert.ok(!/[CHVASTZ]/i.test(path));
+  const commands = pathCommands(path);
+  assert.equal(commands[0].command, 'M');
+  let current = commands[0].numbers;
+  for (const { command, numbers } of commands.slice(1)) {
+    if (command === 'L') {
+      assert.ok(Math.abs(current[0] - numbers[0]) < 0.001 || Math.abs(current[1] - numbers[1]) < 0.001);
+      current = numbers;
+    } else {
+      assert.equal(command, 'Q');
+      const control = numbers.slice(0, 2);
+      const end = numbers.slice(2);
+      const first = [control[0] - current[0], control[1] - current[1]];
+      const last = [end[0] - control[0], end[1] - control[1]];
+      assert.ok(Math.abs(first[0] * last[0] + first[1] * last[1]) < 0.001, 'curve joins perpendicular legs');
+      assert.ok(Math.hypot(...first) <= 6.001 && Math.hypot(...last) <= 6.001, 'corners use at most 6px radius');
+      current = end;
+    }
+  }
+  return { start: commands[0].numbers, end: current };
+}
+
+function onBoundary(point, box) {
+  const [x, y] = point;
+  return (Math.abs(x - box.x) < 0.001 || Math.abs(x - box.x - box.width) < 0.001) && y >= box.y && y <= box.y + box.height ||
+    (Math.abs(y - box.y) < 0.001 || Math.abs(y - box.y - box.height) < 0.001) && x >= box.x && x <= box.x + box.width;
+}
+
+test('connectors have horizontal/vertical segments, gently rounded turns and boundary endpoints', () => {
+  for (const mode of Layout.modes) {
+    const plan = Layout.arrange(fixture(mode));
+    for (const edge of plan.edges) {
+      const endpoints = assertRoundedOrthogonal(edge.path);
+      assert.ok(onBoundary(endpoints.start, plan.nodes.find((item) => item.id === edge.from)));
+      assert.ok(onBoundary(endpoints.end, plan.nodes.find((item) => item.id === edge.to)));
+    }
+  }
+});
+
+test('aligned nodes connect with a straight segment, while offset nodes get small rounded elbows', () => {
+  const nodes = [node('root'), node('a', 'root', null, { x: 400, y: 0 })];
+  let path = Layout.arrange(nodes).edges[0].path;
+  assert.deepEqual(pathCommands(path).map((part) => part.command), ['M', 'L']);
+  nodes[1].x = 20;
+  nodes[1].y = 200;
+  path = Layout.arrange(nodes).edges[0].path;
+  assert.deepEqual(pathCommands(path).map((part) => part.command), ['M', 'L']);
+  nodes[1].x = 228;
+  nodes[1].y = 30;
+  path = Layout.arrange(nodes).edges[0].path;
+  assert.ok(path.includes('Q'));
+  assertRoundedOrthogonal(path);
+});
+
+test('matrix connections route around earlier rows instead of crossing their node interiors', () => {
+  const plan = Layout.arrange(fixture('matrix'));
+  for (const edge of plan.edges) {
+    const others = plan.nodes.filter((item) => item.id !== edge.from && item.id !== edge.to);
+    const commands = pathCommands(edge.path);
+    let current = commands[0].numbers;
+    for (const part of commands.slice(1)) {
+      const end = part.command === 'Q' ? part.numbers.slice(2) : part.numbers;
+      const control = part.numbers.slice(0, 2);
+      for (let step = 0; step <= 50; step++) {
+        const t = step / 50;
+        const point = part.command === 'Q'
+          ? current.map((value, axis) => (1 - t) ** 2 * value + 2 * (1 - t) * t * control[axis] + t ** 2 * end[axis])
+          : current.map((value, axis) => value + (end[axis] - value) * t);
+        for (const box of others) assert.ok(!(point[0] > box.x + 0.001 && point[0] < box.x + box.width - 0.001 &&
+          point[1] > box.y + 0.001 && point[1] < box.y + box.height - 0.001), `${edge.from} -> ${edge.to} crosses ${box.id}`);
+      }
+      current = end;
+    }
+  }
 });
