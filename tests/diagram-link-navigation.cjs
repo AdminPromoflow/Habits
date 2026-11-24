@@ -8,17 +8,18 @@ const diagram = (id, nodes) => ({ id, name: `Diagram ${id}`, nodes });
 const target = (diagram_id, node_id = null) => ({ diagram_id, node_id });
 const plain = value => JSON.parse(JSON.stringify(value));
 
-function harness(diagrams, id, { storage = new Map(), user = 7, path = '/app/' } = {}) {
+function harness(diagrams, id, { storage = new Map(), preferences = new Map(), user = 7, path = '/app/' } = {}) {
   const S = { user: { id: user }, data: { diagrams: structuredClone(diagrams) } };
   const home = { titleName() { return this.active.name; } };
   const context = vm.createContext({ S, URL, location: { href: `https://example.test${path}` },
     sessionStorage: { getItem: key => storage.get(key), setItem: (key, value) => storage.set(key, value) },
+    localStorage: { getItem: key => preferences.get(key), setItem: (key, value) => preferences.set(key, value) },
     t: key => key, esc: value => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('"', '&quot;'),
   });
   const Navigation = vm.runInContext(fs.readFileSync('view/home/diagram-link-navigation.js', 'utf8') + '\nDiagramLinkNavigation;', context);
   const choose = id => { home.active = S.data.diagrams.find(item => item.id === id); home.nodes = home.active.nodes; };
   choose(id);
-  return { nav: new Navigation(home), home, S, storage, choose };
+  return { nav: new Navigation(home), home, S, storage, preferences, choose };
 }
 
 test('topic destinations gain return links without modifying their outgoing link', () => {
@@ -151,4 +152,47 @@ test('stored paths are isolated by account and installation', () => {
   for (const options of [{ user: 8 }, { path: '/other/' }]) {
     assert.deepEqual(plain(harness(fixture, 3, { storage, ...options }).nav.trail()).map(item => item.diagram_id), [1, 3]);
   }
+});
+
+test('siblings occupy one breadcrumb level, sorted alphabetically with a dropdown', () => {
+  const fixture = [diagram(1, [topic('root', target(2)), topic('other', target(3))]), diagram(2, [topic('root')]), diagram(3, [topic('root')])];
+  fixture[1].name = 'Zulu'; fixture[2].name = 'Alpha';
+  const { nav, choose } = harness(fixture, 1);
+  assert.deepEqual(plain(nav.branches()).map(branch => branch.entry.diagram_id), [1, 3]);
+  assert.match(nav.html(), /diagram-link-menu/);
+  assert.doesNotMatch(nav.html(), /Zulu/);
+  choose(2);
+  assert.deepEqual(plain(nav.branches()).map(branch => branch.entry.diagram_id), [1, 2]);
+  assert.deepEqual(plain(nav.branches()[1].choices).map(edge => edge.target_diagram), [3, 2]);
+});
+
+test('switching a sibling trims the previous branch and its descendants from the path', async () => {
+  const fixture = [diagram(1, [topic('root', target(2)), topic('other', target(3))]),
+    diagram(2, [topic('root', target(4))]), diagram(3, [topic('root')]), diagram(4, [topic('root')])];
+  const { nav, home, choose } = harness(fixture, 4);
+  let navigations = 0;
+  home.links = { follow: async (link, options) => { navigations++; nav.prepare(link, 'ignored', options); choose(link.diagram_id); } };
+  assert.deepEqual(plain(nav.trail()).map(entry => entry.diagram_id), [1, 2, 4]);
+  await nav.visitBranch(1, 3);
+  assert.deepEqual(plain(nav.trail()).map(entry => entry.diagram_id), [1, 3]);
+  await nav.visitBranch(1, 4);
+  assert.equal(navigations, 1, 'a descendant is not a selectable sibling');
+});
+
+test('child order can be moved, restored to alphabetical, and persists independently per parent and account', () => {
+  const fixture = [diagram(1, [topic('root', target(2)), topic('other', target(3))]), diagram(2, [topic('root')]), diagram(3, [topic('root')])];
+  const { nav, preferences, S } = harness(fixture, 1);
+  assert.equal(nav.moveChild(1, 3, -1), true);
+  assert.deepEqual(plain(nav.children()).map(edge => edge.target_diagram), [3, 2]);
+  assert.equal(nav.moveChild(1, 3, -1), false);
+  assert.equal(nav.moveChild(1, 999, 1), false);
+  assert.deepEqual(plain(harness(fixture, 1, { preferences }).nav.children()).map(edge => edge.target_diagram), [3, 2]);
+  assert.deepEqual(plain(harness(fixture, 1, { preferences, user: 8 }).nav.children()).map(edge => edge.target_diagram), [2, 3]);
+  assert.deepEqual(plain(harness(fixture, 1, { preferences, path: '/other/' }).nav.children()).map(edge => edge.target_diagram), [2, 3]);
+  assert.deepEqual(plain(nav.readOrder(2)), []);
+  S.data.diagrams[0].nodes[1].link = null;
+  assert.deepEqual(plain(nav.children()).map(edge => edge.target_diagram), [2]);
+  S.data.diagrams[0].nodes[1].link = target(3);
+  nav.writeOrder(1, []);
+  assert.deepEqual(plain(nav.children()).map(edge => edge.target_diagram), [2, 3]);
 });

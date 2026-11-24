@@ -5,9 +5,11 @@ class HomePage extends PageController {
     super(['create-diagram', 'retry-diagram', 'toggle-diagram-menu', 'diagram-layout', 'add-diagram-child', 'add-diagram-sibling',
       'diagram-checkbox-menu', 'diagram-checkbox-state', 'toggle-diagram-picker', 'select-diagram',
       'copy-diagram-node', 'cut-diagram-node', 'paste-diagram-node', 'delete-diagram-node', 'image-diagram-node', 'labels-diagram-node',
-      'link-diagram-node', 'open-diagram-link', 'open-diagram-return', 'choose-diagram-return', 'diagram-link-ancestor', 'diagram-link-child']);
+      'link-diagram-node', 'open-diagram-link', 'open-diagram-return', 'choose-diagram-return', 'diagram-link-ancestor', 'diagram-link-child',
+      'diagram-link-branch', 'diagram-link-menu', 'diagram-link-order']);
     this.nodeTools = new DiagramNodeTools(this);
     this.links = new DiagramLinks(this);
+    this.history = new DiagramHistory(this);
     this.generation = 0;
     this.viewport = new DiagramViewport({
       canInteract: () => !this.drag && !this.resizing && !this.connectionTool?.drag && !this.connectionTool?.editingRoute && !this.layoutOpen && !this.titleEditing,
@@ -98,6 +100,7 @@ class HomePage extends PageController {
     });
     document.addEventListener('keydown', (event) => {
       if (event.isComposing) return;
+      if (this.history.handleKey(event)) return;
       if (event.target.closest?.('.diagram-picker')) {
         this.handlePickerKey(event);
         return;
@@ -203,12 +206,14 @@ class HomePage extends PageController {
     clearTimeout(this.timer);
     this.generation++;
     this.links?.navigation.memory.clear();
+    this.links?.navigation.closeMenu();
     this.links?.hideTooltip();
     this.connectionTool?.cancel();
     this.connectionTool?.clearSelection();
     this.finishNodeDrag(false);
     this.finishNodeResize(false);
     this.viewport?.reset();
+    this.history.reset();
     this.suppressNodeClick = false;
     this.layoutPanel?.close();
     this.layoutPanel = null;
@@ -256,6 +261,7 @@ class HomePage extends PageController {
       this.name = this.nodes.find((node) => node.id === 'root')?.text || '';
       this.diagramTitle = this.active?.name || '';
       this.rememberDiagram();
+      this.history.reconcile();
     }
     return renderTemplate('home', {
       greeting: t('greeting', { name: esc(S.user.name.split(' ')[0]) }),
@@ -354,6 +360,7 @@ class HomePage extends PageController {
   }
 
   syncToolbar() {
+    this.links.navigation.closeMenu();
     const create = document.getElementById('create-diagram');
     if (create) create.disabled = this.switching;
     const toolbar = document.getElementById('diagram-toolbar');
@@ -480,6 +487,7 @@ class HomePage extends PageController {
   }
 
   mount() {
+    this.history.ensure();
     this.syncToolbar();
     this.syncTitleState();
     this.syncNodeState();
@@ -782,6 +790,36 @@ class HomePage extends PageController {
       anchorY: this.plan.origin.y + rootPosition.height / 2,
       bounds: this.plan.nodes,
     });
+    this.renderAlignmentGuides();
+  }
+
+  renderAlignmentGuides() {
+    const layer = document.getElementById('diagram-alignment-guides');
+    if (!layer) return;
+    if (!this.drag?.moving || !this.plan) {
+      layer.innerHTML = '';
+      return;
+    }
+    // Measure the visible boxes, excluding tool handles and labels outside a node.
+    const scene = document.getElementById('diagram-scene');
+    const frame = scene?.getBoundingClientRect?.();
+    const scale = this.viewport.scale;
+    const boxes = this.plan.nodes.map((position) => {
+      const rect = this.element('node', position.id)?.getBoundingClientRect?.();
+      return frame && rect?.width && rect?.height ? {
+        id: position.id, x: (rect.left - frame.left) / scale, y: (rect.top - frame.top) / scale,
+        width: rect.width / scale, height: rect.height / scale,
+      } : position;
+    });
+    const guides = DiagramAlignment.guides(boxes, this.drag.key, this.drag.movingIds, scale);
+    layer.setAttribute('width', this.plan.width);
+    layer.setAttribute('height', this.plan.height);
+    layer.innerHTML = guides.map(({ axis, position, start, end, kind }) => {
+      const points = axis === 'x'
+        ? `x1="${position}" y1="${start}" x2="${position}" y2="${end}"`
+        : `x1="${start}" y1="${position}" x2="${end}" y2="${position}"`;
+      return `<line ${points} class="is-${kind}" />`;
+    }).join('');
   }
 
   syncViewport(keepView = false) {
@@ -916,8 +954,9 @@ class HomePage extends PageController {
 
   finishNodeDrag(save = true) {
     const drag = this.drag;
-    if (!drag) return;
     this.drag = null;
+    this.renderAlignmentGuides();
+    if (!drag) return;
     drag.root.classList.remove('is-dragging');
     if (drag.root.hasPointerCapture?.(drag.pointerId)) drag.root.releasePointerCapture(drag.pointerId);
     if (drag.moving && save) {
@@ -944,6 +983,7 @@ class HomePage extends PageController {
         x: position ? position.baseX ?? position.x - this.plan.origin.x : node.x || 0,
         y: position ? position.baseY ?? position.y - this.plan.origin.y : node.y || 0,
         scale: this.viewport.scale,
+        movingIds: new Set(this.branchNodes(key).map((item) => item.id)),
         descendants: this.branchNodes(key).filter((item) => item.id !== key &&
           Number.isFinite(item.x) && Number.isFinite(item.y)).map((item) => ({ id: item.id, x: item.x, y: item.y })),
         moving: false,
@@ -1049,6 +1089,9 @@ class HomePage extends PageController {
   async handleAction(action, button) {
     if (action === 'diagram-link-ancestor') return this.links.navigation.visit(Number(button.dataset.trailIndex));
     if (action === 'diagram-link-child') return this.links.navigation.visitChild(Number(button.dataset.childDiagram));
+    if (action === 'diagram-link-branch') return this.links.navigation.visitBranch(Number(button.dataset.branchIndex), Number(button.dataset.branchDiagram));
+    if (action === 'diagram-link-menu') return this.links.navigation.openMenu(button);
+    if (action === 'diagram-link-order') return this.links.navigation.openOrder(Number(button.dataset.branchIndex));
     if (action === 'toggle-diagram-picker') return this.pickerOpen ? this.closeDiagramPicker(true) : this.openDiagramPicker();
     if (action === 'select-diagram') return this.openDiagram(button.dataset.id);
     if (action === 'retry-diagram') return this.save();
@@ -1158,6 +1201,7 @@ class HomePage extends PageController {
   }
 
   save() {
+    this.history.checkpoint();
     if (this.savePromise) return this.savePromise;
     const pending = this.persist();
     this.savePromise = pending;
@@ -1202,6 +1246,7 @@ class HomePage extends PageController {
       diagram.connection_styles ||= data.connection_styles;
       const created = !!this.draft;
       this.active = diagram;
+      if (created) this.history.adopt();
       // Keep any pan/zoom made while the new diagram's first save was pending.
       this.syncViewport(created);
       for (const node of diagram.nodes) {

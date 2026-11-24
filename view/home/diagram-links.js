@@ -30,7 +30,7 @@ class DiagramLinks {
 
   badge(node) {
     const returns = this.navigation.incoming(node);
-    const forward = node.link?.node_id ? this.arrowButton('open-diagram-link', this.navigation.direction(node.link),
+    const forward = node.link ? this.arrowButton('open-diagram-link', this.navigation.direction(node.link),
       t('diagram_link_open'), [this.targetDetails(node.link)]) : '';
     const details = returns.map(edge => ({ diagram: edge.diagram_name, topic: edge.text || t('diagram_link_untitled') }));
     const back = returns.length === 1 ? this.arrowButton('open-diagram-return', 'back', this.returnLabel(returns[0]), details,
@@ -41,13 +41,14 @@ class DiagramLinks {
 
   targetDetails(link) {
     const diagram = this.navigation.catalog().find(item => item.id === link.diagram_id);
+    if (link.node_id === null) return { diagram: diagram?.name || t('diagram_link_unavailable'), topic: null };
     const node = diagram?.nodes?.find(item => item.id === link.node_id);
     return { diagram: diagram?.name || t('diagram_link_unavailable'),
       topic: node ? node.text || t('diagram_link_untitled') : t('diagram_link_unavailable') };
   }
 
   arrowButton(action, direction, label, details, attributes = '') {
-    const description = details.map(item => `${t('diagram_link_diagram')}: ${item.diagram}. ${t('diagram_link_topic_name')}: ${item.topic}`).join('\n');
+    const description = details.map(item => `${t('diagram_link_diagram')}: ${item.diagram}. ${item.topic === null ? t('diagram_link_whole') : `${t('diagram_link_topic_name')}: ${item.topic}`}`).join('\n');
     return `<button type="button" class="diagram-topic-link" data-action="${action}" ${attributes}
       data-topic-link-details="${esc(JSON.stringify(details))}" aria-label="${esc(label)}" aria-description="${esc(description)}">
       <span class="diagram-link-direction" aria-hidden="true">${direction === 'back' ? '←' : '→'}</span></button>`;
@@ -55,8 +56,9 @@ class DiagramLinks {
 
   detailsHtml(details) {
     return details.map(item => `<span class="diagram-link-detail"><span class="diagram-link-detail-label">${esc(t('diagram_link_diagram'))}</span>
-      <strong>${esc(item.diagram)}</strong><span class="diagram-link-detail-label">${esc(t('diagram_link_topic_name'))}</span>
-      <span class="diagram-link-detail-topic">${esc(item.topic)}</span></span>`).join('');
+      <strong>${esc(item.diagram)}</strong>${item.topic === null ? `<span>${esc(t('diagram_link_whole'))}</span>`
+        : `<span class="diagram-link-detail-label">${esc(t('diagram_link_topic_name'))}</span>
+          <span class="diagram-link-detail-topic">${esc(item.topic)}</span>`}</span>`).join('');
   }
 
   showTooltip(button) {

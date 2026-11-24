@@ -19,11 +19,15 @@ test('topic links are included in dirty detection, saved snapshots and their vis
   assert.equal(JSON.parse(home.nodeContent(home.nodes[0])).topicLink, '');
 });
 
-test('whole-diagram destinations are absent from topic badges and topic arrows expose named destinations', () => {
+test('whole-diagram sources keep their arrow and describe the diagram instead of an unavailable topic', () => {
   const { home, state } = savedEditor();
   state.data.diagrams.push({ id: 52, name: 'Destination diagram', nodes: [{ id: 'root', text: 'Specific topic' }] });
   home.nodes[0].link = { diagram_id: 52, node_id: null };
-  assert.equal(home.links.badge(home.nodes[0]), '');
+  const wholeBadge = home.links.badge(home.nodes[0]);
+  assert.match(wholeBadge, /data-action="open-diagram-link"/);
+  assert.match(wholeBadge, /Destination diagram/);
+  assert.match(wholeBadge, /diagram_link_whole/);
+  assert.doesNotMatch(wholeBadge, /diagram_link_unavailable/);
   home.nodes[0].link.node_id = 'root';
   const badge = home.links.badge(home.nodes[0]);
   assert.match(badge, /→/);
@@ -289,8 +293,10 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
   vm.runInContext(fs.readFileSync('view/home/diagram-link-navigation.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('view/home/diagram-links.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('view/home/diagram-layout.js', 'utf8'), context);
+  vm.runInContext(fs.readFileSync('view/home/diagram-alignment.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('view/home/diagram-routing.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('view/home/diagram-connections.js', 'utf8'), context);
+  vm.runInContext(fs.readFileSync('view/home/diagram-history.js', 'utf8'), context);
   const HomePage = vm.runInContext(fs.readFileSync('view/home/home.js', 'utf8') + '\nHomePage;', context);
   const home = new HomePage();
   if (draft) {
@@ -312,6 +318,10 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
     checkbox, checkboxTool, checkboxMenu, checkboxOptions, checkboxScopes, addHandle,
     change: (target) => dispatch('change', target),
     home, state, timers, stage, field, root, node, controls, tool, more, widthHandle, menu, menuItem, outside, document, windowListeners, location, navigations, title, titleLabel, titleInput,
+    addAlignmentLayer() {
+      const scene = element('diagram-scene', 'diagram-scene', stage);
+      return element('diagram-alignment-guides', 'diagram-alignment-guides', scene);
+    },
     addConnectionElement(from, to) {
       const svg = document.getElementById('diagram-connections') || element('diagram-connections', 'diagram-connections', stage);
       const group = element(`connection-${from}-${to}`, 'diagram-connection', svg);
@@ -1034,6 +1044,56 @@ test('a node must be selected before dragging, and a click without movement neve
   assert.equal(root.hasPointerCapture(1), false);
   assert.equal(root.classList.contains('is-dragging'), false);
   assert.equal(home.hasChanges(), false);
+});
+
+test('alignment guides appear during an aligned drag and clear for every drag ending', () => {
+  for (const ending of ['pointerup', 'pointercancel', 'lostpointercapture', 'blur', 'reset']) {
+    const { home, node, click, pointer, addNodeElement, addAlignmentLayer, windowListeners } = savedEditor();
+    const layer = addAlignmentLayer();
+    home.nodes = [
+      { id: 'root', parent_id: null, text: home.name, x: 0, y: 0 },
+      { id: 'peer', parent_id: null, text: 'Peer', x: 400, y: 200 },
+    ];
+    addNodeElement('peer', 'Peer');
+    home.positionTree();
+    let saves = 0;
+    home.save = () => { saves++; };
+    click();
+    pointer('pointerdown');
+    pointer('pointermove', node, { clientX: 102, clientY: 101 });
+    assert.equal(layer.innerHTML, '', 'selection or a tiny movement shows no guides');
+    pointer('pointermove', node, { clientX: 140, clientY: 300 });
+    assert.match(layer.innerHTML, /class="is-center"/);
+    assert.equal(saves, 0, 'guides do not write on each frame');
+    assert.equal(home.nodes[0].x, 40, 'guides do not snap or change the pointer movement');
+    assert.equal(home.nodes[0].y, 200);
+    if (ending === 'blur') windowListeners.get('blur')();
+    else if (ending === 'reset') home.reset();
+    else pointer(ending);
+    assert.equal(layer.innerHTML, '', ending);
+    assert.equal(saves, ending === 'reset' ? 0 : 1, ending);
+  }
+});
+
+test('drag guides ignore the full moving branch and vanish when alignment is lost', () => {
+  const { home, node, click, pointer, addNodeElement, addAlignmentLayer } = savedEditor();
+  const layer = addAlignmentLayer();
+  home.nodes = [
+    { id: 'root', parent_id: null, text: home.name, x: 0, y: 0 },
+    { id: 'manual', parent_id: 'root', text: 'Manual', x: 400, y: 0 },
+    { id: 'automatic', parent_id: 'root', text: 'Automatic', x: null, y: null },
+    { id: 'peer', parent_id: null, text: 'Peer', x: 600, y: 200 },
+  ];
+  for (const item of home.nodes.slice(1)) addNodeElement(item.id, item.text);
+  home.positionTree();
+  click();
+  pointer('pointerdown');
+  assert.deepEqual([...home.drag.movingIds], ['root', 'manual', 'automatic']);
+  pointer('pointermove', node, { clientX: 140, clientY: 300 });
+  assert.match(layer.innerHTML, /<line /);
+  pointer('pointermove', node, { clientX: 150, clientY: 380 });
+  assert.equal(layer.innerHTML, '', 'moving descendants do not keep a false guide visible');
+  home.finishNodeDrag(false);
 });
 
 test('a selected root moves by screen distance divided by zoom and persists after reload', async () => {
@@ -3012,4 +3072,288 @@ test('linear connectors keep square baseline junctions when rendered and when la
   assert.ok(svg.innerHTML.includes('Semana'));
   home.connectionTool.render(svg, [{ ...edge, cornerRadius: 6 }]);
   assert.ok(home.connectionTool.drawn[0].path.includes('Q'), 'other layouts retain their rounded turns');
+});
+
+function undoEditor() {
+  const fixture = branchDragEditor();
+  fixture.home.history.reconcile();
+  fixture.home.makeRequest = async (action, data) => ({ ...JSON.parse(JSON.stringify(data)), version: data.version + 1 });
+  return fixture;
+}
+
+const plain = value => JSON.parse(JSON.stringify(value));
+
+test('Command Z and Control Z undo one edit per press and persist with the latest version', async () => {
+  for (const modifier of ['metaKey', 'ctrlKey']) {
+    const { home, node, handleKey } = savedEditor();
+    const requests = [];
+    home.makeRequest = async (action, data) => {
+      requests.push(plain(data));
+      return { ...plain(data), version: data.version + 1 };
+    };
+    for (const text of ['First edit', 'Second edit']) { home.name = text; await home.save(); }
+    assert.equal(handleKey('z', node, { [modifier]: true }).prevented, true);
+    await new Promise(setImmediate);
+    assert.equal(home.name, 'First edit');
+    assert.equal(home.active.version, 4);
+    assert.equal(handleKey('Z', node, { [modifier]: true }).prevented, true);
+    await new Promise(setImmediate);
+    assert.equal(home.name, 'Idea guardada');
+    assert.equal(home.hasChanges(), false);
+    assert.deepEqual(requests.map(item => item.version), [1, 2, 3, 4]);
+    assert.equal(await home.history.undo(), false);
+    assert.equal(requests.length, 4);
+  }
+});
+
+test('undo leaves Shift combinations, native text undo, other pages and dialogs alone', async () => {
+  const { home, node, field, titleInput, state, handleKey, document } = savedEditor();
+  home.name = 'Pending';
+  const nativeTargets = [
+    { tagName: 'INPUT', type: 'text' }, { tagName: 'TEXTAREA' }, { tagName: 'SELECT' },
+    { isContentEditable: true }, titleInput,
+  ];
+  for (const target of nativeTargets) assert.equal(handleKey('z', target, { metaKey: true }).prevented, false);
+  home.beginEditing();
+  assert.equal(handleKey('z', field, { ctrlKey: true }).prevented, false);
+  home.editing = false;
+  for (const modifiers of [{ metaKey: true, shiftKey: true }, { ctrlKey: true, shiftKey: true },
+    { ctrlKey: true, altKey: true }, { metaKey: true, isComposing: true }, {}]) {
+    assert.equal(handleKey('z', node, modifiers).prevented, false);
+  }
+  state.view = 'profile';
+  assert.equal(handleKey('z', node, { ctrlKey: true }).prevented, false);
+  state.view = 'home';
+  const query = document.querySelector;
+  document.querySelector = selector => selector === 'dialog[open]' ? {} : query(selector);
+  assert.equal(handleKey('z', node, { metaKey: true }).prevented, false);
+  assert.equal(home.name, 'Pending');
+  assert.equal(home.history.past.length, 0);
+});
+
+test('undo ignores held keys and active gestures but works from the background and checkboxes', async () => {
+  const { home, outside, checkbox, handleKey } = savedEditor();
+  home.makeRequest = async (action, data) => ({ ...plain(data), version: data.version + 1 });
+  home.name = 'Edit';
+  await home.save();
+  for (const flag of ['drag', 'resizing', 'layoutOpen', 'switching']) {
+    home[flag] = true;
+    assert.equal(handleKey('z', outside, { ctrlKey: true }).prevented, true);
+    assert.equal(home.name, 'Edit');
+    home[flag] = false;
+  }
+  handleKey('z', outside, { metaKey: true, repeat: true });
+  assert.equal(home.name, 'Edit');
+  checkbox.tagName = 'INPUT'; checkbox.type = 'checkbox';
+  handleKey('z', checkbox, { ctrlKey: true });
+  await new Promise(setImmediate);
+  assert.equal(home.name, 'Idea guardada');
+  home.name = 'Another'; await home.save();
+  handleKey('z', outside, { metaKey: true });
+  await new Promise(setImmediate);
+  assert.equal(home.name, 'Idea guardada');
+});
+
+test('undo captures edits before the autosave debounce without creating a redundant request', async () => {
+  const { home, timers } = savedEditor();
+  home.makeRequest = () => { throw new Error('Nothing changed on the server'); };
+  home.name = 'Not saved yet';
+  home.scheduleSave();
+  assert.ok(timers.size);
+  assert.equal(await home.history.undo(), true);
+  assert.equal(home.name, 'Idea guardada');
+  assert.equal(home.hasChanges(), false);
+  assert.equal(timers.size, 0);
+});
+
+test('undo restores all node content, positions, styles and the independent diagram title', async () => {
+  const { home } = undoEditor();
+  const initial = plain(home.history.capture());
+  const changes = [
+    () => { home.nodes[1].x = 500; home.nodes[2].y = -250; },
+    () => { home.nodes[1].width = 320; },
+    () => { home.nodes[1].layout = { mode: 'linear', direction: 'up', vertical: 'top', horizontal: 'ltr' }; },
+    () => { home.nodes[1].checkbox = true; },
+    () => { home.nodes[1].image = 'data:image/png;base64,aGVsbG8='; },
+    () => { home.nodes[1].labels = [{ text: 'Outside', position: 'outside' }, { text: 'Inside', position: 'inside' }]; },
+    () => { home.nodes[1].link = { diagram_id: 52, node_id: 'root' }; },
+    () => { home.diagramTitle = 'New title'; },
+  ];
+  const snapshots = [];
+  for (const change of changes) { snapshots.push(plain(home.history.capture())); change(); await home.save(); }
+  for (const before of snapshots.reverse()) {
+    await home.history.undo();
+    assert.equal(home.history.same(home.history.capture(), before), true);
+    assert.equal(home.hasChanges(), false);
+  }
+  assert.equal(home.history.same(home.history.capture(), initial), true);
+});
+
+test('undo restores deleted branches with their original identifiers and complete connections', async () => {
+  const { home } = undoEditor();
+  home.connections = [{ from: 'leaf', to: 'sibling' }];
+  home.hiddenConnections = [{ from: 'branch', to: 'inherited' }];
+  home.connectionStyles = [{ from: 'leaf', to: 'sibling', points: [[10, 20], [50, 20]], label: 'Link', arrows: 'both' }];
+  await home.save();
+  const before = plain(home.history.capture());
+  home.selectNode('branch');
+  await home.nodeTools.deleteNode('branch');
+  assert.equal(home.nodes.length, 2);
+  await home.history.undo();
+  assert.equal(home.history.same(home.history.capture(), before), true);
+  assert.equal(home.selectedKey, 'branch');
+  assert.equal(home.active.nodes.length, 5);
+  home.connectionStyles[0].points[0][0] = 999;
+  assert.equal(home.history.present.connectionStyles[0].points[0][0], 10, 'restored data never aliases history');
+});
+
+test('undo removes a pasted branch as one operation and preserves the clipboard', async () => {
+  const { home } = undoEditor();
+  const before = plain(home.nodes);
+  home.selectNode('branch');
+  await home.nodeTools.copy();
+  home.selectNode('sibling');
+  await home.nodeTools.paste();
+  assert.equal(home.nodes.length, 8);
+  await home.history.undo();
+  assert.deepEqual(plain(home.nodes), before);
+  assert.equal(home.nodeTools.clipboard().nodes.length, 3);
+});
+
+test('undo restores multiple roots after canonical-root deletion and promotion', async () => {
+  const { home } = forestEditor();
+  home.history.reconcile();
+  const before = plain(home.nodes);
+  await home.nodeTools.deleteNode('root');
+  assert.equal(home.nodes[0].text, 'Segunda raíz');
+  await home.history.undo();
+  assert.deepEqual(plain(home.nodes), before);
+  assert.deepEqual(plain(home.active.nodes), before);
+});
+
+test('undo restores line visibility, extra connections, labels, arrows and bends independently', async () => {
+  const { home } = undoEditor();
+  const snapshots = [];
+  const changes = [
+    () => home.connections.push({ from: 'leaf', to: 'sibling' }),
+    () => home.hiddenConnections.push({ from: 'root', to: 'branch' }),
+    () => home.connectionStyles.push({ from: 'leaf', to: 'sibling', label: 'Connection', arrows: 'both', points: [[1, 2], [4, 2]] }),
+    () => { home.connectionStyles[0].points[0][0] = 50; home.connectionStyles[0].label = 'Edited'; },
+  ];
+  for (const change of changes) { snapshots.push(home.history.capture()); change(); await home.save(); }
+  for (const before of snapshots.reverse()) {
+    await home.history.undo();
+    assert.equal(home.history.same(home.history.capture(), before), true);
+    assert.equal(home.hasChanges(), false);
+  }
+});
+
+test('rapid undo during a pending request saves the final restored document with the returned version', async () => {
+  const { home } = savedEditor();
+  const requests = [];
+  let resolve;
+  home.makeRequest = async (action, data) => {
+    requests.push(plain(data));
+    if (requests.length === 1) await new Promise(done => { resolve = done; });
+    return { ...plain(data), version: data.version + 1 };
+  };
+  home.name = 'First';
+  const pending = home.save();
+  home.name = 'Second';
+  home.save();
+  const undoFirst = home.history.undo();
+  assert.equal(home.name, 'First');
+  const undoSecond = home.history.undo();
+  assert.equal(home.name, 'Idea guardada');
+  resolve();
+  await Promise.all([pending, undoFirst, undoSecond]);
+  assert.equal(home.active.nodes[0].text, 'Idea guardada');
+  assert.equal(home.active.version, 3);
+  assert.deepEqual(requests.map(item => item.version), [1, 2]);
+  assert.equal(home.history.past.length, 0);
+  assert.equal(home.hasChanges(), false);
+});
+
+test('failed undo save remains editable and retryable without reintroducing the undone edit', async () => {
+  const { home } = savedEditor();
+  home.makeRequest = async (action, data) => ({ ...plain(data), version: data.version + 1 });
+  home.name = 'Edit'; await home.save();
+  home.makeRequest = async () => { throw new Error('Offline'); };
+  await home.history.undo();
+  assert.equal(home.name, 'Idea guardada');
+  assert.equal(home.error, 'Offline');
+  assert.equal(home.hasChanges(), true);
+  home.makeRequest = async (action, data) => ({ ...plain(data), version: data.version + 1 });
+  await home.save();
+  assert.equal(home.hasChanges(), false);
+  assert.equal(home.history.past.length, 0);
+});
+
+test('new edits after undo replace the abandoned future and camera changes do not add steps', async () => {
+  const { home } = savedEditor();
+  home.makeRequest = async (action, data) => ({ ...plain(data), version: data.version + 1 });
+  home.name = 'A'; await home.save();
+  home.name = 'B'; await home.save();
+  await home.history.undo();
+  home.viewport.x = 157; home.viewport.y = -42; home.viewport.scale = 1.6;
+  home.name = 'C'; await home.save();
+  await home.history.undo();
+  assert.equal(home.name, 'A');
+  await home.history.undo();
+  assert.equal(home.name, 'Idea guardada');
+  assert.deepEqual([home.viewport.x, home.viewport.y, home.viewport.scale], [157, -42, 1.6]);
+  assert.equal(await home.history.undo(), false);
+});
+
+test('history is capped at 50 steps and is cleared for external changes, another diagram or account reset', async () => {
+  const { home, state } = savedEditor();
+  home.makeRequest = async (action, data) => ({ ...plain(data), version: data.version + 1 });
+  for (let i = 1; i <= 55; i++) { home.name = String(i); await home.save(); }
+  assert.equal(home.history.past.length, 50);
+  home.selected = false;
+  home.render();
+  assert.equal(home.history.past.length, 50, 'ordinary redraws retain local history');
+  state.data.diagrams[0] = { ...plain(home.active), nodes: [{ id: 'root', parent_id: null, text: 'Remote edit' }] };
+  home.render();
+  assert.equal(home.name, 'Remote edit');
+  assert.equal(await home.history.undo(), false);
+  home.name = 'Local edit'; await home.save();
+  home.active = { id: 99, name: 'Another diagram', version: 1 };
+  home.nodes = home.treeFor(home.active); home.name = 'Another diagram'; home.diagramTitle = home.name;
+  home.history.ensure();
+  assert.equal(await home.history.undo(), false);
+  home.name = 'Another edit'; await home.save();
+  home.reset();
+  assert.equal(home.history.past.length, 0);
+  assert.equal(home.history.present, null);
+});
+
+test('first-save ID assignment preserves draft edit history and late saves cannot undo account reset', async () => {
+  const { home } = editor();
+  home.name = 'Nuevo diagrama'; home.drawStage();
+  let resolve;
+  let calls = 0;
+  home.makeRequest = async (action, data) => {
+    if (++calls === 1) await new Promise(done => { resolve = done; });
+    return { ...plain(data), id: 51, version: (data.version || 0) + 1 };
+  };
+  const first = home.save();
+  home.name = 'Draft edit'; home.save();
+  resolve(); await first;
+  await home.save();
+  await home.history.undo();
+  assert.equal(home.name, 'Nuevo diagrama');
+  assert.equal(home.active.nodes[0].text, 'Nuevo diagrama');
+  home.name = 'Pending old account edit';
+  home.makeRequest = async (action, data) => {
+    await new Promise(done => { resolve = done; });
+    return { ...plain(data), version: data.version + 1 };
+  };
+  const pending = home.save();
+  const undo = home.history.undo();
+  home.reset();
+  resolve(); await Promise.all([pending, undo]);
+  assert.equal(home.active, null);
+  assert.equal(home.nodes, null);
+  assert.equal(home.history.present, null);
 });

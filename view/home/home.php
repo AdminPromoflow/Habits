@@ -133,5 +133,6 @@
   <div class="diagram-scene" id="diagram-scene">
     <svg class="diagram-connections" id="diagram-connections"></svg>
     {{nodes}}
+    <svg class="diagram-alignment-guides" id="diagram-alignment-guides" aria-hidden="true" focusable="false"></svg>
   </div>
 </template>
