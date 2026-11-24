@@ -39,6 +39,7 @@ return [
     'platform' => 'admin',
     'diagrams' => 'diagrams',
     'mindspace' => 'mindspaces',
+    'createMindSpace' => 'mindspaces',
     'createMindSpaceItem' => 'mindspaces',
     'saveMindSpaceItem' => 'mindspaces',
     'addMindSpaceHabit' => 'mindspaces',

@@ -12,7 +12,20 @@
 .mindspace-add:hover, .mindspace-tabs [role="tab"]:hover { background: var(--surface); }
 .mindspace-shell button:focus-visible { outline: 2px solid var(--purple); outline-offset: -2px; }
 .mindspace-body { display: flex; min-height: 520px; flex: 1; min-width: 0; }
-.mindspace-explorer { flex: 0 0 190px; width: 190px; padding: 14px 8px; border-right: 1px solid var(--line); font-size: .8125rem; overflow-x: auto; }
+.mindspace-explorer { margin: 2px 0 8px 20px; padding: 3px 0 3px 10px; border-left: 1px solid var(--line); font-size: .8125rem; min-width: 0; }
+.mindspace-explorer[hidden] { display: none; }
+.ms-sidebar-toggle > span:not(.ms-sidebar-chevron) { flex: 1; }
+.ms-sidebar-chevron { font-size: 20px; line-height: 1; transition: transform .15s; }
+.ms-sidebar-toggle[aria-expanded="true"] .ms-sidebar-chevron { transform: rotate(90deg); }
+.ms-sidebar-space { margin-bottom: 3px; }
+.ms-explorer-root { width: 100%; }
+.ms-explorer-root span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ms-sidebar-folders { margin: 2px 0 4px 8px; }
+.mindspace-explorer .ms-sidebar-add { margin-top: 7px; color: var(--purple-dark); font-size: .75rem; }
+.ms-create-space-option { display: flex; align-items: center; gap: 12px; width: 100%; padding: 16px; border: 1px solid var(--lavender); border-radius: 10px; background: var(--lavender-wash); color: var(--ink); text-align: left; cursor: pointer; }
+.ms-create-space-option > svg { width: 24px; height: 24px; color: var(--purple-dark); }
+.ms-create-space-option small { display: block; margin-top: 5px; color: var(--muted); }
+.ms-add-context { color: var(--muted); font-size: .8125rem; margin: 18px 0 10px; }
 .mindspace-explorer button { display: flex; gap: 7px; align-items: center; border: 0; background: transparent; padding: 8px 6px; border-radius: 6px; font: inherit; color: var(--ink); text-align: left; cursor: pointer; }
 .mindspace-explorer .is-current { background: var(--lavender-wash); color: var(--purple-dark); }
 .mindspace-explorer summary { display: flex; align-items: center; cursor: pointer; }
@@ -21,7 +34,6 @@
 .mindspace-explorer summary button { min-width: 0; flex: 1; }
 .mindspace-explorer summary button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ms-tree-children { margin-left: 12px; }
-.mindspace-explorer .ms-new-folder { margin-top: 12px; color: var(--purple-dark); }
 .mindspace-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .mindspace-item-header { padding: 14px 20px 8px; border-bottom: 1px solid var(--line); }
 .mindspace-folder-path { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; color: var(--muted); font-size: .75rem; }
@@ -37,7 +49,7 @@
 .mindspace-panel:focus { outline: none; }
 .mindspace-legacy-picker { display: none !important; }
 .mindspace-panel .mindmap-workspace { min-height: 460px; }
-.mindspace-panel .mindmap-stage.has-tree { border: 0; border-radius: 0 0 16px 0; height: calc(100dvh - 310px); }
+.mindspace-panel .mindmap-stage.has-tree { border: 0; border-radius: 0 0 16px 16px; height: calc(100dvh - 310px); }
 .mindspace-panel .diagram-canvas-navigation { left: 12px; right: 12px; }
 .mindspace-panel .diagram-link-trail { font-size: .8rem; }
 .mindspace-directory { padding: 20px; flex: 1; }
@@ -96,7 +108,7 @@
 .ms-sheet td input:focus { outline: 2px solid var(--purple); outline-offset: -2px; }
 .ms-sheet-hint { color: var(--muted); font-size: .75rem; margin: 10px 0 0; }
 @media (max-width: 760px) {
-  .mindspace-body { flex-direction: column; }.mindspace-explorer { flex-basis: auto; width: auto; max-height: 160px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .mindspace-body { flex-direction: column; }
   .mindspace-item-header { padding: 12px; }.mindspace-item-title { align-items: flex-start; }.mindspace-item-title .button-row { flex-wrap: wrap; }
   .mindspace-tabs [role="tab"] { max-width: 160px; }.ms-kind-grid { grid-template-columns: 1fr; }.ms-board-editor,.ms-habits { padding: 12px; }
 }

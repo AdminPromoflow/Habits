@@ -452,6 +452,7 @@ class HomePage extends PageController {
       const url = new URL(location.href);
       url.searchParams.delete('item');
       url.searchParams.delete('folder');
+      url.searchParams.delete('space');
       url.searchParams.set('diagram', id);
       url.searchParams.delete('topic');
       if (topic !== undefined) url.searchParams.set('topic', topic ?? 'overview');

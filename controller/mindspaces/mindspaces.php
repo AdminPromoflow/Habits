@@ -9,6 +9,7 @@ final class MindSpacesController
         $model = new MindSpacesModel($this->db, $this->user);
         return match ($action) {
             'mindspace' => $model->get(),
+            'createMindSpace' => $model->createSpace($data),
             'createMindSpaceItem' => $model->create($data),
             'saveMindSpaceItem' => $model->save($data),
             'addMindSpaceHabit' => $model->addHabit($data),

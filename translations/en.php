@@ -1,6 +1,11 @@
 <?php
 declare(strict_types=1);
 return [
+    'ms_sidebar_add' => 'Add',
+    'ms_new_space' => 'New MindSpace',
+    'ms_new_space_hint' => 'A space with its own folders and documents.',
+    'ms_add_in' => 'Add to {name}',
+    'error_mindspace_destination' => 'Choose a folder in this MindSpace.',
     'date' => 'Date',
     'app_tagline' => 'A little better, every day.',
     'brand_caption' => 'YOUR SPACE TO GROW',

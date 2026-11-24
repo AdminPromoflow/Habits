@@ -226,3 +226,10 @@ Revisado el nuevo recorrido Ajustes → categorías elegidas → Mis hábitos �
 - Migración de recuperación aplicada en Hostinger; la tabla adicional conserva solo hashes de tokens.
 
 No se ha sustituido una base existente ni se han importado cuentas o completados de prueba en producción.
+
+## MindSpace y carpetas — 24 de noviembre de 2026
+
+- 200 comprobaciones HTTP y 7 comprobaciones de esquema, en MySQL aislado. Incluyen documentos de todos los tipos, carpetas anidadas, movimientos, prevención de ciclos, propiedad, CSRF, versiones concurrentes y conservación de diagramas.
+- 172 pruebas JavaScript de editor, enlaces, MindSpace, guardado concurrente y fórmulas.
+- Revisión visual local: crear Proyectos / Diseño; crear y mover una nota; recargar conservando contenido; calcular SUMA; crear tarjeta Kanban y cambiar su estado; configurar Scrum; crear y completar un hábito. Arrastre de una nota desde el explorador a una subcarpeta verificado en navegador.
+- Hostinger: migraciones 013 y 014 aplicadas; se conservaron 3 diagramas y 13 nodos. MindSpace visible en Safari, con pestañas y explorador. Detalles en MINDSPACE-MIGRATION.md.

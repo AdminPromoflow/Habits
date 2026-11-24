@@ -26,6 +26,8 @@ function shell() {
   const nav = admin ? adminNav : personalNav;
   const unread = S.data.notifications.filter((n) => !Number(n.is_read)).length;
   const pending = S.data.incoming.filter((n) => n.status === 'pending').length;
+  // Resolve the selected document before highlighting its MindSpace in navigation.
+  const content = admin ? adminPage() : personalPage();
   return renderTemplate('layout', {
     brandIcon: flower(),
     brandCaption: t('brand_caption'),
@@ -33,7 +35,7 @@ function shell() {
     navigation: nav
       .map(
         (v) =>
-          `<button data-view="${v}" class="nav-item ${S.view === v || (v === 'habits' && ['routine', 'categoryWeek'].includes(S.view)) ? 'active' : ''}">${icon({ users: 'sharing', requests: 'book', templates: 'habits', statistics: 'progress' }[v] || v)}<span>${t(v)}</span>${v === 'sharing' && pending ? `<span class="nav-count">${pending}</span>` : ''}</button>`
+          `<button data-view="${v}" class="nav-item ${S.view === v || (v === 'habits' && ['routine', 'categoryWeek'].includes(S.view)) ? 'active' : ''}">${icon({ users: 'sharing', requests: 'book', templates: 'habits', statistics: 'progress' }[v] || v)}<span>${t(v)}</span>${v === 'sharing' && pending ? `<span class="nav-count">${pending}</span>` : ''}</button>${!admin && v === 'home' ? pageControllers.home.mindspace.sidebar() : ''}`
       )
       .join(''),
     reminderIcon: icon('leaf'),
@@ -60,7 +62,7 @@ function shell() {
     unreadDot: unread ? '<span class="unread-dot"></span>' : '',
     profileLabel: t('profile'),
     profileAvatar: esc(S.user.name.slice(0, 1)),
-    content: admin ? adminPage() : personalPage(),
+    content,
     footerIcon: flower(),
     privacyNote: t('privacy_note'),
   });

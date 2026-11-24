@@ -11,11 +11,27 @@ final class MindSpacesModel extends BaseModel
         return $ready[$key] ??= (bool) $this->db->one("SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='mindspace_items' AND column_name='parent_id'");
     }
 
-    private function space(bool $lock = false): array
+    private function space(bool $lock = false, mixed $id = null): array
     {
         if (!$this->available()) fail('error_mindspace_setup', 503);
+        if ($id !== null) {
+            if (!is_int($id) || $id < 1) fail('error_validation');
+            $space = $this->db->one('SELECT id,name FROM mindspaces WHERE id=? AND owner_user_id=?' . ($lock ? ' FOR UPDATE' : ''), [$id, $this->uid()]);
+            if (!$space) fail('error_not_found', 404);
+            return $space;
+        }
         $this->db->run("INSERT INTO mindspaces(owner_user_id) VALUES (?) ON DUPLICATE KEY UPDATE id=id", [$this->uid()]);
         return $this->db->one("SELECT id,name FROM mindspaces WHERE owner_user_id=? AND space_key='home'" . ($lock ? ' FOR UPDATE' : ''), [$this->uid()]);
+    }
+
+    public function createSpace(array $data): array
+    {
+        $this->space();
+        $name = Validate::text($data, 'name', 120);
+        $key = Validate::text($data, 'client_key', 36);
+        if (!preg_match('/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/D', $key)) fail('error_validation');
+        $this->db->run('INSERT INTO mindspaces(owner_user_id,space_key,name) VALUES (?,?,?) ON DUPLICATE KEY UPDATE id=id', [$this->uid(), $key, $name]);
+        return $this->db->one('SELECT id,name FROM mindspaces WHERE owner_user_id=? AND space_key=?', [$this->uid(), $key]);
     }
 
     public function get(): array
@@ -25,7 +41,8 @@ final class MindSpacesModel extends BaseModel
             SELECT ?,'diagram',d.name,d.id,'{}',d.client_key,d.id,d.created_at,d.updated_at FROM diagrams d
             LEFT JOIN mindspace_items i ON i.diagram_id=d.id WHERE d.owner_user_id=? AND i.id IS NULL", [$space['id'], $this->uid()]);
         $space['items'] = array_map(self::response(...), $this->db->all(
-            'SELECT i.*,COALESCE(d.name,i.name) AS name,d.version AS diagram_version FROM mindspace_items i LEFT JOIN diagrams d ON d.id=i.diagram_id WHERE i.mindspace_id=? ORDER BY i.sort_order,i.id', [$space['id']]));
+            'SELECT i.*,COALESCE(d.name,i.name) AS name,d.version AS diagram_version FROM mindspace_items i JOIN mindspaces m ON m.id=i.mindspace_id LEFT JOIN diagrams d ON d.id=i.diagram_id WHERE m.owner_user_id=? ORDER BY i.sort_order,i.id', [$this->uid()]));
+        $space['spaces'] = $this->db->all("SELECT id,name FROM mindspaces WHERE owner_user_id=? ORDER BY (space_key='home') DESC,name,id", [$this->uid()]);
         return $space;
     }
 
@@ -68,7 +85,7 @@ final class MindSpacesModel extends BaseModel
 
     public function create(array $data): array
     {
-        $space = $this->space(true);
+        $space = $this->space(true, $data['mindspace_id'] ?? null);
         $kind = Validate::choice($data['kind'] ?? '', ['folder','diagram','spreadsheet','kanban','scrum','habits','notes']);
         $name = Validate::text($data, 'name', 120);
         $key = Validate::text($data, 'client_key', 36);
@@ -78,11 +95,13 @@ final class MindSpacesModel extends BaseModel
             if ($existing['kind'] !== $kind) fail('error_validation');
             return self::response($this->item((int) $existing['id']));
         }
-        $parent = $this->parent($data['parent_id'] ?? null);
+        $parent = $this->parent($data['parent_id'] ?? null, null, (int) $space['id']);
         if ($kind === 'diagram') {
+            $prior = $this->db->one('SELECT i.mindspace_id FROM diagrams d JOIN mindspace_items i ON i.diagram_id=d.id WHERE d.owner_user_id=? AND d.client_key=?', [$this->uid(), $key]);
+            if ($prior && (int) $prior['mindspace_id'] !== (int) $space['id']) fail('error_validation');
             $diagram = (new DiagramsModel($this->db, $this->user))->save(['name' => $name, 'client_key' => $key,
                 'nodes' => [['id' => 'root', 'parent_id' => null, 'text' => '']]]);
-            $this->db->run('UPDATE mindspace_items SET parent_id=? WHERE id=?', [$parent, $diagram['mindspace_item_id']]);
+            $this->db->run('UPDATE mindspace_items SET mindspace_id=?,parent_id=?,sort_order=? WHERE id=?', [$space['id'], $parent, $this->nextOrder((int) $space['id']), $diagram['mindspace_item_id']]);
             return self::response($this->item((int) $diagram['mindspace_item_id']));
         }
         $content = match ($kind) {
@@ -185,7 +204,7 @@ final class MindSpacesModel extends BaseModel
         return $this->save(['id' => $item['id'], 'version' => $item['version'], 'content' => $content]);
     }
 
-    private function parent(mixed $parent, ?int $moving = null): ?int
+    private function parent(mixed $parent, ?int $moving = null, ?int $space = null): ?int
     {
         if ($parent === null) return null;
         if (!is_int($parent) || $parent < 1) fail('error_validation');
@@ -194,6 +213,7 @@ final class MindSpacesModel extends BaseModel
             if ($cursor === $moving || isset($seen[$cursor])) fail('error_mindspace_move');
             $seen[$cursor] = true;
             $folder = $this->item($cursor);
+            if ($space !== null && (int) $folder['mindspace_id'] !== $space) fail('error_mindspace_destination');
             if ($folder['kind'] !== 'folder') fail('error_mindspace_move');
             $cursor = $folder['parent_id'] === null ? null : (int) $folder['parent_id'];
         }
@@ -204,11 +224,12 @@ final class MindSpacesModel extends BaseModel
     {
         // Serialize moves and creations in this MindSpace so concurrent folder
         // moves cannot each validate against a stale tree and create a cycle.
-        $space = $this->space(true);
+        $source = $this->item((int) ($data['id'] ?? 0));
+        $space = $this->space(true, (int) $source['mindspace_id']);
         $item = $this->item((int) ($data['id'] ?? 0), true);
         if ((int) ($data['version'] ?? 0) !== (int) $item['version']) fail('error_mindspace_conflict', 409);
         if (!array_key_exists('parent_id', $data)) fail('error_validation');
-        $parent = $this->parent($data['parent_id'], (int) $item['id']);
+        $parent = $this->parent($data['parent_id'], (int) $item['id'], (int) $space['id']);
         $this->db->run('UPDATE mindspace_items SET parent_id=?,sort_order=?,version=version+1,updated_at=UTC_TIMESTAMP() WHERE id=?',
             [$parent, $this->nextOrder((int) $space['id']), $item['id']]);
         return self::response($this->item((int) $item['id']));

@@ -63,3 +63,36 @@ test('late saves from a reset account never update the next account',async()=>{
   release({id:3,kind:'notes',version:2,content:{text:'old account'}}); await pending;
   assert.equal(state.data.mindspace.items.length,0); assert.equal(space.active,null);
 });
+
+function multiple(url='http://localhost/?space=200&folder=0') {
+  const fixture = setup(url), data = fixture.state.data.mindspace;
+  data.id = 100; data.name = 'MindSpace';
+  data.spaces = [{id:100,name:'MindSpace'},{id:200,name:'Work'}];
+  data.items.push({id:5,kind:'folder',name:'Work folder',mindspace_id:200,parent_id:null,content:{}},
+    {id:6,kind:'notes',name:'Work note',mindspace_id:200,parent_id:5,version:1,content:{text:'work'}});
+  fixture.space.resolve(); return fixture;
+}
+test('MindSpace selection scopes tabs and folders, while document deep links identify their own space',()=>{
+  const {space}=multiple();
+  assert.equal(space.spaceName(),'Work'); assert.equal(space.active,null);
+  assert.equal(space.items().map(i=>i.id).join(','),'5,6');
+  assert.equal(space.folders().map(i=>i.name).join(','),'Work folder');
+  assert.ok(space.tabs().includes('Work note')); assert.ok(!space.tabs().includes('Note</span>'));
+  const linked=multiple('http://localhost/?space=100&item=6').space;
+  assert.equal(linked.spaceId(),200); assert.equal(linked.active.id,6); assert.equal(linked.pathTo(5)[0].name,'Work folder');
+});
+test('switching spaces saves the open document and preserves the other spaces in the shared catalog',async()=>{
+  const {space,home,location,state}=multiple('http://localhost/?item=6'); let request;
+  home.makeRequest=async(action,data)=>{request=data; return {...space.active,version:2,content:data.content};};
+  space.draft.text='new work'; await space.go(null,100);
+  assert.equal(request.id,6); assert.equal(request.content.text,'new work');
+  const params=new URL(location.assigned).searchParams;
+  assert.equal(params.get('space'),'100'); assert.equal(params.get('folder'),'0'); assert.equal(params.has('item'),false);
+  assert.equal(state.data.mindspace.items.length,6); assert.equal(state.data.mindspace.items.find(i=>i.id===6).content.text,'new work');
+});
+test('sidebar collapse leaves the active editor and unsaved draft intact',()=>{
+  const {space}=multiple('http://localhost/?item=6'); space.draft.text='still typing';
+  assert.equal(space.sidebarOpen(),true); space.toggleSidebar(); assert.equal(space.sidebarOpen(),false);
+  assert.equal(space.draft.text,'still typing'); assert.equal(space.dirty(),true);
+  space.toggleSidebar(); assert.equal(space.sidebarOpen(),true); assert.equal(space.active.id,6);
+});
