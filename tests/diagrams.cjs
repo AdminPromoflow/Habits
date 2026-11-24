@@ -2986,3 +2986,17 @@ test('double-click inserts bends, and arrow settings and a label survive subsequ
   assert.equal(home.hiddenConnections.length,1);
   assert.equal(home.nodes.length,5);
 });
+
+test('linear connectors keep square baseline junctions when rendered and when labelled', () => {
+  const { home, addConnectionElement } = branchDragEditor();
+  const { svg } = addConnectionElement('root', 'branch');
+  const edge = { from: 'root', to: 'branch', points: [[100,100],[300,100],[300,50]], cornerRadius: 0, path: 'M100,100 L300,100 L300,50' };
+  home.plan = { origin: { x: 0, y: 0 }, edges: [edge] };
+  home.connectionStyles = [{ from: 'root', to: 'branch', points: null, label: 'Semana', arrows: 'none' }];
+  home.connectionTool.render(svg, [edge]);
+  assert.equal(home.connectionTool.drawn[0].path, edge.path);
+  assert.ok(svg.innerHTML.includes('M100,100 L300,100 L300,50'));
+  assert.ok(svg.innerHTML.includes('Semana'));
+  home.connectionTool.render(svg, [{ ...edge, cornerRadius: 6 }]);
+  assert.ok(home.connectionTool.drawn[0].path.includes('Q'), 'other layouts retain their rounded turns');
+});

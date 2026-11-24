@@ -592,3 +592,100 @@ test('additional connections use the existing orthogonal style without moving no
     assert.equal(edge.path, Layout.connectionPath(linked.nodes.find(n => n.id === from), linked.nodes.find(n => n.id === to), linked.nodes));
   }
 });
+
+for (const vertical of ['compact', 'alternating', 'top', 'bottom']) {
+  for (const horizontal of ['ltr', 'rtl']) {
+    test(`linear ${vertical}/${horizontal} has one continuous baseline and outward topic columns`, () => {
+      const nodes = fixture('linear');
+      Object.assign(nodes[0].layout, { vertical, horizontal });
+      const sizes = { root: { width: 140, height: 72 }, a: { width: 210, height: 90 },
+        b1: { width: 330, height: 190 }, a11: { width: 310, height: 130 } };
+      const plan = Layout.arrange(nodes, sizes);
+      const root = plan.nodes.find(n => n.id === 'root');
+      const baseline = root.y + root.height / 2;
+      const sourceX = horizontal === 'rtl' ? root.x : root.x + root.width;
+      const branches = nodes.filter(n => n.parent_id === 'root');
+      let previous = null;
+      for (const [index, branch] of branches.entries()) {
+        const box = plan.nodes.find(n => n.id === branch.id);
+        const upwards = vertical === 'top' || !['top', 'bottom'].includes(vertical) && index % 2 === 0;
+        const endY = upwards ? box.y + box.height : box.y;
+        const cx = box.x + box.width / 2;
+        const edge = plan.edges.find(e => e.to === branch.id);
+        assert.deepEqual(plain(edge.points), [[sourceX, baseline], [cx, baseline], [cx, endY]]);
+        assert.equal(edge.cornerRadius, 0);
+        assert.equal(edge.path.includes('Q'), false, 'junctions on the baseline stay square');
+        assert.equal(Math.abs(endY - baseline), 32, 'all main topics have the same stem length');
+        if (previous !== null) assert.ok(horizontal === 'rtl' ? cx < previous : cx > previous, 'topic order follows the chosen horizontal direction');
+        previous = cx;
+        const descendantIds = new Set([branch.id]);
+        for (let pass = 0; pass < nodes.length; pass++) for (const n of nodes) if (descendantIds.has(n.parent_id)) descendantIds.add(n.id);
+        for (const descendant of plan.nodes.filter(n => descendantIds.has(n.id))) {
+          assert.equal(descendant.linearRole, 'branch');
+          assert.equal(descendant.linearSide, upwards ? 'top' : 'bottom');
+          assert.ok(upwards ? descendant.y + descendant.height < baseline : descendant.y > baseline);
+        }
+      }
+      for (const parent of plan.nodes.filter(n => n.linearRole === 'branch')) {
+        const childEdges = plan.edges.filter(e => e.from === parent.id);
+        if (!childEdges.length) continue;
+        const spine = childEdges[0].points[0][0];
+        for (const edge of childEdges) {
+          const target = plan.nodes.find(n => n.id === edge.to);
+          assert.deepEqual(plain(edge.points), [[spine, parent.linearSide === 'top' ? parent.y : parent.y + parent.height],
+            [spine, target.y + target.height / 2], [horizontal === 'rtl' ? target.x + target.width : target.x, target.y + target.height / 2]]);
+        }
+      }
+      noOverlaps(plan);
+      for (const edge of plan.edges) {
+        const others = plan.nodes.filter(n => n.id !== edge.from && n.id !== edge.to);
+        for (let i = 1; i < edge.points.length; i++) {
+          const a = edge.points[i - 1], b = edge.points[i];
+          for (const other of others) {
+            const crosses = a[0] === b[0]
+              ? a[0] > other.x && a[0] < other.x + other.width && Math.max(a[1], b[1]) > other.y && Math.min(a[1], b[1]) < other.y + other.height
+              : a[1] > other.y && a[1] < other.y + other.height && Math.max(a[0], b[0]) > other.x && Math.min(a[0], b[0]) < other.x + other.width;
+            assert.equal(crosses, false, `${edge.from} -> ${edge.to} must not cross ${other.id}`);
+          }
+        }
+      }
+      assert.deepEqual(plain(Layout.arrange(plain(nodes), sizes)), plain(plan), 'reloading reproduces the same timeline');
+    });
+  }
+}
+
+test('compact linear layout interleaves opposite sides while preserving complete branch bounds', () => {
+  const compact = Layout.arrange(fixture('linear'));
+  const nodes = fixture('linear');
+  nodes[0].layout.vertical = 'alternating';
+  const spaced = Layout.arrange(nodes);
+  assert.ok(compact.width < spaced.width);
+  noOverlaps(compact);
+});
+
+test('linear groups respect explicitly selected nested layouts and independent roots', () => {
+  const nodes = fixture('linear');
+  nodes.find(n => n.id === 'a').layout = { ...Layout.defaults('vertical'), direction: 'top' };
+  nodes.find(n => n.id === 'b').layout = { ...Layout.defaults('linear'), vertical: 'bottom' };
+  nodes.push(node('other-root', null, { ...Layout.defaults('linear'), vertical: 'top' }), node('other-child', 'other-root'));
+  const plan = Layout.arrange(nodes);
+  assert.equal(plan.nodes.find(n => n.id === 'a').layout.mode, 'vertical');
+  assert.equal(plan.nodes.find(n => n.id === 'a1').layout.mode, 'vertical');
+  assert.equal(plan.nodes.find(n => n.id === 'b').linearRole, 'axis');
+  assert.equal(plan.nodes.find(n => n.id === 'b1').linearRole, 'branch');
+  assert.equal(plan.nodes.find(n => n.id === 'other-root').linearRole, 'axis');
+  assert.equal(plan.edges.some(e => e.from === 'root' && e.to === 'other-root'), false);
+  noOverlaps(plan);
+});
+
+test('extra links from a linear topic retain independent routing rather than joining its baseline', () => {
+  const nodes = fixture('linear');
+  const base = Layout.arrange(nodes);
+  const linked = Layout.arrange(nodes, {}, [{ from: 'a', to: 'd' }]);
+  assert.deepEqual(plain(linked.nodes), plain(base.nodes));
+  const extra = linked.edges.at(-1);
+  assert.equal(extra.cornerRadius, undefined);
+  const ends = assertRoundedOrthogonal(extra.path);
+  assert.ok(onBoundary(ends.start, linked.nodes.find(n => n.id === 'a')));
+  assert.ok(onBoundary(ends.end, linked.nodes.find(n => n.id === 'd')));
+});

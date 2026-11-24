@@ -135,8 +135,10 @@ class DiagramLayoutPanel {
   directionGroup(field, title, values) {
     const settings = this.selectedSettings();
     if (!values.includes(settings[field])) settings[field] = values[0];
+    const labelKey = (value) => this.mode === 'linear' && field === 'vertical'
+      ? `diagram_layout_linear_${value}` : `diagram_layout_direction_${value}`;
     return `<fieldset class="diagram-layout-direction-group"><legend>${esc(t(`diagram_layout_${title}_label`))}</legend>${values.map((value) => `
-      <label><input type="radio" name="diagram-layout-${field}" data-layout-setting="${field}" value="${value}"${settings[field] === value ? ' checked' : ''}><span>${esc(t(`diagram_layout_direction_${value}`))}</span></label>`).join('')}</fieldset>`;
+      <label><input type="radio" name="diagram-layout-${field}" data-layout-setting="${field}" value="${value}"${settings[field] === value ? ' checked' : ''}><span>${esc(t(labelKey(value)))}</span></label>`).join('')}</fieldset>`;
   }
 
   close() {
