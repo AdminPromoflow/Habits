@@ -1,5 +1,15 @@
 # Verificación realizada
 
+## Nodo redondeado y creación persistente — 23 de noviembre de 2026
+
+- Nodo inicial cambiado a rectángulo de 220 × 128 px con esquinas de 24 px.
+- Pulsar Crear diagrama guarda inmediatamente un registro con el nombre traducido «Nuevo diagrama» / «New diagram». El texto queda seleccionado para reemplazarlo. No hace falta escribir para conservar la creación al recargar.
+- 8 pruebas JavaScript completadas: creación inmediata, recuperación al recargar, edición durante la creación, doble clic, reintento con la misma clave y regresiones de guardado, cambio de cuenta y validación.
+- Comprobación real en navegador y base de pruebas aislada: creación sin escribir → recarga → nodo recuperado; cambio a «Mi primer diagrama» → recarga → nombre conservado. Revisadas las vistas de escritorio y móvil (390 × 844).
+- Sintaxis JavaScript/PHP y `git diff --check` correctos. Capturas en `tests/.runtime/rounded-diagram-desktop.png` y `tests/.runtime/rounded-diagram-mobile.png`.
+
+Este cambio está únicamente en los archivos locales. Usa la tabla `diagrams` existente; no requiere una nueva migración ni cambia el modelo relacional. No se publicaron archivos ni se modificó Hostinger durante esta revisión.
+
 ## Reorganización local y primer nodo del diagrama — 23 de noviembre de 2026
 
 Esta actualización se realizó únicamente en la carpeta local MyRemarkableMind. No se publicó ni se sincronizó con Hostinger o Git remoto.

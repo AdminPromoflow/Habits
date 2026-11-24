@@ -94,12 +94,17 @@ class HomePage extends PageController {
 
   async handleAction(action) {
     if (action === 'retry-diagram') return this.save();
+    if (this.active || this.draft) return;
     this.draft = { client_key: crypto.randomUUID() };
-    this.name = '';
+    this.name = t('diagram_default_name');
     this.error = '';
     this.editing = true;
     this.drawStage();
-    document.getElementById('diagram-name')?.focus();
+    const input = document.getElementById('diagram-name');
+    input?.focus();
+    input?.select();
+    // Persist the creation itself, even when the user has not named it yet.
+    await this.save();
   }
 
   isEditing() {

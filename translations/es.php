@@ -366,6 +366,7 @@ return [
     'create_diagram' => 'Crear diagrama',
     'diagram_canvas' => 'Lienzo del diagrama',
     'diagram_name' => 'Nombre del diagrama',
+    'diagram_default_name' => 'Nuevo diagrama',
     'diagram_name_required' => 'Escribe un nombre para el diagrama.',
     'diagram_saving' => 'Guardando diagrama…',
     'diagram_saved' => 'Diagrama guardado',

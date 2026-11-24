@@ -1,0 +1,2165 @@
+{
+  "tables": [
+    {
+      "name": "users",
+      "source": "001_core.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(100)",
+          "definition": "VARCHAR(100) NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "email",
+          "type": "VARCHAR(190)",
+          "definition": "VARCHAR(190) NOT NULL UNIQUE",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "UQ"
+          ]
+        },
+        {
+          "name": "password_hash",
+          "type": "VARCHAR(255)",
+          "definition": "VARCHAR(255) NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "status",
+          "type": "ENUM('active','suspended')",
+          "definition": "ENUM('active','suspended') NOT NULL DEFAULT 'active'",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "auth_version",
+          "type": "INT",
+          "definition": "INT NOT NULL DEFAULT 1",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "setup_token_hash",
+          "type": "CHAR(64)",
+          "definition": "CHAR(64) NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "setup_expires_at",
+          "type": "DATETIME",
+          "definition": "DATETIME NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "email"
+        ]
+      ],
+      "foreign_keys": [],
+      "constraints": [],
+      "engine": "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+      "ddl": "CREATE TABLE IF NOT EXISTS users (\n id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,\n name VARCHAR(100) NOT NULL,\n email VARCHAR(190) NOT NULL UNIQUE,\n password_hash VARCHAR(255) NOT NULL,\n status ENUM('active','suspended') NOT NULL DEFAULT 'active',\n auth_version INT NOT NULL DEFAULT 1,\n setup_token_hash CHAR(64) NULL,\n setup_expires_at DATETIME NULL,\n created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
+    },
+    {
+      "name": "user_roles",
+      "source": "001_core.sql",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK",
+            "FK"
+          ]
+        },
+        {
+          "name": "role",
+          "type": "ENUM('admin','user')",
+          "definition": "ENUM('admin','user') NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK"
+          ]
+        }
+      ],
+      "pk": [
+        "user_id",
+        "role"
+      ],
+      "unique": [],
+      "foreign_keys": [
+        {
+          "columns": [
+            "user_id"
+          ],
+          "parent": "users",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "constraints": [
+        "PRIMARY KEY(user_id,role)",
+        "FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE"
+      ],
+      "engine": "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+      "ddl": "CREATE TABLE IF NOT EXISTS user_roles (\n user_id BIGINT UNSIGNED NOT NULL,\n role ENUM('admin','user') NOT NULL,\n PRIMARY KEY(user_id,role),\n FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+    },
+    {
+      "name": "user_settings",
+      "source": "001_core.sql",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED PRIMARY KEY",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK",
+            "FK"
+          ]
+        },
+        {
+          "name": "language",
+          "type": "ENUM('en','es')",
+          "definition": "ENUM('en','es') NOT NULL DEFAULT 'en'",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "timezone",
+          "type": "VARCHAR(80)",
+          "definition": "VARCHAR(80) NOT NULL DEFAULT 'America/Bogota'",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "theme",
+          "type": "ENUM('light','dark')",
+          "definition": "ENUM('light','dark') NOT NULL DEFAULT 'light'",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "notifications_enabled",
+          "type": "TINYINT(1)",
+          "definition": "TINYINT(1) NOT NULL DEFAULT 1",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        }
+      ],
+      "pk": [
+        "user_id"
+      ],
+      "unique": [],
+      "foreign_keys": [
+        {
+          "columns": [
+            "user_id"
+          ],
+          "parent": "users",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "constraints": [
+        "FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE"
+      ],
+      "engine": "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+      "ddl": "CREATE TABLE IF NOT EXISTS user_settings (\n user_id BIGINT UNSIGNED PRIMARY KEY,\n language ENUM('en','es') NOT NULL DEFAULT 'en',\n timezone VARCHAR(80) NOT NULL DEFAULT 'America/Bogota',\n theme ENUM('light','dark') NOT NULL DEFAULT 'light',\n notifications_enabled TINYINT(1) NOT NULL DEFAULT 1,\n FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+    },
+    {
+      "name": "habit_categories",
+      "source": "001_core.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "owner_user_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": [
+            "FK"
+          ]
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(100)",
+          "definition": "VARCHAR(100) NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "UQ"
+          ]
+        },
+        {
+          "name": "translation_key",
+          "type": "VARCHAR(50)",
+          "definition": "VARCHAR(50) NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "definition": "TEXT NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "icon",
+          "type": "VARCHAR(30)",
+          "definition": "VARCHAR(30) NOT NULL DEFAULT 'sparkles'",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "color",
+          "type": "CHAR(7)",
+          "definition": "CHAR(7) NOT NULL DEFAULT '#B8A4D4'",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "scope_key",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED GENERATED ALWAYS AS (COALESCE(owner_user_id,0)) STORED",
+          "nullable": true,
+          "generated": true,
+          "keys": [
+            "UQ"
+          ]
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "scope_key",
+          "name"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_user_id"
+          ],
+          "parent": "users",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "constraints": [
+        "UNIQUE KEY category_unique(scope_key,name)",
+        "FOREIGN KEY(owner_user_id) REFERENCES users(id) ON DELETE CASCADE"
+      ],
+      "engine": "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+      "ddl": "CREATE TABLE IF NOT EXISTS habit_categories (\n id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,\n owner_user_id BIGINT UNSIGNED NULL,\n name VARCHAR(100) NOT NULL,\n translation_key VARCHAR(50) NULL,\n description TEXT NOT NULL,\n icon VARCHAR(30) NOT NULL DEFAULT 'sparkles',\n color CHAR(7) NOT NULL DEFAULT '#B8A4D4',\n scope_key BIGINT UNSIGNED GENERATED ALWAYS AS (COALESCE(owner_user_id,0)) STORED,\n created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n UNIQUE KEY category_unique(scope_key,name),\n FOREIGN KEY(owner_user_id) REFERENCES users(id) ON DELETE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
+    },
+    {
+      "name": "routines",
+      "source": "001_core.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "owner_user_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "FK",
+            "UQ"
+          ]
+        },
+        {
+          "name": "category_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "FK"
+          ]
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(190)",
+          "definition": "VARCHAR(190) NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "definition": "TEXT NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "start_date",
+          "type": "DATE",
+          "definition": "DATE NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "end_date",
+          "type": "DATE",
+          "definition": "DATE NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "source_key",
+          "type": "VARCHAR(150)",
+          "definition": "VARCHAR(150) NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": [
+            "UQ"
+          ]
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "owner_user_id",
+          "source_key"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_user_id"
+          ],
+          "parent": "users",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT (implícito)"
+        },
+        {
+          "columns": [
+            "category_id"
+          ],
+          "parent": "habit_categories",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT (implícito)"
+        }
+      ],
+      "constraints": [
+        "UNIQUE(owner_user_id,source_key)",
+        "FOREIGN KEY(owner_user_id) REFERENCES users(id)",
+        "FOREIGN KEY(category_id) REFERENCES habit_categories(id)"
+      ],
+      "engine": "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+      "ddl": "CREATE TABLE IF NOT EXISTS routines (\n id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,\n owner_user_id BIGINT UNSIGNED NOT NULL,\n category_id BIGINT UNSIGNED NOT NULL,\n name VARCHAR(190) NOT NULL,\n description TEXT NOT NULL,\n start_date DATE NOT NULL,\n end_date DATE NULL,\n source_key VARCHAR(150) NULL,\n UNIQUE(owner_user_id,source_key),\n FOREIGN KEY(owner_user_id) REFERENCES users(id),\n FOREIGN KEY(category_id) REFERENCES habit_categories(id)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+    },
+    {
+      "name": "habits",
+      "source": "001_core.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "owner_user_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "FK",
+            "UQ"
+          ]
+        },
+        {
+          "name": "category_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "FK"
+          ]
+        },
+        {
+          "name": "routine_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": [
+            "FK"
+          ]
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(190)",
+          "definition": "VARCHAR(190) NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "definition": "TEXT NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "goal",
+          "type": "DECIMAL(10,2)",
+          "definition": "DECIMAL(10,2) NOT NULL DEFAULT 1",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "unit",
+          "type": "VARCHAR(40)",
+          "definition": "VARCHAR(40) NOT NULL DEFAULT ''",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "schedule_days",
+          "type": "VARCHAR(30)",
+          "definition": "VARCHAR(30) NOT NULL DEFAULT '[1,2,3,4,5,6,7]'",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "scheduled_time",
+          "type": "TIME",
+          "definition": "TIME NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "start_date",
+          "type": "DATE",
+          "definition": "DATE NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "end_date",
+          "type": "DATE",
+          "definition": "DATE NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "status",
+          "type": "ENUM('active','archived')",
+          "definition": "ENUM('active','archived') NOT NULL DEFAULT 'active'",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "section",
+          "type": "VARCHAR(150)",
+          "definition": "VARCHAR(150) NOT NULL DEFAULT ''",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "sort_order",
+          "type": "INT",
+          "definition": "INT NOT NULL DEFAULT 0",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "source_key",
+          "type": "VARCHAR(190)",
+          "definition": "VARCHAR(190) NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": [
+            "UQ"
+          ]
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "owner_user_id",
+          "source_key"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_user_id"
+          ],
+          "parent": "users",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT (implícito)"
+        },
+        {
+          "columns": [
+            "category_id"
+          ],
+          "parent": "habit_categories",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT (implícito)"
+        },
+        {
+          "columns": [
+            "routine_id"
+          ],
+          "parent": "routines",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT (implícito)"
+        }
+      ],
+      "constraints": [
+        "UNIQUE(owner_user_id,source_key)",
+        "INDEX owner_category(owner_user_id,category_id)",
+        "FOREIGN KEY(owner_user_id) REFERENCES users(id)",
+        "FOREIGN KEY(category_id) REFERENCES habit_categories(id)",
+        "FOREIGN KEY(routine_id) REFERENCES routines(id)",
+        "CHECK(goal > 0)"
+      ],
+      "engine": "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+      "ddl": "CREATE TABLE IF NOT EXISTS habits (\n id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,\n owner_user_id BIGINT UNSIGNED NOT NULL,\n category_id BIGINT UNSIGNED NOT NULL,\n routine_id BIGINT UNSIGNED NULL,\n name VARCHAR(190) NOT NULL,\n description TEXT NOT NULL,\n goal DECIMAL(10,2) NOT NULL DEFAULT 1,\n unit VARCHAR(40) NOT NULL DEFAULT '',\n schedule_days VARCHAR(30) NOT NULL DEFAULT '[1,2,3,4,5,6,7]',\n scheduled_time TIME NULL,\n start_date DATE NOT NULL,\n end_date DATE NULL,\n status ENUM('active','archived') NOT NULL DEFAULT 'active',\n section VARCHAR(150) NOT NULL DEFAULT '',\n sort_order INT NOT NULL DEFAULT 0,\n source_key VARCHAR(190) NULL,\n created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n UNIQUE(owner_user_id,source_key),\n INDEX owner_category(owner_user_id,category_id),\n FOREIGN KEY(owner_user_id) REFERENCES users(id),\n FOREIGN KEY(category_id) REFERENCES habit_categories(id),\n FOREIGN KEY(routine_id) REFERENCES routines(id),\n CHECK(goal > 0)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+    },
+    {
+      "name": "habit_completions",
+      "source": "001_core.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "habit_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "FK",
+            "UQ"
+          ]
+        },
+        {
+          "name": "user_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "FK",
+            "UQ"
+          ]
+        },
+        {
+          "name": "completed_on",
+          "type": "DATE",
+          "definition": "DATE NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "UQ"
+          ]
+        },
+        {
+          "name": "amount",
+          "type": "DECIMAL(10,2)",
+          "definition": "DECIMAL(10,2) NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "goal_at_time",
+          "type": "DECIMAL(10,2)",
+          "definition": "DECIMAL(10,2) NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "note",
+          "type": "VARCHAR(1000)",
+          "definition": "VARCHAR(1000) NOT NULL DEFAULT ''",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "habit_id",
+          "user_id",
+          "completed_on"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "habit_id"
+          ],
+          "parent": "habits",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT (implícito)"
+        },
+        {
+          "columns": [
+            "user_id"
+          ],
+          "parent": "users",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT (implícito)"
+        }
+      ],
+      "constraints": [
+        "UNIQUE(habit_id,user_id,completed_on)",
+        "INDEX user_date(user_id,completed_on)",
+        "FOREIGN KEY(habit_id) REFERENCES habits(id)",
+        "FOREIGN KEY(user_id) REFERENCES users(id)",
+        "CHECK(amount >= 0)",
+        "CHECK(goal_at_time > 0)"
+      ],
+      "engine": "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+      "ddl": "CREATE TABLE IF NOT EXISTS habit_completions (\n id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,\n habit_id BIGINT UNSIGNED NOT NULL,\n user_id BIGINT UNSIGNED NOT NULL,\n completed_on DATE NOT NULL,\n amount DECIMAL(10,2) NOT NULL,\n goal_at_time DECIMAL(10,2) NOT NULL,\n note VARCHAR(1000) NOT NULL DEFAULT '',\n created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n UNIQUE(habit_id,user_id,completed_on),\n INDEX user_date(user_id,completed_on),\n FOREIGN KEY(habit_id) REFERENCES habits(id),\n FOREIGN KEY(user_id) REFERENCES users(id),\n CHECK(amount >= 0),\n CHECK(goal_at_time > 0)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+    },
+    {
+      "name": "category_requests",
+      "source": "001_core.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "user_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "FK"
+          ]
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(100)",
+          "definition": "VARCHAR(100) NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "definition": "TEXT NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "icon",
+          "type": "VARCHAR(30)",
+          "definition": "VARCHAR(30) NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "color",
+          "type": "CHAR(7)",
+          "definition": "CHAR(7) NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "reason",
+          "type": "TEXT",
+          "definition": "TEXT NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "status",
+          "type": "ENUM('pending','approved','rejected')",
+          "definition": "ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending'",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "feedback",
+          "type": "TEXT",
+          "definition": "TEXT NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "reviewed_by",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": [
+            "FK"
+          ]
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "reviewed_at",
+          "type": "TIMESTAMP",
+          "definition": "TIMESTAMP NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": []
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "unique": [],
+      "foreign_keys": [
+        {
+          "columns": [
+            "user_id"
+          ],
+          "parent": "users",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT (implícito)"
+        },
+        {
+          "columns": [
+            "reviewed_by"
+          ],
+          "parent": "users",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT (implícito)"
+        }
+      ],
+      "constraints": [
+        "FOREIGN KEY(user_id) REFERENCES users(id)",
+        "FOREIGN KEY(reviewed_by) REFERENCES users(id)"
+      ],
+      "engine": "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+      "ddl": "CREATE TABLE IF NOT EXISTS category_requests (\n id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,\n user_id BIGINT UNSIGNED NOT NULL,\n name VARCHAR(100) NOT NULL,\n description TEXT NOT NULL,\n icon VARCHAR(30) NOT NULL,\n color CHAR(7) NOT NULL,\n reason TEXT NOT NULL,\n status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',\n feedback TEXT NULL,\n reviewed_by BIGINT UNSIGNED NULL,\n created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n reviewed_at TIMESTAMP NULL,\n FOREIGN KEY(user_id) REFERENCES users(id),\n FOREIGN KEY(reviewed_by) REFERENCES users(id)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+    },
+    {
+      "name": "habit_templates",
+      "source": "001_core.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "category_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "FK"
+          ]
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(190)",
+          "definition": "VARCHAR(190) NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "translation_key",
+          "type": "VARCHAR(50)",
+          "definition": "VARCHAR(50) NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "definition": "TEXT NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "goal",
+          "type": "DECIMAL(10,2)",
+          "definition": "DECIMAL(10,2) NOT NULL DEFAULT 1",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "unit",
+          "type": "VARCHAR(40)",
+          "definition": "VARCHAR(40) NOT NULL DEFAULT ''",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "schedule_days",
+          "type": "VARCHAR(30)",
+          "definition": "VARCHAR(30) NOT NULL DEFAULT '[1,2,3,4,5,6,7]'",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "active",
+          "type": "TINYINT(1)",
+          "definition": "TINYINT(1) NOT NULL DEFAULT 1",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "unique": [],
+      "foreign_keys": [
+        {
+          "columns": [
+            "category_id"
+          ],
+          "parent": "habit_categories",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT (implícito)"
+        }
+      ],
+      "constraints": [
+        "FOREIGN KEY(category_id) REFERENCES habit_categories(id)"
+      ],
+      "engine": "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+      "ddl": "CREATE TABLE IF NOT EXISTS habit_templates (\n id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,\n category_id BIGINT UNSIGNED NOT NULL,\n name VARCHAR(190) NOT NULL,\n translation_key VARCHAR(50) NULL,\n description TEXT NOT NULL,\n goal DECIMAL(10,2) NOT NULL DEFAULT 1,\n unit VARCHAR(40) NOT NULL DEFAULT '',\n schedule_days VARCHAR(30) NOT NULL DEFAULT '[1,2,3,4,5,6,7]',\n active TINYINT(1) NOT NULL DEFAULT 1,\n FOREIGN KEY(category_id) REFERENCES habit_categories(id)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+    },
+    {
+      "name": "notifications",
+      "source": "001_core.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "user_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "FK"
+          ]
+        },
+        {
+          "name": "message_key",
+          "type": "VARCHAR(100)",
+          "definition": "VARCHAR(100) NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "detail",
+          "type": "VARCHAR(1000)",
+          "definition": "VARCHAR(1000) NOT NULL DEFAULT ''",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "is_read",
+          "type": "TINYINT(1)",
+          "definition": "TINYINT(1) NOT NULL DEFAULT 0",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "unique": [],
+      "foreign_keys": [
+        {
+          "columns": [
+            "user_id"
+          ],
+          "parent": "users",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "constraints": [
+        "FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE"
+      ],
+      "engine": "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+      "ddl": "CREATE TABLE IF NOT EXISTS notifications (\n id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,\n user_id BIGINT UNSIGNED NOT NULL,\n message_key VARCHAR(100) NOT NULL,\n detail VARCHAR(1000) NOT NULL DEFAULT '',\n is_read TINYINT(1) NOT NULL DEFAULT 0,\n created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+    },
+    {
+      "name": "wellness_entries",
+      "source": "001_core.sql",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK",
+            "FK"
+          ]
+        },
+        {
+          "name": "recorded_on",
+          "type": "DATE",
+          "definition": "DATE NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "weight_kg",
+          "type": "DECIMAL(5,2)",
+          "definition": "DECIMAL(5,2) NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        }
+      ],
+      "pk": [
+        "user_id",
+        "recorded_on"
+      ],
+      "unique": [],
+      "foreign_keys": [
+        {
+          "columns": [
+            "user_id"
+          ],
+          "parent": "users",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT (implícito)"
+        }
+      ],
+      "constraints": [
+        "PRIMARY KEY(user_id,recorded_on)",
+        "FOREIGN KEY(user_id) REFERENCES users(id)"
+      ],
+      "engine": "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+      "ddl": "CREATE TABLE IF NOT EXISTS wellness_entries (\n user_id BIGINT UNSIGNED NOT NULL,\n recorded_on DATE NOT NULL,\n weight_kg DECIMAL(5,2) NOT NULL,\n PRIMARY KEY(user_id,recorded_on),\n FOREIGN KEY(user_id) REFERENCES users(id)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+    },
+    {
+      "name": "platform_settings",
+      "source": "001_core.sql",
+      "columns": [
+        {
+          "name": "setting_key",
+          "type": "VARCHAR(100)",
+          "definition": "VARCHAR(100) PRIMARY KEY",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "setting_value",
+          "type": "VARCHAR(1000)",
+          "definition": "VARCHAR(1000) NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        }
+      ],
+      "pk": [
+        "setting_key"
+      ],
+      "unique": [],
+      "foreign_keys": [],
+      "constraints": [],
+      "engine": "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+      "ddl": "CREATE TABLE IF NOT EXISTS platform_settings (\n setting_key VARCHAR(100) PRIMARY KEY,\n setting_value VARCHAR(1000) NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+    },
+    {
+      "name": "rate_limits",
+      "source": "001_core.sql",
+      "columns": [
+        {
+          "name": "bucket",
+          "type": "CHAR(64)",
+          "definition": "CHAR(64) PRIMARY KEY",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "attempts",
+          "type": "INT",
+          "definition": "INT NOT NULL DEFAULT 0",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "expires_at",
+          "type": "DATETIME",
+          "definition": "DATETIME NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        }
+      ],
+      "pk": [
+        "bucket"
+      ],
+      "unique": [],
+      "foreign_keys": [],
+      "constraints": [],
+      "engine": "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+      "ddl": "CREATE TABLE IF NOT EXISTS rate_limits (\n bucket CHAR(64) PRIMARY KEY,\n attempts INT NOT NULL DEFAULT 0,\n expires_at DATETIME NOT NULL\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+    },
+    {
+      "name": "habit_shares",
+      "source": "002_collaboration.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "owner_user_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "FK",
+            "UQ"
+          ]
+        },
+        {
+          "name": "recipient_user_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "FK",
+            "UQ"
+          ]
+        },
+        {
+          "name": "habit_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": [
+            "FK"
+          ]
+        },
+        {
+          "name": "category_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": [
+            "FK"
+          ]
+        },
+        {
+          "name": "permission",
+          "type": "ENUM('viewer','participant','editor')",
+          "definition": "ENUM('viewer','participant','editor') NOT NULL DEFAULT 'viewer'",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "progress_visibility",
+          "type": "ENUM('none','summary','detailed')",
+          "definition": "ENUM('none','summary','detailed') NOT NULL DEFAULT 'none'",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "include_future",
+          "type": "TINYINT(1)",
+          "definition": "TINYINT(1) NOT NULL DEFAULT 0",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "status",
+          "type": "ENUM('pending','accepted','declined','revoked')",
+          "definition": "ENUM('pending','accepted','declined','revoked') NOT NULL DEFAULT 'pending'",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "invitation_message",
+          "type": "TEXT",
+          "definition": "TEXT NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "responded_at",
+          "type": "TIMESTAMP",
+          "definition": "TIMESTAMP NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "active_resource",
+          "type": "VARCHAR(50)",
+          "definition": "VARCHAR(50) GENERATED ALWAYS AS (CASE WHEN status IN ('pending','accepted') THEN CONCAT(IF(habit_id IS NULL,'c','h'),COALESCE(habit_id,category_id)) ELSE NULL END) STORED",
+          "nullable": true,
+          "generated": true,
+          "keys": [
+            "UQ"
+          ]
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "owner_user_id",
+          "recipient_user_id",
+          "active_resource"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_user_id"
+          ],
+          "parent": "users",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT (implícito)"
+        },
+        {
+          "columns": [
+            "recipient_user_id"
+          ],
+          "parent": "users",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT (implícito)"
+        },
+        {
+          "columns": [
+            "habit_id"
+          ],
+          "parent": "habits",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT (implícito)"
+        },
+        {
+          "columns": [
+            "category_id"
+          ],
+          "parent": "habit_categories",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT (implícito)"
+        }
+      ],
+      "constraints": [
+        "UNIQUE KEY active_invitation(owner_user_id,recipient_user_id,active_resource)",
+        "FOREIGN KEY(owner_user_id) REFERENCES users(id)",
+        "FOREIGN KEY(recipient_user_id) REFERENCES users(id)",
+        "FOREIGN KEY(habit_id) REFERENCES habits(id)",
+        "FOREIGN KEY(category_id) REFERENCES habit_categories(id)",
+        "CHECK((habit_id IS NULL) <> (category_id IS NULL))",
+        "CHECK(owner_user_id <> recipient_user_id)"
+      ],
+      "engine": "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+      "ddl": "CREATE TABLE IF NOT EXISTS habit_shares (\n id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,\n owner_user_id BIGINT UNSIGNED NOT NULL,\n recipient_user_id BIGINT UNSIGNED NOT NULL,\n habit_id BIGINT UNSIGNED NULL,\n category_id BIGINT UNSIGNED NULL,\n permission ENUM('viewer','participant','editor') NOT NULL DEFAULT 'viewer',\n progress_visibility ENUM('none','summary','detailed') NOT NULL DEFAULT 'none',\n include_future TINYINT(1) NOT NULL DEFAULT 0,\n status ENUM('pending','accepted','declined','revoked') NOT NULL DEFAULT 'pending',\n invitation_message TEXT NULL,\n created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n responded_at TIMESTAMP NULL,\n active_resource VARCHAR(50) GENERATED ALWAYS AS\n  (CASE WHEN status IN ('pending','accepted') THEN CONCAT(IF(habit_id IS NULL,'c','h'),COALESCE(habit_id,category_id)) ELSE NULL END) STORED,\n UNIQUE KEY active_invitation(owner_user_id,recipient_user_id,active_resource),\n FOREIGN KEY(owner_user_id) REFERENCES users(id),\n FOREIGN KEY(recipient_user_id) REFERENCES users(id),\n FOREIGN KEY(habit_id) REFERENCES habits(id),\n FOREIGN KEY(category_id) REFERENCES habit_categories(id),\n CHECK((habit_id IS NULL) <> (category_id IS NULL)),\n CHECK(owner_user_id <> recipient_user_id)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+    },
+    {
+      "name": "share_habits",
+      "source": "002_collaboration.sql",
+      "columns": [
+        {
+          "name": "share_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK",
+            "FK"
+          ]
+        },
+        {
+          "name": "habit_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK",
+            "FK"
+          ]
+        }
+      ],
+      "pk": [
+        "share_id",
+        "habit_id"
+      ],
+      "unique": [],
+      "foreign_keys": [
+        {
+          "columns": [
+            "share_id"
+          ],
+          "parent": "habit_shares",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        },
+        {
+          "columns": [
+            "habit_id"
+          ],
+          "parent": "habits",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT (implícito)"
+        }
+      ],
+      "constraints": [
+        "PRIMARY KEY(share_id,habit_id)",
+        "FOREIGN KEY(share_id) REFERENCES habit_shares(id) ON DELETE CASCADE",
+        "FOREIGN KEY(habit_id) REFERENCES habits(id)"
+      ],
+      "engine": "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+      "ddl": "CREATE TABLE IF NOT EXISTS share_habits (\n share_id BIGINT UNSIGNED NOT NULL,\n habit_id BIGINT UNSIGNED NOT NULL,\n PRIMARY KEY(share_id,habit_id),\n FOREIGN KEY(share_id) REFERENCES habit_shares(id) ON DELETE CASCADE,\n FOREIGN KEY(habit_id) REFERENCES habits(id)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+    },
+    {
+      "name": "habit_collaborators",
+      "source": "002_collaboration.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "habit_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "FK",
+            "UQ"
+          ]
+        },
+        {
+          "name": "user_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "FK",
+            "UQ"
+          ]
+        },
+        {
+          "name": "share_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "FK"
+          ]
+        },
+        {
+          "name": "joined_at",
+          "type": "TIMESTAMP",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "progress_consent",
+          "type": "ENUM('none','summary','detailed')",
+          "definition": "ENUM('none','summary','detailed') NOT NULL DEFAULT 'none'",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "habit_id",
+          "user_id"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "habit_id"
+          ],
+          "parent": "habits",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT (implícito)"
+        },
+        {
+          "columns": [
+            "user_id"
+          ],
+          "parent": "users",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT (implícito)"
+        },
+        {
+          "columns": [
+            "share_id"
+          ],
+          "parent": "habit_shares",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT (implícito)"
+        }
+      ],
+      "constraints": [
+        "UNIQUE(habit_id,user_id)",
+        "FOREIGN KEY(habit_id) REFERENCES habits(id)",
+        "FOREIGN KEY(user_id) REFERENCES users(id)",
+        "FOREIGN KEY(share_id) REFERENCES habit_shares(id)"
+      ],
+      "engine": "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+      "ddl": "CREATE TABLE IF NOT EXISTS habit_collaborators (\n id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,\n habit_id BIGINT UNSIGNED NOT NULL,\n user_id BIGINT UNSIGNED NOT NULL,\n share_id BIGINT UNSIGNED NOT NULL,\n joined_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n progress_consent ENUM('none','summary','detailed') NOT NULL DEFAULT 'none',\n UNIQUE(habit_id,user_id),\n FOREIGN KEY(habit_id) REFERENCES habits(id),\n FOREIGN KEY(user_id) REFERENCES users(id),\n FOREIGN KEY(share_id) REFERENCES habit_shares(id)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+    },
+    {
+      "name": "collaboration_activity",
+      "source": "002_collaboration.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "habit_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "FK"
+          ]
+        },
+        {
+          "name": "user_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "FK"
+          ]
+        },
+        {
+          "name": "action",
+          "type": "VARCHAR(100)",
+          "definition": "VARCHAR(100) NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "description",
+          "type": "TEXT",
+          "definition": "TEXT NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "unique": [],
+      "foreign_keys": [
+        {
+          "columns": [
+            "habit_id"
+          ],
+          "parent": "habits",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT (implícito)"
+        },
+        {
+          "columns": [
+            "user_id"
+          ],
+          "parent": "users",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT (implícito)"
+        }
+      ],
+      "constraints": [
+        "FOREIGN KEY(habit_id) REFERENCES habits(id)",
+        "FOREIGN KEY(user_id) REFERENCES users(id)"
+      ],
+      "engine": "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+      "ddl": "CREATE TABLE IF NOT EXISTS collaboration_activity (\n id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,\n habit_id BIGINT UNSIGNED NOT NULL,\n user_id BIGINT UNSIGNED NOT NULL,\n action VARCHAR(100) NOT NULL,\n description TEXT NOT NULL,\n created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n FOREIGN KEY(habit_id) REFERENCES habits(id),\n FOREIGN KEY(user_id) REFERENCES users(id)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+    },
+    {
+      "name": "invitation_receipts",
+      "source": "002_collaboration.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "owner_user_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "FK",
+            "UQ"
+          ]
+        },
+        {
+          "name": "share_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": [
+            "FK"
+          ]
+        },
+        {
+          "name": "recipient_email",
+          "type": "VARCHAR(190)",
+          "definition": "VARCHAR(190) NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "UQ"
+          ]
+        },
+        {
+          "name": "habit_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": [
+            "FK"
+          ]
+        },
+        {
+          "name": "category_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": [
+            "FK"
+          ]
+        },
+        {
+          "name": "permission",
+          "type": "ENUM('viewer','participant','editor')",
+          "definition": "ENUM('viewer','participant','editor') NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "progress_visibility",
+          "type": "ENUM('none','summary','detailed')",
+          "definition": "ENUM('none','summary','detailed') NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "include_future",
+          "type": "TINYINT(1)",
+          "definition": "TINYINT(1) NOT NULL DEFAULT 0",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "status",
+          "type": "ENUM('pending','accepted','declined','revoked')",
+          "definition": "ENUM('pending','accepted','declined','revoked') NOT NULL DEFAULT 'pending'",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "invitation_message",
+          "type": "TEXT",
+          "definition": "TEXT NULL",
+          "nullable": true,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "active_resource",
+          "type": "VARCHAR(50)",
+          "definition": "VARCHAR(50) GENERATED ALWAYS AS (CASE WHEN status IN ('pending','accepted') THEN CONCAT(IF(habit_id IS NULL,'c','h'),COALESCE(habit_id,category_id)) ELSE NULL END) STORED",
+          "nullable": true,
+          "generated": true,
+          "keys": [
+            "UQ"
+          ]
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "owner_user_id",
+          "recipient_email",
+          "active_resource"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_user_id"
+          ],
+          "parent": "users",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT (implícito)"
+        },
+        {
+          "columns": [
+            "share_id"
+          ],
+          "parent": "habit_shares",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT (implícito)"
+        },
+        {
+          "columns": [
+            "habit_id"
+          ],
+          "parent": "habits",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT (implícito)"
+        },
+        {
+          "columns": [
+            "category_id"
+          ],
+          "parent": "habit_categories",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "RESTRICT (implícito)"
+        }
+      ],
+      "constraints": [
+        "UNIQUE(owner_user_id,recipient_email,active_resource)",
+        "FOREIGN KEY(owner_user_id) REFERENCES users(id)",
+        "FOREIGN KEY(share_id) REFERENCES habit_shares(id)",
+        "FOREIGN KEY(habit_id) REFERENCES habits(id)",
+        "FOREIGN KEY(category_id) REFERENCES habit_categories(id)",
+        "CHECK((habit_id IS NULL) <> (category_id IS NULL))"
+      ],
+      "engine": "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+      "ddl": "CREATE TABLE IF NOT EXISTS invitation_receipts (\n id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,\n owner_user_id BIGINT UNSIGNED NOT NULL,\n share_id BIGINT UNSIGNED NULL,\n recipient_email VARCHAR(190) NOT NULL,\n habit_id BIGINT UNSIGNED NULL,\n category_id BIGINT UNSIGNED NULL,\n permission ENUM('viewer','participant','editor') NOT NULL,\n progress_visibility ENUM('none','summary','detailed') NOT NULL,\n include_future TINYINT(1) NOT NULL DEFAULT 0,\n status ENUM('pending','accepted','declined','revoked') NOT NULL DEFAULT 'pending',\n invitation_message TEXT NULL,\n created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n active_resource VARCHAR(50) GENERATED ALWAYS AS\n  (CASE WHEN status IN ('pending','accepted') THEN CONCAT(IF(habit_id IS NULL,'c','h'),COALESCE(habit_id,category_id)) ELSE NULL END) STORED,\n UNIQUE(owner_user_id,recipient_email,active_resource),\n FOREIGN KEY(owner_user_id) REFERENCES users(id),\n FOREIGN KEY(share_id) REFERENCES habit_shares(id),\n FOREIGN KEY(habit_id) REFERENCES habits(id),\n FOREIGN KEY(category_id) REFERENCES habit_categories(id),\n CHECK((habit_id IS NULL) <> (category_id IS NULL))\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
+    },
+    {
+      "name": "password_resets",
+      "source": "003_password_recovery.sql",
+      "columns": [
+        {
+          "name": "token_hash",
+          "type": "CHAR(64)",
+          "definition": "CHAR(64) PRIMARY KEY",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "user_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "FK"
+          ]
+        },
+        {
+          "name": "auth_version",
+          "type": "INT",
+          "definition": "INT NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "expires_at",
+          "type": "DATETIME",
+          "definition": "DATETIME NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        }
+      ],
+      "pk": [
+        "token_hash"
+      ],
+      "unique": [],
+      "foreign_keys": [
+        {
+          "columns": [
+            "user_id"
+          ],
+          "parent": "users",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "constraints": [
+        "INDEX password_resets_user (user_id)",
+        "INDEX password_resets_expiry (expires_at)",
+        "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE"
+      ],
+      "engine": "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+      "ddl": "CREATE TABLE IF NOT EXISTS password_resets (\n token_hash CHAR(64) PRIMARY KEY,\n user_id BIGINT UNSIGNED NOT NULL,\n auth_version INT NOT NULL,\n expires_at DATETIME NOT NULL,\n created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n INDEX password_resets_user (user_id),\n INDEX password_resets_expiry (expires_at),\n FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+    },
+    {
+      "name": "user_categories",
+      "source": "004_category_choices.sql",
+      "columns": [
+        {
+          "name": "user_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK",
+            "FK"
+          ]
+        },
+        {
+          "name": "category_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK",
+            "FK"
+          ]
+        },
+        {
+          "name": "joined_at",
+          "type": "TIMESTAMP",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        }
+      ],
+      "pk": [
+        "user_id",
+        "category_id"
+      ],
+      "unique": [],
+      "foreign_keys": [
+        {
+          "columns": [
+            "user_id"
+          ],
+          "parent": "users",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        },
+        {
+          "columns": [
+            "category_id"
+          ],
+          "parent": "habit_categories",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "constraints": [
+        "PRIMARY KEY(user_id,category_id)",
+        "FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE",
+        "FOREIGN KEY(category_id) REFERENCES habit_categories(id) ON DELETE CASCADE"
+      ],
+      "engine": "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+      "ddl": "CREATE TABLE IF NOT EXISTS user_categories (\n user_id BIGINT UNSIGNED NOT NULL,\n category_id BIGINT UNSIGNED NOT NULL,\n joined_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n PRIMARY KEY(user_id,category_id),\n FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,\n FOREIGN KEY(category_id) REFERENCES habit_categories(id) ON DELETE CASCADE\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
+    },
+    {
+      "name": "diagrams",
+      "source": "005_diagrams.sql",
+      "columns": [
+        {
+          "name": "id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "owner_user_id",
+          "type": "BIGINT UNSIGNED",
+          "definition": "BIGINT UNSIGNED NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "FK",
+            "UQ"
+          ]
+        },
+        {
+          "name": "name",
+          "type": "VARCHAR(120)",
+          "definition": "VARCHAR(120) NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "client_key",
+          "type": "CHAR(36)",
+          "definition": "CHAR(36) NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "UQ"
+          ]
+        },
+        {
+          "name": "version",
+          "type": "INT UNSIGNED",
+          "definition": "INT UNSIGNED NOT NULL DEFAULT 1",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "created_at",
+          "type": "TIMESTAMP",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "updated_at",
+          "type": "TIMESTAMP",
+          "definition": "TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        }
+      ],
+      "pk": [
+        "id"
+      ],
+      "unique": [
+        [
+          "owner_user_id",
+          "client_key"
+        ]
+      ],
+      "foreign_keys": [
+        {
+          "columns": [
+            "owner_user_id"
+          ],
+          "parent": "users",
+          "parent_columns": [
+            "id"
+          ],
+          "on_delete": "CASCADE"
+        }
+      ],
+      "constraints": [
+        "UNIQUE KEY uq_diagram_create (owner_user_id, client_key)",
+        "KEY ix_diagrams_owner_updated (owner_user_id, updated_at)",
+        "CONSTRAINT fk_diagrams_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE",
+        "CONSTRAINT chk_diagram_name CHECK (CHAR_LENGTH(TRIM(name)) > 0)"
+      ],
+      "engine": "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+      "ddl": "CREATE TABLE diagrams (\n    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,\n    owner_user_id BIGINT UNSIGNED NOT NULL,\n    name VARCHAR(120) NOT NULL,\n    client_key CHAR(36) NOT NULL,\n    version INT UNSIGNED NOT NULL DEFAULT 1,\n    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    UNIQUE KEY uq_diagram_create (owner_user_id, client_key),\n    KEY ix_diagrams_owner_updated (owner_user_id, updated_at),\n    CONSTRAINT fk_diagrams_owner FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE,\n    CONSTRAINT chk_diagram_name CHECK (CHAR_LENGTH(TRIM(name)) > 0)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;"
+    },
+    {
+      "name": "schema_migrations",
+      "source": "bin/migrate.php",
+      "columns": [
+        {
+          "name": "version",
+          "type": "VARCHAR(190)",
+          "definition": "VARCHAR(190) PRIMARY KEY",
+          "nullable": false,
+          "generated": false,
+          "keys": [
+            "PK"
+          ]
+        },
+        {
+          "name": "checksum",
+          "type": "CHAR(64)",
+          "definition": "CHAR(64) NOT NULL",
+          "nullable": false,
+          "generated": false,
+          "keys": []
+        },
+        {
+          "name": "applied_at",
+          "type": "TIMESTAMP",
+          "definition": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+          "nullable": false,
+          "generated": false,
+          "keys": [],
+          "nullable_source": "Hostinger/phpMyAdmin Structure, 2026-11-23: Null=No; Default=current_timestamp()"
+        }
+      ],
+      "pk": [
+        "version"
+      ],
+      "unique": [],
+      "foreign_keys": [],
+      "constraints": [],
+      "engine": "ENGINE=InnoDB",
+      "ddl": "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(190) PRIMARY KEY,checksum CHAR(64) NOT NULL,applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB;"
+    }
+  ]
+}

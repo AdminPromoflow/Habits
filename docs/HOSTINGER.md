@@ -2,15 +2,15 @@
 
 ## Requisitos
 
-PHP 8.2 o posterior con `pdo_mysql`, `mbstring`, `json` y `session`; MySQL 8.0.16+ o MariaDB 10.4+; HTTPS y Apache/LiteSpeed con `.htaccess`. La aplicación funciona dentro de un subdirectorio como `/habits/` porque las rutas del frontend son relativas.
+PHP 8.2 o posterior con `pdo_mysql`, `mbstring`, `json` y `session`; MySQL 8.0.16+ o MariaDB 10.4+; HTTPS y Apache/LiteSpeed con `.htaccess`. La aplicación funciona dentro de un subdirectorio como `/MyRemarkableMind/` porque las rutas del frontend son relativas.
 
 ## Sitio de esta instalación
 
-La sesión de hPanel revisada corresponde a **aleinarossui.com**. El repositorio Habits está conectado a `public_html/habits`. La base solicitada y creada en el panel es **u348170507_habits**, con usuario **u348170507_habits**. Estos nombres no son contraseñas. El archivo `config/local.php` de desarrollo contiene credenciales del MySQL local y no debe copiarse a producción.
+La sesión de hPanel revisada el 23 de noviembre de 2026 corresponde a **aleinarossui.com**. El repositorio MyRemarkableMind está conectado a `public_html/MyRemarkableMind`. La instalación conserva la base **u348170507_habits**, con usuario **u348170507_habits**. Estos nombres no son contraseñas. El archivo `config/local.php` de desarrollo contiene credenciales del MySQL local y no debe copiarse a producción.
 
 ## Conexión de producción
 
-Crea directamente en el servidor `public_html/habits/config/local.php` (se excluye de Git):
+Crea directamente en el servidor `public_html/MyRemarkableMind/config/local.php` (se excluye de Git):
 
 ```php
 <?php
@@ -21,7 +21,7 @@ return [
     'db_user' => 'u348170507_habits',
     'db_password' => 'CONTRASEÑA_ELEGIDA_EN_HOSTINGER',
     'db_socket' => '',
-    'app_url' => 'https://aleinarossui.com/habits',
+    'app_url' => 'https://aleinarossui.com/MyRemarkableMind',
     'secure_cookies' => true,
     'session_path' => __DIR__ . '/../storage/sessions',
     'mail_transport' => 'mail',
@@ -41,7 +41,7 @@ La exportación `storage/hostinger-mi-rutina.sql` se importa en **la nueva base 
 
 Si partes desde cero y tienes SSH, ejecuta `php bin/install.php` y `php bin/import-routine.php` después de guardar la conexión. Si ya importaste la exportación, ejecutar el instalador de nuevo es idempotente.
 
-Tras importar, el enlace de activación de Aleina utiliza el mismo token de un solo uso, reemplazando el origen local por `https://aleinarossui.com/habits/`. Si Aleina ya había activado su cuenta antes de exportar, inicia sesión con la misma contraseña. Para emitir un nuevo enlace, mediante SSH:
+Tras importar, el enlace de activación de Aleina utiliza el mismo token de un solo uso, reemplazando el origen local por `https://aleinarossui.com/MyRemarkableMind/`. Si Aleina ya había activado su cuenta antes de exportar, inicia sesión con la misma contraseña. Para emitir un nuevo enlace, mediante SSH:
 
 ```sh
 php bin/reset-password.php aleinarossui@gmail.com
@@ -61,19 +61,29 @@ Los enlaces duran 30 minutos y solo pueden usarse una vez. Pedir un enlace no ca
 
 Para la selección voluntaria de categorías, aplica `004_category_choices.sql` antes de desplegar esa versión. Conserva inscripciones de categorías globales que ya tengan hábitos/rutinas; las categorías privadas propias permanecen disponibles. El catálogo global se conserva en Hostinger, mientras que cada usuario elige en Ajustes cuáles añadir. En Mis hábitos se muestran las categorías con hábitos, y cada una abre su tablero semanal.
 
-Sube los archivos de aplicación, incluidos `.htaccess`, `assets`, `app` y `translations`. Los archivos `config/local.php` y el contenido de `storage` no se versionan. No despliegues `tests/.runtime`, archivos SQL privados ni la carpeta `.git` a una ruta pública.
+Para el editor de diagramas, aplica `005_diagrams.sql` antes de desplegar esa versión. El panel autenticado consulta `diagrams`; si falta la tabla, devuelve `error_database`, aunque el formulario de acceso sí cargue. El migrador registra el nombre y el SHA-256 de cada archivo en `schema_migrations`.
 
-Comprueba que la estrategia de despliegue de Hostinger conserva archivos no versionados. Si reemplaza todo `public_html/habits`, conserva la configuración y las sesiones fuera de la carpeta reemplazada y proporciona sus rutas/valores mediante variables `RUTINA_DB_*`, `RUTINA_APP_URL`, `RUTINA_SESSION_PATH` y `RUTINA_SECURE_COOKIES=1`.
+Sube los archivos de aplicación, incluidos `.htaccess`, `assets`, `app`, `controller`, `model`, `view` y `translations`. Los archivos `config/local.php` y el contenido de `storage` no se versionan. No despliegues `tests/.runtime`, archivos SQL privados ni la carpeta `.git` a una ruta pública.
+
+Comprueba que la estrategia de despliegue de Hostinger conserva archivos no versionados. Si reemplaza todo `public_html/MyRemarkableMind`, conserva la configuración y las sesiones fuera de la carpeta reemplazada y proporciona sus rutas/valores mediante variables `RUTINA_DB_*`, `RUTINA_APP_URL`, `RUTINA_SESSION_PATH` y `RUTINA_SECURE_COOKIES=1`.
+
+## Reparación de diagramas del 23 de noviembre de 2026
+
+Se comprobó mediante Chrome y phpMyAdmin que producción tenía 21 tablas y las migraciones `001`–`004`, pero no `diagrams`. Se aplicó únicamente `005_diagrams.sql` y se registró su checksum `485f348de5d73507f7b262655be8bea654df2537890c47fb72a7f33da00184cb` en `schema_migrations`.
+
+La comprobación posterior mostró 22 tablas, checksum correcto y la clave foránea `diagrams.owner_user_id → users.id` con `ON DELETE CASCADE`. Los conteos comparados antes y después se conservaron: 1 usuario, 41 hábitos, 1 rutina y 1 registro de cumplimiento. La tabla nueva quedó vacía. No se importaron datos iniciales ni se desplegaron archivos de aplicación durante esta reparación.
+
+El modelo documentado desde las migraciones está en [database-model](database-model/). La página pública cargó el formulario de acceso y la usuaria confirmó posteriormente que, al iniciar sesión, el panel volvió a abrir correctamente y desapareció `error_database`.
 
 ## Verificación en producción
 
-1. Abre `/habits/` y comprueba que aparece el formulario de acceso.
-2. Verifica que `/habits/config/local.php`, `/habits/storage/initial-access.txt` y `/habits/.git/config` devuelven 403/404.
+1. Abre `/MyRemarkableMind/` y comprueba que aparece el formulario de acceso.
+2. Verifica que `/MyRemarkableMind/config/local.php`, `/MyRemarkableMind/storage/initial-access.txt` y `/MyRemarkableMind/.git/config` devuelven 403/404.
 3. Inicia sesión, cambia el idioma, recarga y confirma que se conserva.
 4. Comprueba la categoría Ejercicios y la rutina de noviembre/diciembre.
 5. Comprueba que Aleina puede alternar entre el panel personal y administración.
 6. Verifica que las cookies de sesión sean `Secure`, `HttpOnly` y `SameSite=Lax`.
-7. Excluye `/habits/` y `/habits/api.php` del almacenamiento en caché de páginas/CDN. Las respuestas privadas envían `Cache-Control: no-store, private`.
+7. Excluye `/MyRemarkableMind/`, `/MyRemarkableMind/api.php` y `/MyRemarkableMind/controller/` del almacenamiento en caché de páginas/CDN. Las respuestas privadas envían `Cache-Control: no-store, private`.
 8. Conserva copias de seguridad de MySQL. Para futuras actualizaciones, respalda primero y ejecuta `php bin/migrate.php`; no vuelvas a importar una copia inicial encima de datos existentes.
 
 ## Referencias oficiales consultadas

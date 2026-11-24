@@ -1,0 +1,233 @@
+erDiagram
+    direction LR
+    users {
+        bigint_unsigned id PK "NOT NULL"
+        varchar_100_ name  "NOT NULL"
+        varchar_190_ email UK "NOT NULL"
+        varchar_255_ password_hash  "NOT NULL"
+        enum status  "NOT NULL"
+        int auth_version  "NOT NULL"
+        char_64_ setup_token_hash  "NULL"
+        datetime setup_expires_at  "NULL"
+        timestamp created_at  "NOT NULL"
+    }
+    user_roles {
+        bigint_unsigned user_id PK, FK "NOT NULL"
+        enum role PK "NOT NULL"
+    }
+    user_settings {
+        bigint_unsigned user_id PK, FK "NOT NULL"
+        enum language  "NOT NULL"
+        varchar_80_ timezone  "NOT NULL"
+        enum theme  "NOT NULL"
+        tinyint_1_ notifications_enabled  "NOT NULL"
+    }
+    habit_categories {
+        bigint_unsigned id PK "NOT NULL"
+        bigint_unsigned owner_user_id FK "NULL"
+        varchar_100_ name UK "NOT NULL"
+        varchar_50_ translation_key  "NULL"
+        text description  "NOT NULL"
+        varchar_30_ icon  "NOT NULL"
+        char_7_ color  "NOT NULL"
+        bigint_unsigned scope_key UK "NULL; generado"
+        timestamp created_at  "NOT NULL"
+    }
+    routines {
+        bigint_unsigned id PK "NOT NULL"
+        bigint_unsigned owner_user_id FK, UK "NOT NULL"
+        bigint_unsigned category_id FK "NOT NULL"
+        varchar_190_ name  "NOT NULL"
+        text description  "NOT NULL"
+        date start_date  "NOT NULL"
+        date end_date  "NULL"
+        varchar_150_ source_key UK "NULL"
+    }
+    habits {
+        bigint_unsigned id PK "NOT NULL"
+        bigint_unsigned owner_user_id FK, UK "NOT NULL"
+        bigint_unsigned category_id FK "NOT NULL"
+        bigint_unsigned routine_id FK "NULL"
+        varchar_190_ name  "NOT NULL"
+        text description  "NOT NULL"
+        decimal_10_2_ goal  "NOT NULL"
+        varchar_40_ unit  "NOT NULL"
+        varchar_30_ schedule_days  "NOT NULL"
+        time scheduled_time  "NULL"
+        date start_date  "NOT NULL"
+        date end_date  "NULL"
+        enum status  "NOT NULL"
+        varchar_150_ section  "NOT NULL"
+        int sort_order  "NOT NULL"
+        varchar_190_ source_key UK "NULL"
+        timestamp created_at  "NOT NULL"
+        timestamp updated_at  "NOT NULL"
+    }
+    habit_completions {
+        bigint_unsigned id PK "NOT NULL"
+        bigint_unsigned habit_id FK, UK "NOT NULL"
+        bigint_unsigned user_id FK, UK "NOT NULL"
+        date completed_on UK "NOT NULL"
+        decimal_10_2_ amount  "NOT NULL"
+        decimal_10_2_ goal_at_time  "NOT NULL"
+        varchar_1000_ note  "NOT NULL"
+        timestamp created_at  "NOT NULL"
+        timestamp updated_at  "NOT NULL"
+    }
+    category_requests {
+        bigint_unsigned id PK "NOT NULL"
+        bigint_unsigned user_id FK "NOT NULL"
+        varchar_100_ name  "NOT NULL"
+        text description  "NOT NULL"
+        varchar_30_ icon  "NOT NULL"
+        char_7_ color  "NOT NULL"
+        text reason  "NOT NULL"
+        enum status  "NOT NULL"
+        text feedback  "NULL"
+        bigint_unsigned reviewed_by FK "NULL"
+        timestamp created_at  "NOT NULL"
+        timestamp reviewed_at  "NULL"
+    }
+    habit_templates {
+        bigint_unsigned id PK "NOT NULL"
+        bigint_unsigned category_id FK "NOT NULL"
+        varchar_190_ name  "NOT NULL"
+        varchar_50_ translation_key  "NULL"
+        text description  "NOT NULL"
+        decimal_10_2_ goal  "NOT NULL"
+        varchar_40_ unit  "NOT NULL"
+        varchar_30_ schedule_days  "NOT NULL"
+        tinyint_1_ active  "NOT NULL"
+    }
+    notifications {
+        bigint_unsigned id PK "NOT NULL"
+        bigint_unsigned user_id FK "NOT NULL"
+        varchar_100_ message_key  "NOT NULL"
+        varchar_1000_ detail  "NOT NULL"
+        tinyint_1_ is_read  "NOT NULL"
+        timestamp created_at  "NOT NULL"
+    }
+    wellness_entries {
+        bigint_unsigned user_id PK, FK "NOT NULL"
+        date recorded_on PK "NOT NULL"
+        decimal_5_2_ weight_kg  "NOT NULL"
+    }
+    platform_settings {
+        varchar_100_ setting_key PK "NOT NULL"
+        varchar_1000_ setting_value  "NOT NULL"
+    }
+    rate_limits {
+        char_64_ bucket PK "NOT NULL"
+        int attempts  "NOT NULL"
+        datetime expires_at  "NOT NULL"
+    }
+    habit_shares {
+        bigint_unsigned id PK "NOT NULL"
+        bigint_unsigned owner_user_id FK, UK "NOT NULL"
+        bigint_unsigned recipient_user_id FK, UK "NOT NULL"
+        bigint_unsigned habit_id FK "NULL"
+        bigint_unsigned category_id FK "NULL"
+        enum permission  "NOT NULL"
+        enum progress_visibility  "NOT NULL"
+        tinyint_1_ include_future  "NOT NULL"
+        enum status  "NOT NULL"
+        text invitation_message  "NULL"
+        timestamp created_at  "NOT NULL"
+        timestamp responded_at  "NULL"
+        varchar_50_ active_resource UK "NULL; generado"
+    }
+    share_habits {
+        bigint_unsigned share_id PK, FK "NOT NULL"
+        bigint_unsigned habit_id PK, FK "NOT NULL"
+    }
+    habit_collaborators {
+        bigint_unsigned id PK "NOT NULL"
+        bigint_unsigned habit_id FK, UK "NOT NULL"
+        bigint_unsigned user_id FK, UK "NOT NULL"
+        bigint_unsigned share_id FK "NOT NULL"
+        timestamp joined_at  "NOT NULL"
+        enum progress_consent  "NOT NULL"
+    }
+    collaboration_activity {
+        bigint_unsigned id PK "NOT NULL"
+        bigint_unsigned habit_id FK "NOT NULL"
+        bigint_unsigned user_id FK "NOT NULL"
+        varchar_100_ action  "NOT NULL"
+        text description  "NOT NULL"
+        timestamp created_at  "NOT NULL"
+    }
+    invitation_receipts {
+        bigint_unsigned id PK "NOT NULL"
+        bigint_unsigned owner_user_id FK, UK "NOT NULL"
+        bigint_unsigned share_id FK "NULL"
+        varchar_190_ recipient_email UK "NOT NULL"
+        bigint_unsigned habit_id FK "NULL"
+        bigint_unsigned category_id FK "NULL"
+        enum permission  "NOT NULL"
+        enum progress_visibility  "NOT NULL"
+        tinyint_1_ include_future  "NOT NULL"
+        enum status  "NOT NULL"
+        text invitation_message  "NULL"
+        timestamp created_at  "NOT NULL"
+        varchar_50_ active_resource UK "NULL; generado"
+    }
+    password_resets {
+        char_64_ token_hash PK "NOT NULL"
+        bigint_unsigned user_id FK "NOT NULL"
+        int auth_version  "NOT NULL"
+        datetime expires_at  "NOT NULL"
+        timestamp created_at  "NOT NULL"
+    }
+    user_categories {
+        bigint_unsigned user_id PK, FK "NOT NULL"
+        bigint_unsigned category_id PK, FK "NOT NULL"
+        timestamp joined_at  "NOT NULL"
+    }
+    diagrams {
+        bigint_unsigned id PK "NOT NULL"
+        bigint_unsigned owner_user_id FK, UK "NOT NULL"
+        varchar_120_ name  "NOT NULL"
+        char_36_ client_key UK "NOT NULL"
+        int_unsigned version  "NOT NULL"
+        timestamp created_at  "NOT NULL"
+        timestamp updated_at  "NOT NULL"
+    }
+    schema_migrations {
+        varchar_190_ version PK "NOT NULL"
+        char_64_ checksum  "NOT NULL"
+        timestamp applied_at  "NOT NULL"
+    }
+    users ||--o{ user_roles : "user_id"
+    users ||--o| user_settings : "user_id"
+    users |o..o{ habit_categories : "owner_user_id"
+    users ||..o{ routines : "owner_user_id"
+    habit_categories ||..o{ routines : "category_id"
+    users ||..o{ habits : "owner_user_id"
+    habit_categories ||..o{ habits : "category_id"
+    routines |o..o{ habits : "routine_id"
+    habits ||..o{ habit_completions : "habit_id"
+    users ||..o{ habit_completions : "user_id"
+    users ||..o{ category_requests : "user_id"
+    users |o..o{ category_requests : "reviewed_by"
+    habit_categories ||..o{ habit_templates : "category_id"
+    users ||..o{ notifications : "user_id"
+    users ||--o{ wellness_entries : "user_id"
+    users ||..o{ habit_shares : "owner_user_id"
+    users ||..o{ habit_shares : "recipient_user_id"
+    habits |o..o{ habit_shares : "habit_id"
+    habit_categories |o..o{ habit_shares : "category_id"
+    habit_shares ||--o{ share_habits : "share_id"
+    habits ||--o{ share_habits : "habit_id"
+    habits ||..o{ habit_collaborators : "habit_id"
+    users ||..o{ habit_collaborators : "user_id"
+    habit_shares ||..o{ habit_collaborators : "share_id"
+    habits ||..o{ collaboration_activity : "habit_id"
+    users ||..o{ collaboration_activity : "user_id"
+    users ||..o{ invitation_receipts : "owner_user_id"
+    habit_shares |o..o{ invitation_receipts : "share_id"
+    habits |o..o{ invitation_receipts : "habit_id"
+    habit_categories |o..o{ invitation_receipts : "category_id"
+    users ||..o{ password_resets : "user_id"
+    users ||--o{ user_categories : "user_id"
+    habit_categories ||--o{ user_categories : "category_id"
+    users ||..o{ diagrams : "owner_user_id"

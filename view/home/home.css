@@ -29,11 +29,11 @@
 }
 
 .diagram-node {
-  width: 178px;
-  height: 178px;
+  width: 220px;
+  height: 128px;
   display: grid;
   place-items: center;
-  border-radius: 50%;
+  border-radius: 24px;
   background: var(--lavender-wash);
   border: 2px solid var(--lavender);
   box-shadow: 0 8px 28px #70579512;
@@ -49,8 +49,8 @@
 
 .diagram-node textarea {
   display: block;
-  width: 144px;
-  height: 100px;
+  width: 184px;
+  height: 94px;
   padding: 10px 6px;
   border: 0;
   border-radius: 0;
