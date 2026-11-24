@@ -20,13 +20,17 @@ final class MindSpacesModel extends BaseModel
             if (!$space) fail('error_not_found', 404);
             return $space;
         }
+        $space = $this->db->one("SELECT id,name FROM mindspaces WHERE owner_user_id=? ORDER BY (space_key='home') DESC,id LIMIT 1" . ($lock ? ' FOR UPDATE' : ''), [$this->uid()]);
+        if ($space) return $space;
         $this->db->run("INSERT INTO mindspaces(owner_user_id) VALUES (?) ON DUPLICATE KEY UPDATE id=id", [$this->uid()]);
-        return $this->db->one("SELECT id,name FROM mindspaces WHERE owner_user_id=? AND space_key='home'" . ($lock ? ' FOR UPDATE' : ''), [$this->uid()]);
+        return $this->space($lock);
     }
 
     public function createSpace(array $data): array
     {
-        $this->space();
+        if (!$this->available()) fail('error_mindspace_setup', 503);
+        // Spaces are always siblings; only items can have a parent.
+        if (isset($data['parent_id']) || isset($data['mindspace_id'])) fail('error_validation');
         $name = Validate::text($data, 'name', 120);
         $key = Validate::text($data, 'client_key', 36);
         if (!preg_match('/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/D', $key)) fail('error_validation');
@@ -36,10 +40,17 @@ final class MindSpacesModel extends BaseModel
 
     public function get(): array
     {
-        $space = $this->space();
-        $this->db->run("INSERT IGNORE INTO mindspace_items(mindspace_id,kind,name,diagram_id,content_json,client_key,sort_order,created_at,updated_at)
+        if (!$this->available()) fail('error_mindspace_setup', 503);
+        $space = $this->db->one("SELECT id,name FROM mindspaces WHERE owner_user_id=? ORDER BY (space_key='home') DESC,id LIMIT 1", [$this->uid()]);
+        // Adopt legacy diagrams, but never recreate a deleted space on a read.
+        $orphan = $this->db->one('SELECT d.id FROM diagrams d LEFT JOIN mindspace_items i ON i.diagram_id=d.id WHERE d.owner_user_id=? AND i.id IS NULL LIMIT 1', [$this->uid()]);
+        if ($orphan) {
+            $space ??= $this->space();
+            $this->db->run("INSERT IGNORE INTO mindspace_items(mindspace_id,kind,name,diagram_id,content_json,client_key,sort_order,created_at,updated_at)
             SELECT ?,'diagram',d.name,d.id,'{}',d.client_key,d.id,d.created_at,d.updated_at FROM diagrams d
             LEFT JOIN mindspace_items i ON i.diagram_id=d.id WHERE d.owner_user_id=? AND i.id IS NULL", [$space['id'], $this->uid()]);
+        }
+        $space ??= ['id' => null, 'name' => 'MindSpace'];
         $space['items'] = array_map(self::response(...), $this->db->all(
             'SELECT i.*,COALESCE(d.name,i.name) AS name,d.version AS diagram_version FROM mindspace_items i JOIN mindspaces m ON m.id=i.mindspace_id LEFT JOIN diagrams d ON d.id=i.diagram_id WHERE m.owner_user_id=? ORDER BY i.sort_order,i.id', [$this->uid()]));
         $space['spaces'] = $this->db->all("SELECT id,name FROM mindspaces WHERE owner_user_id=? ORDER BY (space_key='home') DESC,name,id", [$this->uid()]);
@@ -67,12 +78,62 @@ final class MindSpacesModel extends BaseModel
 
     private function item(int $id, bool $lock = false): array
     {
-        $this->space();
+        if (!$this->available()) fail('error_mindspace_setup', 503);
         $item = $this->db->one('SELECT i.*,COALESCE(d.name,i.name) AS name,d.version AS diagram_version FROM mindspace_items i
             JOIN mindspaces m ON m.id=i.mindspace_id LEFT JOIN diagrams d ON d.id=i.diagram_id
             WHERE i.id=? AND m.owner_user_id=?' . ($lock ? ' FOR UPDATE' : ''), [$id, $this->uid()]);
         if (!$item) fail('error_not_found', 404);
         return $item;
+    }
+
+    public function renameSpace(array $data): array
+    {
+        $space = $this->space(true, (int) ($data['id'] ?? 0));
+        $name = Validate::text($data, 'name', 120);
+        $this->db->run('UPDATE mindspaces SET name=?,updated_at=UTC_TIMESTAMP() WHERE id=?', [$name, $space['id']]);
+        return ['id' => $space['id'], 'name' => $name];
+    }
+
+    public function deleteSpace(array $data): array
+    {
+        $space = $this->space(true, (int) ($data['id'] ?? 0));
+        $items = $this->db->all('SELECT id,diagram_id FROM mindspace_items WHERE mindspace_id=? FOR UPDATE', [$space['id']]);
+        $this->deleteItems($items);
+        $this->db->run('DELETE FROM mindspaces WHERE id=?', [$space['id']]);
+        return ['id' => $space['id']];
+    }
+
+    public function delete(array $data): array
+    {
+        $source = $this->item((int) ($data['id'] ?? 0));
+        $this->space(true, (int) $source['mindspace_id']);
+        $item = $this->item((int) $source['id'], true);
+        if ((int) ($data['version'] ?? 0) !== (int) $item['version']) fail('error_mindspace_conflict', 409);
+        if ($item['kind'] === 'diagram' && (int) ($data['diagram_version'] ?? 0) !== (int) $item['diagram_version']) fail('error_diagram_conflict', 409);
+        $all = $this->db->all('SELECT id,parent_id,diagram_id FROM mindspace_items WHERE mindspace_id=? FOR UPDATE', [$item['mindspace_id']]);
+        $ids = [(int) $item['id'] => true];
+        do {
+            $count = count($ids);
+            foreach ($all as $child) if (isset($ids[$child['parent_id']])) $ids[(int) $child['id']] = true;
+        } while (count($ids) !== $count);
+        $this->deleteItems(array_values(array_filter($all, static fn($child) => isset($ids[$child['id']]))));
+        return ['id' => $item['id'], 'deleted_ids' => array_keys($ids)];
+    }
+
+    private function deleteItems(array $items): void
+    {
+        if (!$items) return;
+        $ids = array_column($items, 'id');
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        // Detach the selected subtree before deleting: parent FKs are restrictive.
+        $this->db->run("UPDATE mindspace_items SET parent_id=NULL WHERE id IN ($placeholders)", $ids);
+        $diagrams = new DiagramsModel($this->db, $this->user);
+        foreach ($items as $item) {
+            if ($item['diagram_id'] === null) continue;
+            $diagram = $this->db->one('SELECT id,version FROM diagrams WHERE id=? AND owner_user_id=? FOR UPDATE', [$item['diagram_id'], $this->uid()]);
+            if ($diagram) $diagrams->delete($diagram);
+        }
+        $this->db->run("DELETE FROM mindspace_items WHERE id IN ($placeholders)", $ids);
     }
 
     private static function response(array $item): array

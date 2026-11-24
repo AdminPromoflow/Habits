@@ -3,7 +3,12 @@ declare(strict_types=1);
 return [
     'ms_sidebar_add' => 'Añadir',
     'ms_new_space' => 'Nuevo MindSpace',
-    'ms_new_space_hint' => 'Un espacio con sus propias carpetas y documentos.',
+    'ms_new_space_hint' => 'Un espacio independiente, al mismo nivel que los demás.',
+    'ms_options_for' => 'Opciones de {name}',
+    'ms_create_kind' => 'Añadir {kind}',
+    'ms_delete_container_confirm' => '¿Eliminar «{name}» y todo su contenido? Esta acción no se puede deshacer. Se conservan los hábitos de Mis hábitos.',
+    'ms_delete_item_confirm' => '¿Eliminar «{name}»? Esta acción no se puede deshacer.',
+    'ms_delete_habits_hint' => 'Se conservan los hábitos de Mis hábitos.',
     'ms_add_in' => 'Añadir a {name}',
     'error_mindspace_destination' => 'Elige una carpeta de este MindSpace.',
     'date' => 'Fecha',

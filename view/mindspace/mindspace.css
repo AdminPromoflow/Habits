@@ -20,8 +20,10 @@
 .ms-sidebar-space { margin-bottom: 3px; }
 .ms-explorer-root { width: 100%; }
 .ms-explorer-root span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ms-sidebar-folders { margin: 2px 0 4px 8px; }
+.ms-sidebar-folders { margin-top: 2px; margin-bottom: 4px; }
 .mindspace-explorer .ms-sidebar-add { margin-top: 7px; color: var(--purple-dark); font-size: .75rem; }
+.mindspace-explorer .ms-sidebar-add:hover { background: var(--lavender-wash); }
+.mindspace-explorer .ms-sidebar-add-global { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); border-radius: 0; width: 100%; }
 .ms-create-space-option { display: flex; align-items: center; gap: 12px; width: 100%; padding: 16px; border: 1px solid var(--lavender); border-radius: 10px; background: var(--lavender-wash); color: var(--ink); text-align: left; cursor: pointer; }
 .ms-create-space-option > svg { width: 24px; height: 24px; color: var(--purple-dark); }
 .ms-create-space-option small { display: block; margin-top: 5px; color: var(--muted); }
@@ -32,9 +34,26 @@
 .mindspace-explorer summary::-webkit-details-marker { display: none; }
 .mindspace-explorer summary::before { content: '›'; flex: 0 0 12px; text-align: center; }
 .mindspace-explorer details[open] > summary::before { transform: rotate(90deg); }
-.mindspace-explorer summary button { min-width: 0; flex: 1; }
-.mindspace-explorer summary button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ms-tree-children { margin-left: 12px; }
+.ms-tree-row { display: flex; align-items: center; min-width: 0; border-radius: 6px; }
+.ms-tree-row:hover, .ms-tree-row:focus-within { background: var(--lavender-wash); }
+.mindspace-explorer .ms-entry-label { min-width: 0; flex: 1; gap: 6px; }
+.ms-entry-label > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mindspace-explorer .ms-entry-more { flex: 0 0 26px; width: 26px; height: 28px; justify-content: center; padding: 0; opacity: 0; font-size: 22px; line-height: 1; color: var(--purple-dark); }
+.ms-tree-row:hover > .ms-entry-more, .ms-tree-row:focus-within > .ms-entry-more, .ms-entry-more[aria-expanded="true"] { opacity: 1; }
+.ms-entry-more:hover { background: var(--surface); }
+.mindspace-explorer button:focus-visible, .mindspace-explorer summary:focus-visible { outline: 2px solid var(--purple); outline-offset: -2px; }
+.ms-tree-document { padding-left: 12px; }
+.ms-tree-children { margin-left: 10px; padding-left: 3px; border-left: 1px solid var(--line); }
+.ms-context-menu { position: fixed; z-index: 1002; width: 235px; max-width: calc(100vw - 16px); max-height: calc(100dvh - 16px); overflow-y: auto; padding: 6px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 30px #34204726; }
+.ms-context-title { margin: 0; padding: 8px 10px; color: var(--muted); font-size: .75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ms-context-menu button { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 36px; border: 0; border-radius: 6px; padding: 8px 10px; background: transparent; color: inherit; text-align: left; font: inherit; font-size: .8125rem; cursor: pointer; }
+.ms-context-menu button svg { width: 17px; height: 17px; flex-shrink: 0; }
+.ms-context-menu button:hover, .ms-context-menu button:focus-visible { background: var(--lavender-wash); outline: 1px solid var(--lavender); outline-offset: -1px; }
+.ms-context-menu .is-danger { color: #b3475c; }
+.ms-context-menu hr { border: 0; border-top: 1px solid var(--line); margin: 5px; }
+@media (hover: none), (pointer: coarse) {
+  .mindspace-explorer .ms-entry-more { opacity: 1; flex-basis: 32px; width: 32px; height: 36px; }
+}
 .mindspace-main { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .mindspace-item-header { padding: 14px 20px 8px; border-bottom: 1px solid var(--line); }
 .mindspace-folder-path { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; color: var(--muted); font-size: .75rem; }

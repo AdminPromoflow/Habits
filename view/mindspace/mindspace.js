@@ -3,7 +3,7 @@
 class MindSpace extends PageController {
   constructor(home) {
     super(['ms-new','ms-new-kind','ms-open','ms-folder','ms-rename','ms-move','ms-retry',
-      'ms-sidebar-toggle','ms-sidebar-add','ms-space-open','ms-space-new',
+      'ms-sidebar-toggle','ms-sidebar-add','ms-space-open','ms-space-new','ms-entry-menu','ms-space-rename','ms-delete','ms-space-delete',
       'ms-card-new','ms-card-edit','ms-sprint','ms-habits-select','ms-habit-new','ms-sheet-row','ms-sheet-column','ms-sheet-export']);
     this.home = home;
     this.editor = new MindSpaceEditors(this);
@@ -18,6 +18,17 @@ class MindSpace extends PageController {
         tabs[event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowLeft' ? -1 : 1) + tabs.length) % tabs.length]?.focus();
       }
     });
+    document.addEventListener('toggle', event => {
+      const key = event.target.dataset?.msTree;
+      if (key && event.target.isConnected) this.rememberTree(key, event.target.open);
+    }, true);
+    document.addEventListener('click', event => {
+      if (!event.target.closest?.('#ms-context-menu,[data-action="ms-entry-menu"]')) this.closeMenu();
+    });
+    document.addEventListener('keydown', event => this.menuKeydown(event));
+    document.addEventListener('scroll', event => {
+      if (!event.target.closest?.('#ms-context-menu')) this.closeMenu();
+    }, true);
     document.addEventListener('dragstart', event => {
       const entry = event.target.closest?.('[data-ms-draggable]');
       if (!entry) return;
@@ -27,7 +38,7 @@ class MindSpace extends PageController {
     });
     document.addEventListener('dragover', event => {
       const target = event.target.closest?.('[data-ms-drop]');
-      if (!this.draggingId || !target) return;
+      if (!this.draggingId || !target || !this.canDrop(this.draggingId, target)) return;
       event.preventDefault(); event.dataTransfer.dropEffect = 'move';
       document.querySelectorAll('.ms-drop-target').forEach(el => el.classList.remove('ms-drop-target'));
       target.classList.add('ms-drop-target');
@@ -37,6 +48,7 @@ class MindSpace extends PageController {
       const target = event.target.closest?.('[data-ms-drop]'), id = this.draggingId;
       if (!id || !target) return;
       event.preventDefault();
+      if (!this.canDrop(id, target)) { this.clearDrag(); return; }
       const parent = Number(target.dataset.msDrop) || null;
       this.clearDrag();
       void this.move(id, parent).catch(error => toast(error.message, true));
@@ -44,11 +56,12 @@ class MindSpace extends PageController {
   }
 
   reset() {
+    this.closeMenu();
     clearTimeout(this.timer);
     this.generation = (this.generation || 0) + 1;
     this.active = null; this.draft = null; this.baseline = ''; this.busy = false;
     this.error = ''; this.savePromise = null; this.draggingId = null;
-    this.sidebarExpanded = undefined;
+    this.sidebarExpanded = undefined; this.treeExpanded = undefined;
   }
   enabled() { return !!S.data?.mindspace; }
   allItems() { return S.data?.mindspace?.items || []; }
@@ -60,7 +73,7 @@ class MindSpace extends PageController {
       : this.allItems().find(item => item.kind === 'diagram' && item.diagram_id === Number(params.get('diagram')));
     return target?.mindspace_id || this.spaces().find(space => space.id === Number(params.get('space')))?.id || S.data?.mindspace?.id;
   }
-  spaceName() { return this.spaces().find(space => space.id === this.spaceId())?.name || 'MindSpace'; }
+  spaceName(spaceId = this.spaceId()) { return this.spaces().find(space => space.id === spaceId)?.name || 'MindSpace'; }
   items(spaceId = this.spaceId()) { return this.allItems().filter(item => (item.mindspace_id || S.data?.mindspace?.id) === spaceId); }
   kindIcon(kind) { return icon({ folder:'folder', diagram:'branch', spreadsheet:'table', kanban:'overview', scrum:'briefcase', habits:'habits', notes:'book' }[kind] || 'book'); }
   kindLabel(kind) { return t(`ms_kind_${kind}`); }
@@ -82,11 +95,11 @@ class MindSpace extends PageController {
     }
   }
 
-  pathTo(id) {
+  pathTo(id, spaceId = this.spaceId()) {
     const path = [], seen = new Set();
     while (id && !seen.has(id)) {
       seen.add(id);
-      const folder = this.items().find(item => item.id === id && item.kind === 'folder');
+      const folder = this.items(spaceId).find(item => item.id === id && item.kind === 'folder');
       if (!folder) break;
       path.unshift(folder); id = folder.parent_id;
     }
@@ -116,29 +129,93 @@ class MindSpace extends PageController {
     const list = document.getElementById('mindspace-sidebar-list');
     if (list) list.hidden = !open;
   }
+  treeState() {
+    if (this.treeExpanded === undefined) {
+      try { this.treeExpanded = JSON.parse(localStorage.getItem(`${this.sidebarKey()}:tree`) || '{}') || {}; }
+      catch { this.treeExpanded = {}; }
+    }
+    return this.treeExpanded;
+  }
+  rememberTree(key, open) {
+    this.treeState()[key] = open;
+    try { localStorage.setItem(`${this.sidebarKey()}:tree`, JSON.stringify(this.treeExpanded)); } catch {}
+  }
+  addButton(spaceId, parent = null) {
+    return `<button type="button" class="ms-sidebar-add" data-action="ms-sidebar-add" data-space="${spaceId}" data-parent="${parent || 0}" title="${esc(t('ms_add_in', {name:this.allItems().find(item => item.id === parent)?.name || this.spaceName(spaceId)}))}">${icon('plus')}<span>${esc(t('ms_sidebar_add'))}</span></button>`;
+  }
+  moreButton(target, id, name) {
+    return `<button type="button" class="ms-entry-more" data-action="ms-entry-menu" data-target="${target}" data-id="${id}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(t('ms_options_for', {name}))}" title="${esc(t('more'))}"><span aria-hidden="true">⋯</span></button>`;
+  }
   sidebar() {
     if (!this.enabled()) return '';
     return `<section class="mindspace-sidebar"><button type="button" id="mindspace-sidebar-toggle" class="nav-item ms-sidebar-toggle"
       data-action="ms-sidebar-toggle" aria-expanded="${this.sidebarOpen()}" aria-controls="mindspace-sidebar-list">${icon('overview')}<span>All MindSpace</span><span class="ms-sidebar-chevron" aria-hidden="true">›</span></button>
       <div id="mindspace-sidebar-list" class="mindspace-explorer" ${this.sidebarOpen() ? '' : 'hidden'}>${this.explorer()}
-        <button type="button" class="ms-sidebar-add" data-action="ms-sidebar-add" aria-label="${esc(t('ms_sidebar_add'))}" title="${esc(t('ms_sidebar_add'))}">${icon('plus')}<span>${esc(t('ms_sidebar_add'))}</span></button>
+        <button type="button" class="ms-sidebar-add ms-sidebar-add-global" data-action="ms-sidebar-add" data-global="true" aria-label="${esc(t('ms_sidebar_add'))}" title="${esc(t('ms_sidebar_add'))}">${icon('plus')}<span>${esc(t('ms_sidebar_add'))}</span></button>
       </div></section>`;
   }
   explorer() {
     const ancestors = new Set(this.pathTo(this.folderId()).map(item => item.id));
-    const tree = (parent, depth, seen = new Set()) => this.items().filter(item => item.kind === 'folder' && item.parent_id === parent && !seen.has(item.id))
-      .sort((a,b) => a.name.localeCompare(b.name)).map(folder => {
-        const visited = new Set([...seen, folder.id]);
-        return `<details ${ancestors.has(folder.id) ? 'open' : ''}><summary><button type="button" data-action="ms-folder" data-id="${folder.id}"
-          data-ms-drop="${folder.id}" draggable="true" data-ms-draggable="${folder.id}" class="${this.folderId() === folder.id ? 'is-current' : ''}">${this.kindIcon('folder')}<span>${esc(folder.name)}</span></button></summary>
-          <div class="ms-tree-children">${tree(folder.id, depth + 1, visited)}</div></details>`;
+    const expanded = this.treeState();
+    const tree = (spaceId, parent, seen = new Set()) => this.items(spaceId).filter(item => item.parent_id === parent && !seen.has(item.id))
+      .sort((a,b) => Number(b.kind === 'folder') - Number(a.kind === 'folder') || a.name.localeCompare(b.name)).map(item => {
+        const folder = item.kind === 'folder', current = item.id === this.active?.id && S.view === 'home';
+        const row = `<button type="button" class="ms-entry-label ${current ? 'is-current' : ''}" data-action="${folder ? 'ms-folder' : 'ms-open'}" data-id="${item.id}"
+          ${folder ? `data-ms-drop="${item.id}"` : ''} draggable="true" data-ms-draggable="${item.id}" ${current ? 'aria-current="page"' : ''} title="${esc(item.name)}">${this.kindIcon(item.kind)}<span>${esc(item.name)}</span></button>${this.moreButton('item', item.id, item.name)}`;
+        if (!folder) return `<div class="ms-tree-row ms-tree-document">${row}</div>`;
+        return `<details data-ms-tree="item-${item.id}" ${expanded[`item-${item.id}`] ?? ancestors.has(item.id) ? 'open' : ''}><summary class="ms-tree-row">${row}</summary>
+          <div class="ms-tree-children">${tree(spaceId, item.id, new Set([...seen, item.id]))}${this.addButton(spaceId, item.id)}</div></details>`;
       }).join('');
     return this.spaces().map(space => {
-      const selected = space.id === this.spaceId(), current = selected && S.view === 'home';
-      return `<div class="ms-sidebar-space"><button type="button" class="ms-explorer-root ${current ? 'is-current' : ''}" data-action="ms-space-open" data-space="${space.id}"
-        ${selected ? 'data-ms-drop="0"' : ''} ${current ? 'aria-current="page"' : ''} title="${esc(space.name)}">${this.kindIcon('folder')}<span>${esc(space.name)}</span></button>
-        ${selected ? `<div class="ms-sidebar-folders">${tree(null, 0)}</div>` : ''}</div>`;
+      const selected = space.id === this.spaceId(), current = selected && !this.active && S.view === 'home';
+      return `<details class="ms-sidebar-space" data-ms-tree="space-${space.id}" ${expanded[`space-${space.id}`] ?? selected ? 'open' : ''}><summary class="ms-tree-row">
+        <button type="button" class="ms-entry-label ms-explorer-root ${current ? 'is-current' : ''}" data-action="ms-space-open" data-space="${space.id}"
+        data-ms-drop="0" data-ms-space="${space.id}" ${current ? 'aria-current="page"' : ''} title="${esc(space.name)}">${this.kindIcon('folder')}<span>${esc(space.name)}</span></button>${this.moreButton('space', space.id, space.name)}</summary>
+        <div class="ms-tree-children ms-sidebar-folders">${tree(space.id, null)}${this.addButton(space.id)}</div></details>`;
     }).join('');
+  }
+
+  closeMenu(restoreFocus = false) {
+    document.getElementById('ms-context-menu')?.remove();
+    this.menuTrigger?.setAttribute('aria-expanded', 'false');
+    if (restoreFocus && this.menuTrigger?.isConnected) this.menuTrigger.focus();
+    this.menuTrigger = null;
+  }
+  entryMenu(button) {
+    const wasOpen = this.menuTrigger === button;
+    this.closeMenu();
+    if (wasOpen) return;
+    const isSpace = button.dataset.target === 'space', id = Number(button.dataset.id);
+    const target = (isSpace ? this.spaces() : this.allItems()).find(item => item.id === id);
+    if (!target) return;
+    const container = isSpace || target.kind === 'folder';
+    const spaceId = isSpace ? id : target.mindspace_id || this.spaceId();
+    const context = `data-space="${spaceId}" data-parent="${isSpace ? 0 : id}"`;
+    const option = (action, label, attrs = '', symbol = '', extra = '') => `<button type="button" role="menuitem" data-action="${action}" ${attrs} class="${extra}">${symbol}<span>${esc(label)}</span></button>`;
+    const menu = document.createElement('div');
+    menu.id = 'ms-context-menu'; menu.className = 'ms-context-menu'; menu.setAttribute('role', 'menu');
+    menu.setAttribute('aria-label', t('ms_options_for', {name:target.name}));
+    menu.innerHTML = `<p class="ms-context-title">${esc(target.name)}</p>` + (container ? this.kinds().map(kind => option('ms-new-kind', t('ms_create_kind', {kind:this.kindLabel(kind)}), `${context} data-kind="${kind}"`, this.kindIcon(kind))).join('') : '')
+      + (isSpace ? option('ms-space-new', t('ms_new_space'), '', icon('plus')) : '')
+      + (container ? '<hr role="separator">' : '')
+      + option(isSpace ? 'ms-space-rename' : 'ms-rename', t('ms_rename'), `data-id="${id}"`)
+      + option(isSpace ? 'ms-space-delete' : 'ms-delete', t('delete'), `data-id="${id}"`, '', 'is-danger');
+    document.body.append(menu); this.menuTrigger = button;
+    button.setAttribute('aria-expanded', 'true'); button.setAttribute('aria-controls', menu.id);
+    const rect = button.getBoundingClientRect();
+    menu.style.left = `${Math.max(8, Math.min(rect.right + 6, window.innerWidth - menu.offsetWidth - 8))}px`;
+    menu.style.top = `${Math.max(8, Math.min(rect.top, window.innerHeight - menu.offsetHeight - 8))}px`;
+    menu.querySelector('button')?.focus();
+  }
+  menuKeydown(event) {
+    const menu = document.getElementById('ms-context-menu');
+    if (!menu) return;
+    if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); this.closeMenu(true); return; }
+    if (event.key === 'Tab') { this.closeMenu(true); return; }
+    if (!menu.contains(event.target) || !['ArrowDown','ArrowUp','Home','End'].includes(event.key)) return;
+    event.preventDefault();
+    const options = [...menu.querySelectorAll('[role="menuitem"]')], index = options.indexOf(event.target);
+    options[event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1 : (index + (event.key === 'ArrowUp' ? -1 : 1) + options.length) % options.length]?.focus();
   }
 
   folderContent() {
@@ -228,16 +305,18 @@ class MindSpace extends PageController {
     if (!item || item.kind === 'folder') url.searchParams.set('folder', String(item?.id || 0));
     else if (item.kind === 'diagram') url.searchParams.set('diagram', item.diagram_id);
     else url.searchParams.set('item', item.id);
+    if (spaceId) this.rememberTree(`space-${item?.mindspace_id || spaceId}`, true);
+    for (const folder of this.pathTo(item?.kind === 'folder' ? item.id : item?.parent_id, item?.mindspace_id || spaceId)) this.rememberTree(`item-${folder.id}`, true);
     // The creation request has finished; do not trigger beforeunload for its form.
     this.busy = false;
     location.assign(url.href);
   }
 
   folders(exclude = null, spaceId = this.spaceId()) {
-    return this.items(spaceId).filter(item => item.kind === 'folder' && item.id !== exclude && !this.pathTo(item.parent_id).some(folder => folder.id === exclude));
+    return this.items(spaceId).filter(item => item.kind === 'folder' && item.id !== exclude && !this.pathTo(item.parent_id, spaceId).some(folder => folder.id === exclude));
   }
-  folderOptions(selected, exclude = null) {
-    return `<option value="0">${esc(this.spaceName())}</option>` + this.folders(exclude).map(folder => `<option value="${folder.id}" ${folder.id === selected ? 'selected' : ''}>${esc(this.spaceName())} / ${esc(this.pathTo(folder.id).map(item => item.name).join(' / '))}</option>`).join('');
+  folderOptions(selected, exclude = null, spaceId = this.spaceId()) {
+    return `<option value="0">${esc(this.spaceName(spaceId))}</option>` + this.folders(exclude, spaceId).map(folder => `<option value="${folder.id}" ${folder.id === selected ? 'selected' : ''}>${esc(this.spaceName(spaceId))} / ${esc(this.pathTo(folder.id, spaceId).map(item => item.name).join(' / '))}</option>`).join('');
   }
   async submit(form, task) {
     const button = form.querySelector('[type="submit"]');
@@ -248,18 +327,25 @@ class MindSpace extends PageController {
     finally { button.disabled = false; this.busy = false; }
   }
 
-  async newMenu(includeSpaces = false) {
-    if (!await this.flush()) return;
-    openModal(includeSpaces ? 'ms_sidebar_add' : 'ms_add', `${includeSpaces ? `<button type="button" class="ms-create-space-option" data-action="ms-space-new">${icon('plus')}<span><strong>${esc(t('ms_new_space'))}</strong><small>${esc(t('ms_new_space_hint'))}</small></span></button><p class="ms-add-context">${esc(t('ms_add_in', { name:this.spaceName() }))}</p>` : ''}<div class="ms-kind-grid">${['folder','diagram','spreadsheet','kanban','scrum','habits','notes'].map(kind =>
-      `<button type="button" data-action="ms-new-kind" data-kind="${kind}">${this.kindIcon(kind)}<strong>${esc(this.kindLabel(kind))}</strong><small>${esc(t(`ms_hint_${kind}`))}</small></button>`).join('')}</div>`);
+  kinds() { return ['folder','diagram','spreadsheet','kanban','scrum','habits','notes']; }
+  creationContext(button) {
+    return {spaceId:Number(button.dataset.space) || this.spaceId(), parent:button.dataset.parent !== undefined ? Number(button.dataset.parent) || null : this.folderId()};
   }
-  async newForm(kind) {
-    if (!['folder','diagram','spreadsheet','kanban','scrum','habits','notes'].includes(kind) || !await this.flush()) return;
+  async newMenu(includeSpaces = false, {spaceId = this.spaceId(), parent = this.folderId()} = {}) {
+    if (!await this.flush()) return;
+    this.closeMenu();
+    const name = this.allItems().find(item => item.id === parent)?.name || this.spaceName(spaceId);
+    openModal(includeSpaces ? 'ms_sidebar_add' : 'ms_add', `${includeSpaces || !this.spaces().length ? `<button type="button" class="ms-create-space-option" data-action="ms-space-new">${icon('plus')}<span><strong>${esc(t('ms_new_space'))}</strong><small>${esc(t('ms_new_space_hint'))}</small></span></button>` : ''}<p class="ms-add-context">${esc(t('ms_add_in', { name }))}</p><div class="ms-kind-grid">${this.kinds().map(kind =>
+      `<button type="button" data-action="ms-new-kind" data-kind="${kind}" data-space="${spaceId || 0}" data-parent="${parent || 0}">${this.kindIcon(kind)}<strong>${esc(this.kindLabel(kind))}</strong><small>${esc(t(`ms_hint_${kind}`))}</small></button>`).join('')}</div>`);
+  }
+  async newForm(kind, {spaceId = this.spaceId(), parent = this.folderId()} = {}) {
+    if (!this.kinds().includes(kind) || !await this.flush()) return;
+    this.closeMenu();
     openModal('ms_create', `<form id="ms-create-form"><label class="field"><span>${esc(t('name'))}</span><input name="name" maxlength="120" required value="${esc(t(`ms_default_${kind}`))}"></label>
-      <label class="field"><span>${esc(t('ms_location'))}</span><select name="parent">${this.folderOptions(this.folderId())}</select></label>${formFooter('create')}</form>`);
+      <label class="field"><span>${esc(t('ms_location'))}</span><select name="parent">${this.folderOptions(parent, null, spaceId)}</select></label>${formFooter('create')}</form>`);
     const form = document.getElementById('ms-create-form'), key = crypto.randomUUID();
     form.addEventListener('submit', event => { event.preventDefault(); void this.submit(form, async values => {
-      const item = await this.home.makeRequest('createMindSpaceItem', { kind, name:values.get('name'), mindspace_id:this.spaceId(), parent_id:Number(values.get('parent')) || null, client_key:key });
+      const item = await this.home.makeRequest('createMindSpaceItem', { kind, name:values.get('name'), mindspace_id:spaceId, parent_id:Number(values.get('parent')) || null, client_key:key });
       this.upsert(item); closeModal(); await this.go(item);
     }); });
   }
@@ -274,26 +360,68 @@ class MindSpace extends PageController {
       closeModal(); await this.go(null, space.id);
     }); });
   }
-  async rename() {
-    if (!this.active || !await this.flush()) return;
-    const item = this.active;
+  diagramVersion(item) { return item.kind === 'diagram' && this.home.active?.id === item.diagram_id ? this.home.active.version : item.diagram_version; }
+  async rename(id = this.active?.id, isSpace = false) {
+    if (!id || !await this.flush()) return;
+    this.closeMenu();
+    const item = (isSpace ? this.spaces() : this.allItems()).find(entry => entry.id === id);
+    if (!item) return;
     openModal('ms_rename', `<form id="ms-rename-form"><label class="field"><span>${esc(t('name'))}</span><input name="name" maxlength="120" required value="${esc(item.name)}"></label>${formFooter()}</form>`);
     const form = document.getElementById('ms-rename-form');
     form.addEventListener('submit', event => { event.preventDefault(); void this.submit(form, async values => {
-      const saved = await this.home.makeRequest('saveMindSpaceItem', { id:item.id, version:item.version, name:values.get('name'), diagram_version:this.home.active?.id === item.diagram_id ? this.home.active.version : item.diagram_version });
-      this.active = saved; this.upsert(saved);
-      if (saved.kind === 'diagram') {
-        this.home.diagramTitle = saved.name;
-        Object.assign(this.home.active, { name:saved.name, version:saved.diagram_version });
-        const diagram = S.data.diagrams.find(entry => entry.id === saved.diagram_id);
-        if (diagram) Object.assign(diagram, { name:saved.name, version:saved.diagram_version });
+      const saved = await this.home.makeRequest(isSpace ? 'renameMindSpace' : 'saveMindSpaceItem', { id:item.id, version:item.version, name:values.get('name'), diagram_version:this.diagramVersion(item) });
+      if (isSpace) {
+        Object.assign(item, saved);
+        if (S.data.mindspace.id === id) S.data.mindspace.name = saved.name;
+      } else {
+        if (this.active?.id === id) this.active = saved;
+        this.upsert(saved);
+        if (saved.kind === 'diagram') {
+          if (this.home.active?.id === saved.diagram_id) {
+            this.home.diagramTitle = saved.name;
+            Object.assign(this.home.active, { name:saved.name, version:saved.diagram_version });
+          }
+          const diagram = S.data.diagrams.find(entry => entry.id === saved.diagram_id);
+          if (diagram) Object.assign(diagram, { name:saved.name, version:saved.diagram_version });
+        }
       }
       closeModal(); render();
     }); });
   }
+  async deleteForm(id, isSpace = false) {
+    if (!await this.flush()) return;
+    this.closeMenu();
+    const item = (isSpace ? this.spaces() : this.allItems()).find(entry => entry.id === id);
+    if (!item) return;
+    const container = isSpace || item.kind === 'folder';
+    openModal('delete', `<form id="ms-delete-form"><p>${esc(t(container ? 'ms_delete_container_confirm' : 'ms_delete_item_confirm', {name:item.name}))}</p>${item.kind === 'habits' ? `<p>${esc(t('ms_delete_habits_hint'))}</p>` : ''}${formFooter('delete')}</form>`);
+    const form = document.getElementById('ms-delete-form');
+    form.addEventListener('submit', event => { event.preventDefault(); void this.submit(form, async () => {
+      // Save any edits completed while the confirmation was open before deleting.
+      if (!await this.flush()) throw new Error(this.error || t('ms_unsaved'));
+      const fresh = isSpace ? item : this.allItems().find(entry => entry.id === id);
+      const result = await this.home.makeRequest(isSpace ? 'deleteMindSpace' : 'deleteMindSpaceItem', {id, version:fresh.version, diagram_version:this.diagramVersion(fresh)});
+      const currentSpace = this.spaceId();
+      const deleted = new Set(isSpace ? this.items(id).map(entry => entry.id) : result.deleted_ids);
+      const diagramIds = new Set(this.allItems().filter(entry => deleted.has(entry.id)).map(entry => entry.diagram_id));
+      S.data.diagrams = S.data.diagrams.filter(entry => !diagramIds.has(entry.id));
+      S.data.mindspace.items = this.allItems().filter(entry => !deleted.has(entry.id));
+      if (isSpace) S.data.mindspace.spaces = this.spaces().filter(entry => entry.id !== id);
+      const removedActive = deleted.has(this.active?.id);
+      if (removedActive) { this.active = null; this.draft = null; this.baseline = 'null'; }
+      if (isSpace && S.data.mindspace.id === id) {
+        const next = this.spaces()[0]; S.data.mindspace.id = next?.id || null; S.data.mindspace.name = next?.name || 'MindSpace';
+      }
+      closeModal();
+      if (removedActive || (isSpace && currentSpace === id)) {
+        const nextSpace = isSpace ? this.spaces()[0]?.id : item.mindspace_id || this.spaceId();
+        await this.go(isSpace ? null : this.allItems().find(entry => entry.id === item.parent_id) || null, nextSpace);
+      } else render();
+    }); });
+  }
   async move(id, parent) {
     if (!await this.flush()) return;
-    const item = this.items().find(entry => entry.id === id);
+    const item = this.allItems().find(entry => entry.id === id);
     if (!item || item.parent_id === parent) return;
     const saved = await this.home.makeRequest('moveMindSpaceItem', { id, version:item.version, parent_id:parent });
     this.upsert(saved);
@@ -308,19 +436,29 @@ class MindSpace extends PageController {
     const form = document.getElementById('ms-move-form');
     form.addEventListener('submit', event => { event.preventDefault(); void this.submit(form, async values => { await this.move(item.id, Number(values.get('parent')) || null); closeModal(); }); });
   }
+  canDrop(id, target) {
+    const item = this.allItems().find(entry => entry.id === id);
+    const parent = this.allItems().find(entry => entry.id === Number(target.dataset.msDrop));
+    const spaceId = Number(target.dataset.msSpace) || (parent ? parent.mindspace_id || S.data.mindspace.id : this.spaceId());
+    return !!item && (item.mindspace_id || S.data.mindspace.id) === spaceId;
+  }
   clearDrag() {
     this.draggingId = null;
     document.querySelectorAll('.ms-drop-target').forEach(el => el.classList.remove('ms-drop-target'));
   }
   async handleAction(action, button) {
     if (action === 'ms-sidebar-toggle') return this.toggleSidebar();
-    if (action === 'ms-sidebar-add') return this.newMenu(true);
-    if (action === 'ms-space-new') return this.newSpace();
+    if (action === 'ms-entry-menu') return this.entryMenu(button);
+    if (action === 'ms-sidebar-add') return this.newMenu(button.dataset.global === 'true', button.dataset.global === 'true' ? {spaceId:this.spaceId(), parent:null} : this.creationContext(button));
+    if (action === 'ms-space-rename') return this.rename(Number(button.dataset.id), true);
+    if (action === 'ms-space-delete') return this.deleteForm(Number(button.dataset.id), true);
+    if (action === 'ms-delete') return this.deleteForm(Number(button.dataset.id));
+    if (action === 'ms-space-new') { this.closeMenu(); return this.newSpace(); }
     if (action === 'ms-space-open') return this.go(null, Number(button.dataset.space));
     if (action === 'ms-new') return this.newMenu();
-    if (action === 'ms-new-kind') return this.newForm(button.dataset.kind);
-    if (action === 'ms-open' || action === 'ms-folder') return this.go(this.items().find(item => item.id === Number(button.dataset.id)) || null);
-    if (action === 'ms-rename') return this.rename();
+    if (action === 'ms-new-kind') return this.newForm(button.dataset.kind, this.creationContext(button));
+    if (action === 'ms-open' || action === 'ms-folder') return this.go(this.allItems().find(item => item.id === Number(button.dataset.id)) || null);
+    if (action === 'ms-rename') return this.rename(Number(button.dataset.id) || this.active?.id);
     if (action === 'ms-move') return this.moveForm();
     if (action === 'ms-retry') return this.save();
     return this.editor.action(action, button);

@@ -101,3 +101,38 @@ def run(owner, stranger, guest, check):
  check(all(s['id']!=work['id'] for s in call('mindspace',client=stranger)['spaces']), 'Space ownership and folder boundaries are enforced on the server')
  reloaded=owner.boot()['data']['mindspace']
  check(any(s==work for s in reloaded['spaces']) and any(i['id']==work_diagram['id'] for i in reloaded['items']) and any(i['id']==root['id'] for i in reloaded['items']), 'Reload returns every owned MindSpace and preserves all existing folders and documents')
+
+ # Context-menu mutations use the same ownership and HTTP boundaries.
+ for action, payload in [('renameMindSpace',{'id':work['id'],'name':'Renamed'}), ('deleteMindSpace',{'id':work['id']}), ('deleteMindSpaceItem',{'id':work_folder['id'],'version':work_folder['version']})]:
+  call(action,payload,404,client=stranger)
+  call(action,payload,401,client=guest)
+  owner.request(action,payload,419,csrf=False,module='mindspaces')
+  call(action,expected=405)
+ check(True, 'Sidebar rename and delete actions enforce ownership, authentication, CSRF and POST')
+ call('createMindSpace',{'name':'Nested space','client_key':str(uuid.uuid4()),'parent_id':work_folder['id']},422)
+ call('createMindSpace',{'name':'Nested space','client_key':str(uuid.uuid4()),'mindspace_id':work['id']},422)
+ renamed_space=call('renameMindSpace',{'id':work['id'],'name':'Trabajo actualizado'})
+ call('renameMindSpace',{'id':work['id'],'name':'  '},422)
+ check(renamed_space in owner.boot()['data']['mindspace']['spaces'] and current(work_folder['id'])['mindspace_id']==work['id'], 'Space renaming persists without moving contents, and nested spaces are rejected')
+ renamed_folder=call('saveMindSpaceItem',{'id':work_folder['id'],'version':work_folder['version'],'name':'Carpeta actualizada'})
+ call('deleteMindSpaceItem',{'id':work_folder['id'],'version':work_folder['version']},409)
+ call('deleteMindSpaceItem',{'id':work_diagram['id'],'version':work_diagram['version'],'diagram_version':0},409)
+ check(current(work_folder['id'])['name']=='Carpeta actualizada' and current(work_diagram['id']), 'Stale folder and diagram deletes leave current content intact')
+ nested=work_item('folder','Nested',work_folder['id'])
+ nested_note=work_item('notes','Nested note',nested['id'])
+ deleted=call('deleteMindSpaceItem',{'id':work_folder['id'],'version':renamed_folder['version']})
+ remaining=call('mindspace')
+ check(set(deleted['deleted_ids'])=={work_folder['id'],work_diagram['id'],nested['id'],nested_note['id']} and current(work_note['id']) and current(root['id']), 'Deleting a folder removes its complete subtree while preserving siblings and other spaces')
+ check(all(d['id']!=work_diagram['diagram_id'] for d in owner.data()['diagrams']) and all(i['id']!=work_diagram['id'] for i in owner.boot()['data']['mindspace']['items']), 'Deleted folder diagrams are removed from storage and never reappear during bootstrap')
+ call('deleteMindSpaceItem',{'id':sheet['id'],'version':sheet['version']})
+ call('deleteMindSpaceItem',{'id':renamed['id'],'version':renamed['version'],'diagram_version':renamed['diagram_version']})
+ check(all(i['id'] not in [sheet['id'],renamed['id']] for i in call('mindspace')['items']), 'Individual spreadsheets and diagrams can be deleted')
+ call('deleteMindSpace',{'id':space['id']})
+ remaining=owner.boot()['data']['mindspace']
+ check(remaining['id']==work['id'] and all(s['id']!=space['id'] for s in remaining['spaces']) and current(work_note['id']), 'Deleting the default space preserves siblings and does not recreate the removed default')
+ check(any(h['id']==habit_id for h in owner.data()['habits']), 'Deleting a habit document preserves the separately tracked habits')
+ call('deleteMindSpace',{'id':work['id']})
+ empty=owner.boot()['data']['mindspace']
+ check(empty['spaces']==[] and empty['items']==[] and empty['id'] is None and owner.data()['diagrams']==[], 'Deleting the final space stays empty after reload without orphan diagrams')
+ fresh=call('createMindSpace',{'name':'Start again','client_key':str(uuid.uuid4())})
+ check(call('mindspace')['spaces']==[fresh], 'A new space can be created after deleting every space, without a duplicate default')

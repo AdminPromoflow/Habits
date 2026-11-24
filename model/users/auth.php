@@ -115,6 +115,9 @@ final class Auth
                     password_hash($password, PASSWORD_DEFAULT),
                 ]);
                 $id = $this->db->id();
+                if ((new MindSpacesModel($this->db, ['id' => $id]))->available()) {
+                    $this->db->run('INSERT INTO mindspaces(owner_user_id) VALUES (?)', [$id]);
+                }
                 $this->db->run("INSERT INTO user_roles(user_id,role) VALUES (?,'user')", [$id]);
                 $this->db->run('INSERT INTO user_settings(user_id,language) VALUES (?,?)', [
                     $id,

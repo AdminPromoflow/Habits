@@ -34,7 +34,7 @@ function setup(url='http://localhost/?item=3') {
   const Space=vm.runInContext(fs.readFileSync('view/mindspace/mindspace.js','utf8')+'\nMindSpace;',context);
   const home={makeRequest:async(action,data)=>({...items.find(i=>i.id===data.id),version:data.version+1,content:data.content}),finishBeforeSwitch:async()=>true};
   const space=new Space(home); space.resolve();
-  return {space,home,state,location,listeners};
+  return {space,home,state,location,listeners,context};
 }
 test('folder root, nested documents and diagram deep links resolve independently',()=>{
   assert.equal(setup('http://localhost/?folder=0').space.active,null);
@@ -95,4 +95,101 @@ test('sidebar collapse leaves the active editor and unsaved draft intact',()=>{
   assert.equal(space.sidebarOpen(),true); space.toggleSidebar(); assert.equal(space.sidebarOpen(),false);
   assert.equal(space.draft.text,'still typing'); assert.equal(space.dirty(),true);
   space.toggleSidebar(); assert.equal(space.sidebarOpen(),true); assert.equal(space.active.id,6);
+});
+
+
+function modalFixture(url='http://localhost/?item=6') {
+  const fixture=multiple(url), {space,context}=fixture;
+  const forms=new Map();
+  context.openModal=(title,html)=>{ fixture.modal={title,html}; };
+  context.closeModal=()=>{fixture.closed=true;};
+  context.render=()=>{fixture.rendered=true;};
+  context.formFooter=()=>'';
+  context.crypto={randomUUID:()=> '12345678-1234-1234-1234-123456789abc'};
+  context.document.getElementById=id=>forms.get(id) || null;
+  fixture.form=id=>{
+    const form={addEventListener(type,handler){this[type]=handler;}};
+    forms.set(id,form); return form;
+  };
+  space.submit=(form,task)=>fixture.pending=task(new Map(Object.entries(fixture.values || {})));
+  fixture.state.data.diagrams=[{id:10,name:'Map',version:1}];
+  fixture.state.data.mindspace.items.find(item=>item.id===4).diagram_version=1;
+  return fixture;
+}
+
+test('sidebar includes documents in every space, nested folders and contextual Add buttons',()=>{
+  const {space}=multiple(); const html=space.sidebar();
+  for (const name of ['Note','Map','Work note','Parent','Child','Work folder']) assert.ok(html.includes(`>${name}</span>`), name);
+  assert.ok(html.includes('data-space="100" data-parent="2"'));
+  assert.ok(html.includes('data-space="200" data-parent="5"'));
+  assert.equal((html.match(/data-action="ms-entry-menu"/g)||[]).length,8);
+});
+
+test('creation from a different space retains the requested destination through form submission',async()=>{
+  const f=modalFixture(), form=f.form('ms-create-form'); let request;
+  f.home.makeRequest=async(action,data)=>{request={action,...data};return {id:7,...data,content:{text:''}};};
+  await f.space.newForm('notes',{spaceId:100,parent:2});
+  assert.match(f.modal.html, /value="2" selected/);
+  assert.ok(!f.modal.html.includes('Work folder'));
+  f.values={name:'New child',parent:'2'};form.submit({preventDefault(){}});await f.pending;
+  assert.equal(request.mindspace_id,100);assert.equal(request.parent_id,2);
+  assert.equal(new URL(f.location.assigned).searchParams.get('space'),'100');
+});
+
+test('renaming an inactive diagram preserves the active editor and updates only that diagram',async()=>{
+  const f=modalFixture(), form=f.form('ms-rename-form');
+  f.home.active={id:20,name:'Other map',version:9};f.home.diagramTitle='Other map';
+  f.home.makeRequest=async(action,data)=>({...f.space.allItems().find(i=>i.id===data.id),name:data.name,version:2,diagram_version:2});
+  await f.space.rename(4);
+  f.values={name:'Renamed map'};form.submit({preventDefault(){}});await f.pending;
+  assert.equal(f.space.active.id,6);assert.equal(f.space.draft.text,'work');
+  assert.equal(f.home.active.name,'Other map');assert.equal(f.home.diagramTitle,'Other map');
+  assert.equal(f.state.data.diagrams[0].name,'Renamed map');
+});
+
+test('renaming a space updates its catalog without selecting it',async()=>{
+  const f=modalFixture(), form=f.form('ms-rename-form');
+  f.home.makeRequest=async(action,data)=>({id:data.id,name:data.name});
+  await f.space.rename(100,true);f.values={name:'Personal'};form.submit({preventDefault(){}});await f.pending;
+  assert.equal(f.space.spaceName(100),'Personal');assert.equal(f.state.data.mindspace.name,'Personal');
+  assert.equal(f.space.active.id,6);assert.equal(f.space.spaceId(),200);
+});
+
+test('deleting the current nondefault space at its root navigates to a surviving space',async()=>{
+  const f=modalFixture('http://localhost/?space=200&folder=0'), form=f.form('ms-delete-form');
+  f.home.makeRequest=async()=>({id:200});
+  await f.space.deleteForm(200,true);form.submit({preventDefault(){}});await f.pending;
+  assert.equal(new URL(f.location.assigned).searchParams.get('space'),'100');
+  assert.equal(f.space.allItems().some(item=>item.id===5||item.id===6),false);
+});
+
+test('deleting a folder containing the open document navigates to its parent',async()=>{
+  const f=modalFixture(), form=f.form('ms-delete-form');f.home.makeRequest=async()=>({id:5,deleted_ids:[5,6]});
+  await f.space.deleteForm(5);form.submit({preventDefault(){}});await f.pending;
+  const url=new URL(f.location.assigned);assert.equal(url.searchParams.get('space'),'200');assert.equal(url.searchParams.get('folder'),'0');
+  assert.equal(f.space.allItems().some(item=>item.id===5||item.id===6),false);assert.equal(f.space.active,null);
+});
+
+test('failed deletion keeps the editor and item catalog intact',async()=>{
+  const f=modalFixture(), form=f.form('ms-delete-form');f.home.makeRequest=async()=>{throw new Error('offline');};
+  await f.space.deleteForm(5);form.submit({preventDefault(){}});await assert.rejects(f.pending,/offline/);
+  assert.equal(f.space.active.id,6);assert.equal(f.space.allItems().length,6);assert.equal(f.location.assigned,undefined);
+});
+
+test('drag and drop cannot silently move an item to a different space root',()=>{
+  const {space}=multiple();
+  assert.equal(space.canDrop(6,{dataset:{msDrop:'0',msSpace:'100'}}),false);
+  assert.equal(space.canDrop(6,{dataset:{msDrop:'0',msSpace:'200'}}),true);
+  assert.equal(space.canDrop(6,{dataset:{msDrop:'1'}}),false);
+});
+
+
+test('deleting the final space clears its URL and leaves no synthetic replacement in the sidebar',async()=>{
+  const f=modalFixture('http://localhost/?space=200&folder=0'), form=f.form('ms-delete-form');
+  f.state.data.mindspace.spaces=[{id:200,name:'Work'}];f.state.data.mindspace.id=200;
+  f.state.data.mindspace.items=f.space.allItems().filter(item=>item.mindspace_id===200);
+  f.home.makeRequest=async()=>({id:200});
+  await f.space.deleteForm(200,true);form.submit({preventDefault(){}});await f.pending;
+  const url=new URL(f.location.assigned);assert.equal(url.searchParams.has('space'),false);assert.equal(url.searchParams.get('folder'),'0');
+  assert.equal(f.space.spaces().length,0);assert.equal(f.space.allItems().length,0);assert.equal(f.space.explorer(),'');
 });

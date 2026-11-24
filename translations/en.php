@@ -3,7 +3,12 @@ declare(strict_types=1);
 return [
     'ms_sidebar_add' => 'Add',
     'ms_new_space' => 'New MindSpace',
-    'ms_new_space_hint' => 'A space with its own folders and documents.',
+    'ms_new_space_hint' => 'A separate space alongside your other spaces.',
+    'ms_options_for' => 'Options for {name}',
+    'ms_create_kind' => 'Add {kind}',
+    'ms_delete_container_confirm' => 'Delete “{name}” and everything inside it? This cannot be undone. Habits in My habits are kept.',
+    'ms_delete_item_confirm' => 'Delete “{name}”? This cannot be undone.',
+    'ms_delete_habits_hint' => 'Habits in My habits are kept.',
     'ms_add_in' => 'Add to {name}',
     'error_mindspace_destination' => 'Choose a folder in this MindSpace.',
     'date' => 'Date',

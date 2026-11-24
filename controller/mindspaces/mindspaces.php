@@ -10,6 +10,9 @@ final class MindSpacesController
         return match ($action) {
             'mindspace' => $model->get(),
             'createMindSpace' => $model->createSpace($data),
+            'renameMindSpace' => $model->renameSpace($data),
+            'deleteMindSpace' => $model->deleteSpace($data),
+            'deleteMindSpaceItem' => $model->delete($data),
             'createMindSpaceItem' => $model->create($data),
             'saveMindSpaceItem' => $model->save($data),
             'addMindSpaceHabit' => $model->addHabit($data),
