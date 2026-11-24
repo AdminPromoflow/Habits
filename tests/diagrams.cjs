@@ -2350,3 +2350,51 @@ test('the picker pauses background redraws and cannot open during a diagram swit
   assert.equal(home.pickerOpen, false);
   assert.equal(picker.menu.hidden, true);
 });
+
+test('Delete and the Mac Backspace key remove the selected branch and persist its deletion', async () => {
+  for (const key of ['Delete', 'Backspace']) {
+    const { home, branch, handleKey, state, node, document } = branchDragEditor();
+    home.nodes.push({ id: 'deep', parent_id: 'leaf', text: 'Deep task' });
+    home.active.nodes = JSON.parse(JSON.stringify(home.nodes));
+    home.selectNode('branch');
+    branch.node.focus();
+    const kept = JSON.parse(JSON.stringify(home.nodes.filter(n => ['root', 'sibling'].includes(n.id))));
+    assert.equal(handleKey(key, branch.node).prevented, true);
+    await new Promise(setImmediate);
+    assert.deepEqual(JSON.parse(JSON.stringify(home.active.nodes)), kept);
+    assert.equal(home.selectedKey, 'root');
+    assert.equal(document.activeElement, node);
+    assert.equal(home.hasChanges(), false);
+    const restored = editor({ draft: false, state: JSON.parse(JSON.stringify(state)) });
+    restored.home.render();
+    assert.deepEqual(JSON.parse(JSON.stringify(restored.home.nodes)), kept);
+  }
+});
+
+test('Delete ignores text editing, unselected nodes, key repeats and competing gestures', async () => {
+  const { home, branch, handleKey, titleInput, outside, node } = branchDragEditor();
+  let calls = 0;
+  home.nodeTools.remove = () => { calls++; };
+  home.selectNode('branch');
+  handleKey('Delete', branch.field);
+  handleKey('Backspace', titleInput);
+  handleKey('Delete', outside);
+  handleKey('Delete', node);
+  for (const flag of ['editing', 'titleEditing', 'layoutOpen', 'switching', 'drag', 'resizing']) {
+    home[flag] = true;
+    handleKey('Delete', branch.node);
+    home[flag] = false;
+  }
+  for (const modifier of ['repeat', 'isComposing', 'ctrlKey', 'metaKey', 'altKey', 'shiftKey']) {
+    handleKey('Delete', branch.node, { [modifier]: true });
+  }
+  home.nodeTools.busy = true;
+  handleKey('Delete', branch.node);
+  home.nodeTools.busy = false;
+  home.selected = false;
+  handleKey('Delete', branch.node);
+  assert.equal(calls, 0);
+  home.selectNode('branch');
+  handleKey('Delete', branch.node);
+  assert.equal(calls, 1);
+});
