@@ -23,6 +23,9 @@ class DiagramColors {
     const values=[this.luminance(a),this.luminance(b)];
     return (Math.max(...values)+.05)/(Math.min(...values)+.05);
   }
+  static stroke(paint,background) {
+    return [paint.border,paint.fill,paint.text].find(color=>this.contrast(color,background)>=3) || paint.text;
+  }
   static paint(fill) {
     const rgb = fill.match(/[\da-f]{2}/gi).map(value => parseInt(value,16));
     const luminance = this.luminance(fill);
@@ -57,13 +60,13 @@ class DiagramColors {
     if (!paint) return '';
     // Keep connections visible on Night and on custom backgrounds as well.
     const background=this.background();
-    return [paint.border,paint.fill,paint.text].find(color=>DiagramColors.contrast(color,background)>=3) || paint.text;
+    return DiagramColors.stroke(paint,background);
   }
   background() { return this.home.canvasColor || DiagramColors.theme(this.home.colorTheme).background; }
   preview(theme) {
     const nodes = [[104,54,theme.root],[13,17,theme.colors[0]],[195,17,theme.colors[1%theme.colors.length]],
       [13,91,theme.colors[2%theme.colors.length]],[195,91,theme.colors[3%theme.colors.length]]];
-    return `<svg viewBox="0 0 280 130" aria-hidden="true"><rect width="280" height="130" rx="10" fill="${theme.background}"/>${nodes.slice(1).map(([x,y,color])=>`<path d="M140 65 Q${x<100?95:185} 65 ${x+36} ${y+11}" fill="none" stroke="${DiagramColors.paint(color).border}" stroke-width="2"/>`).join('')}${nodes.map(([x,y,color])=>`<rect x="${x}" y="${y}" width="72" height="22" rx="8" fill="${color}" stroke="${DiagramColors.paint(color).border}"/><path d="M${x+18} ${y+11}h36" stroke="${DiagramColors.paint(color).text}" stroke-opacity=".45" stroke-linecap="round"/>`).join('')}</svg>`;
+    return `<svg viewBox="0 0 280 130" aria-hidden="true"><rect width="280" height="130" rx="10" fill="${theme.background}"/>${nodes.slice(1).map(([x,y,color])=>`<path d="M140 65 Q${x<100?95:185} 65 ${x+36} ${y+11}" fill="none" stroke="${DiagramColors.stroke(DiagramColors.paint(color),theme.background)}" stroke-width="2"/>`).join('')}${nodes.map(([x,y,color])=>`<rect x="${x}" y="${y}" width="72" height="22" rx="8" fill="${color}" stroke="${DiagramColors.paint(color).border}"/><path d="M${x+18} ${y+11}h36" stroke="${DiagramColors.paint(color).text}" stroke-opacity=".45" stroke-linecap="round"/>`).join('')}</svg>`;
   }
   open() {
     const home=this.home;

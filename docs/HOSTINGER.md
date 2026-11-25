@@ -83,6 +83,10 @@ El modelo documentado desde las migraciones está en [database-model](database-m
 
 ## Verificación en producción
 
+Para esta instalación, verificar siempre la base publicada desde Hostinger/phpMyAdmin en Chrome al revisar cambios o incidencias; las pruebas locales no sustituyen esa comprobación. Utilizar consultas de solo lectura para revisar migraciones, columnas y datos, y comprobar también la carga real del sitio.
+
+El 24 de noviembre de 2026 se revisó un aviso `error_server` que desapareció al reintentar; la usuaria confirmó su recuperación. En Chrome, la petición publicada `controller/dashboard/index.php?action=bootstrap` respondió **200** y el diagrama abrió correctamente. La causa del aviso puntual no quedó identificada. En Hostinger se verificaron la migración 017 y su checksum, los tres campos de colores mediante `SHOW COLUMNS`, un diagrama con diez nodos, cero nodos huérfanos y cero documentos con JSON inválido. No se modificaron datos durante esta comprobación.
+
 ### Colores del diagrama — 24 de noviembre de 2026
 
 Se verificó la instalación publicada en Chrome. La base tenía las migraciones 001–016, pero faltaban los campos de colores. Se aplicó `017_diagram_colors.sql` mediante phpMyAdmin y se registró el SHA-256 `a980129b25bcad7cb3ba598808673ebf3cf883daf1aa5268412c1d7fa6e9e7c5`. La comprobación posterior confirmó `color_theme VARCHAR(32)`, `diagram_color CHAR(7)` y `canvas_color CHAR(7)`, todos anulables, y el checksum correcto. Se conservaron un diagrama y diez nodos; no había documentos MindSpace con JSON inválido.
