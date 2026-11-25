@@ -4,7 +4,7 @@
 .diagram-colors-dialog .diagram-layout-header { align-items: flex-start; }
 .diagram-colors-dialog .diagram-layout-header p { margin: 7px 0 0; color: var(--muted); font-size: .875rem; line-height: 1.5; }
 .diagram-colors-body { padding: 20px 24px; }
-.diagram-color-themes { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; }
+.diagram-color-themes { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; }
 .diagram-color-card { position: relative; padding: 7px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--ink); min-width: 0; text-align: left; }
 .diagram-color-card > svg { display: block; width: 100%; height: auto; }
 .diagram-color-card > span:not(.diagram-color-check) { display: block; padding: 9px 5px 4px; font-size: .8125rem; font-weight: 600; }
@@ -16,10 +16,14 @@
 .diagram-color-custom label { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: .8125rem; }
 .diagram-color-custom input[type="color"] { width: 44px; height: 36px; min-width: 44px; border: 0; padding: 2px; background: transparent; cursor: pointer; }
 .diagram-color-preview { margin-bottom: 12px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-.diagram-color-preview svg { display: block; width: 100%; max-height: 160px; }
+.diagram-color-preview svg { display: block; width: 100%; max-height: 110px; }
 @media (max-width: 520px) {
   .diagram-colors-body { padding: 16px; }
-  .diagram-color-themes { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
-  .diagram-color-custom { grid-template-columns: 1fr; }
+  .diagram-color-themes { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+  .diagram-color-card { padding: 5px; }
+  .diagram-color-card > span:not(.diagram-color-check) { padding: 8px 2px 3px; font-size: .75rem; }
+  .diagram-color-check { right: 6px; bottom: 7px; font-size: .75rem; }
+  .diagram-color-custom { margin-top: 16px; }
+  .diagram-color-custom label { flex-direction: column; align-items: flex-start; padding: 10px; }
   .diagram-colors-dialog .diagram-layout-header { padding: 16px; }
 }

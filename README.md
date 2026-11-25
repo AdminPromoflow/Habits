@@ -92,6 +92,8 @@ Aplica **015_mindspace_shares.sql** y **016_mindspace_share_permissions.sql** co
 
 ## Editor de diagramas
 
+El icono de **paleta**, situado sobre el cuadro seleccionado, abre **Colores del diagrama**. Ofrece siete combinaciones con vistas previas y dos controles: **Color del diagrama** y **Color del fondo**. Las combinaciones asignan colores por rama; elegir un color personalizado colorea todos los cuadros. **Aplicar** guarda, **Cancelar** descarta y **Restablecer colores** recupera la combinación original. Los colores se conservan al recargar, al deshacer y en el PDF. Requiere la migración `017_diagram_colors.sql`, mediante `php bin/migrate.php`.
+
 En los tres puntos, **Enlace** (primera opción de la segunda fila) permite elegir cualquier elemento de tus MindSpaces: diagramas, hojas de cálculo, Kanban - Scrum, hábitos, notas y carpetas. Cada opción muestra el espacio y la ruta de carpetas. Puedes enlazar el **elemento completo** o seleccionar un **cuadro del diagrama**, una **celda de la hoja**, una **columna**, una **tarjeta** o un **hábito**. Las notas y carpetas se abren completas.
 
 La vista previa de Kanban - Scrum muestra sus cuatro columnas predeterminadas y las columnas añadidas, con las tarjetas agrupadas por estado. Pulsar el encabezado elige la columna completa, incluso si está vacía; pulsar una tarjeta elige solo esa tarjeta. También se puede elegir desde las opciones **Elemento completo / Columna / Tarjeta** y el selector inferior. Un enlace a columna conserva su estado de destino aunque sus tarjetas cambien de estado, abre la columna enfocada y resaltada y muestra su flecha de regreso en el encabezado.

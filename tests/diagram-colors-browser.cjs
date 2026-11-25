@@ -78,6 +78,11 @@ const base='http://127.0.0.1:8785';
     await open();
     const bounds=await page.locator('.diagram-colors-dialog').boundingBox();
     assert.ok(bounds.x>=0 && bounds.width<=390 && bounds.height<=844);
+    const footer=await page.locator('.diagram-colors-dialog .diagram-layout-footer').boundingBox();
+    for(const field of ['diagram','canvas']) {
+      const control=await page.locator(`[data-custom-color=${field}]`).boundingBox();
+      assert.ok(control.y+control.height<footer.y,'both color controls are visible above the footer on mobile');
+    }
     await page.locator('[data-color-theme=pastel]').click();
     await page.locator('.diagram-colors-dialog').screenshot({path:'tests/.runtime/diagram-colors-dialog-mobile.png'});
     await page.locator('[data-colors-apply]').click();await settled();

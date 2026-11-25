@@ -97,6 +97,7 @@ class DiagramColors {
     dialog.querySelectorAll('[data-color-theme]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.colorTheme===this.choice && !this.diagramColor && !this.canvasColor)));
     dialog.querySelector('[data-custom-color="diagram"]').value=this.diagramColor || theme.root;
     dialog.querySelector('[data-custom-color="canvas"]').value=this.canvasColor || theme.background;
+    dialog.querySelector('[data-colors-preview]').style.backgroundColor=this.canvasColor || theme.background;
     dialog.querySelector('[data-colors-preview]').innerHTML=this.preview({...theme,background:this.canvasColor || theme.background,
       root:this.diagramColor || theme.root,colors:this.diagramColor?[this.diagramColor]:theme.colors});
   }
