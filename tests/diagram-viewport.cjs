@@ -51,6 +51,7 @@ function harness({ storage = new Map(), storageError = false } = {}) {
       },
       emit(type, input = {}) {
         const event = {
+          type,
           target: this,
           pointerId: 7, button: 0, clientX: 400, clientY: 250,
           deltaX: 0, deltaY: 0, deltaMode: 0,
@@ -89,6 +90,10 @@ function harness({ storage = new Map(), storageError = false } = {}) {
           if (selectors.split(',').some((selector) => candidate.matches(selector.trim()))) return candidate;
         }
         return null;
+      },
+      contains(target) {
+        for (let element = target; element; element = element.parentElement) if (element === this) return true;
+        return false;
       },
     };
   }
@@ -355,6 +360,76 @@ test('Safari falls back to the last pointer when gesture coordinates are absent'
   const syntheticOrigin = worldAt(camera, surface, 600, 150);
   almost(syntheticOrigin[0], expected[0]);
   almost(syntheticOrigin[1], expected[1]);
+});
+
+test('lifting fingers keeps the last Safari zoom even when the final event resets its scale and centroid', () => {
+  const {camera, surface} = harness();
+  surface.emit('gesturestart', {clientX:600, clientY:220});
+  surface.emit('gesturechange', {scale:1.7, clientX:630, clientY:240});
+  const final = [camera.x, camera.y, camera.scale];
+  surface.emit('gestureend', {scale:1, clientX:0, clientY:0});
+  assert.deepEqual([camera.x, camera.y, camera.scale], final);
+  assert.equal(camera.isInteracting(), false);
+});
+
+test('a full-screen Safari canvas retains its latest centroid when coordinates become synthetic', () => {
+  const {camera, surface} = harness();
+  surface.getBoundingClientRect = () => ({left:0, top:0, width:800, height:500});
+  surface.emit('gesturestart', {clientX:300, clientY:200});
+  surface.emit('gesturechange', {scale:1.2, clientX:350, clientY:230});
+  const expected = worldAt(camera, surface, 350, 230);
+  surface.emit('gesturechange', {scale:1.8, clientX:0, clientY:0});
+  const actual = worldAt(camera, surface, 350, 230);
+  almost(actual[0], expected[0]); almost(actual[1], expected[1]);
+});
+
+test('two-finger touch zoom follows the midpoint and ends without a second zoom or a remaining-finger pan', () => {
+  const {camera, surface} = harness();
+  const finger = (identifier, clientX, clientY = 250) => ({identifier,clientX,clientY,target:surface});
+  surface.emit('pointerdown', {pointerType:'touch',pointerId:1,clientX:350});
+  surface.emit('pointermove', {pointerType:'touch',pointerId:1,clientX:370});
+  const expected = worldAt(camera, surface, 350, 200);
+  assert.equal(surface.emit('touchstart', {touches:[finger(1,350),finger(2,550)]}).prevented, true);
+  assert.equal(camera.pan, null);
+  surface.emit('touchmove', {touches:[finger(1,270,280),finger(2,670,280)]});
+  assert.equal(camera.scale, 2);
+  const actual = worldAt(camera, surface, 370, 230);
+  almost(actual[0],expected[0]); almost(actual[1],expected[1]);
+  const final = [camera.x,camera.y,camera.scale];
+  surface.emit('gesturestart');
+  surface.emit('gesturechange', {scale:2});
+  surface.emit('gestureend', {scale:1});
+  surface.emit('wheel', {ctrlKey:true,deltaY:-30});
+  assert.deepEqual([camera.x,camera.y,camera.scale],final);
+  surface.emit('touchend', {touches:[finger(1,270,280)]});
+  surface.emit('pointermove', {pointerType:'touch',pointerId:1,clientX:280,clientY:285});
+  surface.emit('touchend', {touches:[]});
+  surface.emit('gesturestart');
+  assert.deepEqual([camera.x,camera.y,camera.scale],final);
+  assert.equal(camera.isInteracting(),false);
+  assert.equal(surface.emit('click').prevented,true);
+});
+
+test('touch zoom handles cancellation and limits, releases a pending node drag and ignores editor controls', () => {
+  const {camera, surface, element, setAllowed} = harness();
+  const node = element({classes:['diagram-root'],parent:surface});
+  const touch = (identifier,clientX,target=node) => ({identifier,clientX,clientY:250,target});
+  setAllowed(false);
+  let released = 0;
+  camera.onPinchStart = () => {released++;setAllowed(true);};
+  surface.emit('touchstart', {touches:[touch(1,400),touch(2,500)]});
+  assert.equal(released,1);
+  surface.emit('touchmove', {touches:[touch(1,0),touch(2,900)]});
+  assert.equal(camera.scale,3);
+  surface.emit('touchmove', {touches:[touch(1,449),touch(2,451)]});
+  assert.equal(camera.scale,.2);
+  const final = [camera.x,camera.y,camera.scale];
+  surface.emit('touchcancel', {touches:[]});
+  assert.equal(camera.isInteracting(),false);
+  assert.deepEqual([camera.x,camera.y,camera.scale],final);
+  const input = element({tag:'textarea',parent:node});
+  assert.equal(surface.emit('touchstart', {touches:[touch(1,400,input),touch(2,500)]}).prevented,false);
+  assert.equal(released,1);
 });
 
 test('cancellation, capture loss, and window blur end gestures without resetting the view', () => {

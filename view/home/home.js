@@ -14,6 +14,7 @@ class HomePage extends PageController {
     this.generation = 0;
     this.viewport = new DiagramViewport({
       canInteract: () => !this.drag && !this.resizing && !this.connectionTool?.drag && !this.connectionTool?.editingRoute && !this.layoutOpen && !this.titleEditing,
+      onPinchStart: () => this.finishNodeDrag(),
       onInteractionStart: () => {
         this.menuOpen = false;
         this.syncNodeState();

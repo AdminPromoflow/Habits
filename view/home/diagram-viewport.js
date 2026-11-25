@@ -2,9 +2,10 @@
 
 // The camera is view state only. Diagram coordinates and saved layouts stay intact.
 class DiagramViewport {
-  constructor({ canInteract = () => true, onInteractionStart = () => {} } = {}) {
+  constructor({ canInteract = () => true, onInteractionStart = () => {}, onPinchStart = () => {} } = {}) {
     this.canInteract = canInteract;
     this.onInteractionStart = onInteractionStart;
+    this.onPinchStart = onPinchStart;
     this.x = 0;
     this.y = 0;
     this.scale = 1;
@@ -30,6 +31,10 @@ class DiagramViewport {
       gesturestart: (event) => this.gestureStart(event),
       gesturechange: (event) => this.gestureChange(event),
       gestureend: (event) => this.gestureEnd(event),
+      touchstart: (event) => this.touchStart(event),
+      touchmove: (event) => this.touchMove(event),
+      touchend: (event) => this.touchEnd(event),
+      touchcancel: (event) => this.touchEnd(event),
       click: (event) => this.suppressClick(event),
     };
     this.onBlur = () => this.cancelInteraction();
@@ -56,7 +61,7 @@ class DiagramViewport {
 
   listenerOptions(type) {
     return type === 'click' ? { capture: true }
-      : ['wheel', 'gesturestart', 'gesturechange', 'gestureend'].includes(type)
+      : ['wheel', 'gesturestart', 'gesturechange', 'gestureend', 'touchstart', 'touchmove', 'touchend', 'touchcancel'].includes(type)
         ? { passive: false } : false;
   }
 
@@ -191,9 +196,8 @@ class DiagramViewport {
 
   gesturePoint(event, fallback = null) {
     // Some Safari trackpads report a synthetic (0, 0) instead of a centroid.
-    // Keep the last point on this canvas when that origin is outside it.
-    const box = this.stage.getBoundingClientRect();
-    if (event.clientX === 0 && event.clientY === 0 && (box.left > 0 || box.top > 0)) {
+    // Keep the last centroid, including when the canvas fills the screen.
+    if (event.clientX === 0 && event.clientY === 0) {
       return this.point({}, fallback);
     }
     return this.point(event, fallback);
@@ -306,6 +310,10 @@ class DiagramViewport {
   }
 
   gestureStart(event) {
+    if (this.gesture?.touchIds || Date.now() < this.nativeGestureUntil) {
+      event.preventDefault();
+      return;
+    }
     if (!this.allowed(event)) return;
     event.preventDefault();
     this.finishPan();
@@ -323,6 +331,7 @@ class DiagramViewport {
     const gesture = this.gesture;
     if (!gesture) return;
     event.preventDefault();
+    if (gesture.touchIds) return;
     if (!this.canInteract()) {
       this.cancelInteraction();
       return;
@@ -334,6 +343,7 @@ class DiagramViewport {
     this.y = point.y - this.stage.clientHeight / 2 - gesture.worldY * scale;
     this.scale = scale;
     this.render();
+    gesture.point = point;
     gesture.worldX = (point.x - this.stage.clientWidth / 2 - this.x) / scale;
     gesture.worldY = (point.y - this.stage.clientHeight / 2 - this.y) / scale;
   }
@@ -341,9 +351,67 @@ class DiagramViewport {
   gestureEnd(event) {
     if (!this.gesture) return;
     event.preventDefault();
-    this.gestureChange(event);
+    if (this.gesture.touchIds) return;
+    // Safari can report a different centroid/scale as the fingers lift.
+    // The last change event already rendered the final stable camera position.
     this.gesture = null;
     this.nativeGestureUntil = Date.now() + 150;
+  }
+
+  touchFrame(touches) {
+    const [first, second] = touches;
+    return {
+      point: this.point({clientX: (first.clientX + second.clientX) / 2, clientY: (first.clientY + second.clientY) / 2}),
+      distance: Math.hypot(second.clientX - first.clientX, second.clientY - first.clientY),
+    };
+  }
+
+  touchStart(event) {
+    if (this.gesture?.touchIds) { event.preventDefault(); return; }
+    const touches = Array.from(event.touches);
+    if (touches.length !== 2 || !this.stage || !this.content ||
+        touches.some(touch => !this.stage.contains(touch.target) || this.ignoredTarget(touch.target))) return;
+    // A first finger on a selected node may have armed a node drag.
+    this.onPinchStart();
+    if (!this.canInteract()) return;
+    const {point, distance} = this.touchFrame(touches);
+    if (!distance) return;
+    event.preventDefault();
+    this.finishPan();
+    this.gesture = {
+      touchIds: touches.map(touch => touch.identifier), distance, scale: this.scale, point,
+      worldX: (point.x - this.stage.clientWidth / 2 - this.x) / this.scale,
+      worldY: (point.y - this.stage.clientHeight / 2 - this.y) / this.scale,
+    };
+    this.onInteractionStart();
+  }
+
+  touchMove(event) {
+    const gesture = this.gesture;
+    if (!gesture?.touchIds) return;
+    event.preventDefault();
+    if (!this.canInteract()) { this.cancelInteraction(); return; }
+    const touches = Array.from(event.touches).filter(touch => gesture.touchIds.includes(touch.identifier));
+    if (touches.length !== 2) return;
+    const {point, distance} = this.touchFrame(touches);
+    const scale = Math.max(Math.min(0.2, gesture.scale), Math.min(3, gesture.scale * distance / gesture.distance));
+    this.x = point.x - this.stage.clientWidth / 2 - gesture.worldX * scale;
+    this.y = point.y - this.stage.clientHeight / 2 - gesture.worldY * scale;
+    this.scale = scale;
+    this.render();
+    gesture.worldX = (point.x - this.stage.clientWidth / 2 - this.x) / scale;
+    gesture.worldY = (point.y - this.stage.clientHeight / 2 - this.y) / scale;
+    gesture.point = point;
+  }
+
+  touchEnd(event) {
+    if (!this.gesture?.touchIds) return;
+    event.preventDefault();
+    const remaining = Array.from(event.touches).filter(touch => this.gesture.touchIds.includes(touch.identifier));
+    if (event.type !== 'touchcancel' && remaining.length === 2) return;
+    this.gesture = null;
+    this.suppressClickUntil = Date.now() + 300;
+    this.nativeGestureUntil = Date.now() + 300;
   }
 
   cancelInteraction() {
