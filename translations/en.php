@@ -580,7 +580,7 @@ return [
     'ms_template_projects_hint' => 'Tasks, owners, status, dates and notes in one place.',
     'ms_template_blank' => 'Blank sheet',
     'ms_template_blank_hint' => 'An empty grid for your own layout and formulas.',
-    'ms_template_calculated_hint' => 'Template headers and calculated columns are protected. Add rows to keep growing your sheet.',
+    'ms_template_calculated_hint' => 'Template headers and calculated columns are protected. Pasting rows from Excel expands the sheet automatically.',
     'ms_ledger_hint' => 'Dates: YYYY-MM-DD or DD/MM/YYYY. Amounts: 1250.50, without thousands separators; rounded to two decimals. Colors follow each row’s month.',
     'ms_ledger_totals' => 'Ledger totals',
     'ms_ledger_totals_hint' => 'All transactions · all months',

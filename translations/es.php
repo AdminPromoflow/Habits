@@ -580,7 +580,7 @@ return [
     'ms_template_projects_hint' => 'Tareas, responsables, estado, fechas y notas en un solo lugar.',
     'ms_template_blank' => 'Hoja en blanco',
     'ms_template_blank_hint' => 'Una cuadrícula vacía para tu propia estructura y fórmulas.',
-    'ms_template_calculated_hint' => 'Los encabezados y las columnas calculadas están protegidos. Añade filas para ampliar la hoja.',
+    'ms_template_calculated_hint' => 'Los encabezados y las columnas calculadas están protegidos. Al pegar filas desde Excel, la hoja se amplía automáticamente.',
     'ms_ledger_hint' => 'Fechas: AAAA-MM-DD o DD/MM/AAAA. Importes: 1250.50, sin separador de miles; se redondean a dos decimales. Las filas toman el color de su mes.',
     'ms_ledger_totals' => 'Totales del libro',
     'ms_ledger_totals_hint' => 'Todos los movimientos · todos los meses',
