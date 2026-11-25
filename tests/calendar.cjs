@@ -28,3 +28,11 @@ test('all calendar views combine habits and tasks without leaking markup and pre
   assert.ok(plannerDay().includes('&lt;Task&gt;'));
   assert.ok(!plannerDay().includes('<Task>'));
 });
+test('monthly date lists, month intervals, selected annual months and ordinal weekdays match',()=>{
+  const monthly={...base,start_date:'2024-01-01',recurrence_rule:{month_mode:'dates',month_days:[5,20],interval:2}};
+  for(const [date,expected] of Object.entries({'2024-01-05':true,'2024-01-20':true,'2024-02-05':false,'2024-03-20':true,'2024-03-21':false})) assert.equal(scheduled(monthly,date),expected,date);
+  const annual={...monthly,recurrence:'yearly',recurrence_rule:{month_mode:'dates',month_days:[5,20],months:[2,5,11]}};
+  for(const [date,expected] of Object.entries({'2024-02-05':true,'2024-03-05':false,'2024-11-20':true,'2025-05-05':true})) assert.equal(scheduled(annual,date),expected,date);
+  const ordinal={...monthly,recurrence_rule:{month_mode:'weekdays',positions:[1,-1],weekdays:[1],interval:1}};
+  for(const [date,expected] of Object.entries({'2024-02-05':true,'2024-02-12':false,'2024-02-26':true,'2024-02-27':false,'2024-04-29':true})) assert.equal(scheduled(ordinal,date),expected,date);
+});

@@ -18,6 +18,7 @@ return [
     'completeCalendarTask' => 'calendar',
     'deleteCalendarTask' => 'calendar',
     'archiveHabit' => 'habits',
+    'deleteHabit' => 'habits',
     'complete' => 'habits',
     'saveCategory' => 'categories',
     'joinCategory' => 'categories',

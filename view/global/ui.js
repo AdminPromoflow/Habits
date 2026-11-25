@@ -137,15 +137,18 @@ function habitCategory(h) {
 function scheduled(h, date) {
   if (date < (h.tracking_start || h.start_date) || date < h.start_date || (h.end_date && date > h.end_date)) return false;
   const recurrence = h.recurrence || 'weekly';
-  const day = Number(date.slice(8)), anchor = Number(h.start_date.slice(8));
-  const d = dateObj(date);
-  d.setUTCMonth(d.getUTCMonth() + 1, 0);
-  const monthDay = Math.min(anchor, d.getUTCDate());
   if (recurrence === 'once') return date === h.start_date;
   if (recurrence === 'daily') return true;
-  if (recurrence === 'monthly') return day === monthDay;
-  if (recurrence === 'yearly') return date.slice(5, 7) === h.start_date.slice(5, 7) && day === monthDay;
-  return recurrence === 'weekly' && h.schedule_days.includes(dayNum(date));
+  if (recurrence === 'weekly') return h.schedule_days.includes(dayNum(date));
+  if (!['monthly','yearly'].includes(recurrence)) return false;
+  const rule = plannerRule(h), number = Number(date.slice(8));
+  const d = dateObj(date); d.setUTCMonth(d.getUTCMonth()+1,0);
+  const last = d.getUTCDate();
+  if (recurrence === 'yearly' && !(rule.months || [Number(h.start_date.slice(5,7))]).includes(Number(date.slice(5,7)))) return false;
+  const monthOffset = (Number(date.slice(0,4))-Number(h.start_date.slice(0,4)))*12+Number(date.slice(5,7))-Number(h.start_date.slice(5,7));
+  if (recurrence === 'monthly' && monthOffset % (rule.interval || 1) !== 0) return false;
+  if (rule.month_mode === 'weekdays') return rule.weekdays.includes(dayNum(date)) && (rule.positions.includes(Math.ceil(number/7)) || (number+7 > last && rule.positions.includes(-1)));
+  return (rule.month_days || [Number(h.start_date.slice(8))]).some(day => number === Math.min(day,last));
 }
 
 function completion(h, date) {

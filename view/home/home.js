@@ -1361,7 +1361,9 @@ class HomePage extends PageController {
       this.commitName();
       const node = this.ensureTree().find(item => item.id === this.selectedKey);
       this.menuOpen = false; this.syncNodeState();
-      return plannerForm(null, {name: Array.from((node?.text || '').replace(/\s+/g, ' ').trim()).slice(0, 190).join('')});
+      const source = !S.sharedWorkspace && this.active?.id ? {source_diagram_id:this.active.id, source_node_key:node.id} : {};
+      const matching = [...(S.data.calendar?.tasks || []).map(e=>({...e,kind:'task'})),...S.data.habits.filter(h=>h.permission === 'owner' && h.status === 'active').map(h=>({...h,kind:'habit'}))].find(e=>source.source_diagram_id && Number(e.source_diagram_id) === Number(source.source_diagram_id) && e.source_node_key === source.source_node_key);
+      return plannerForm(matching || null, {...source,name:Array.from((node?.text || '').replace(/\s+/g,' ').trim()).slice(0,190).join('')});
     }
     if (action === 'image-diagram-node') return this.nodeTools.openImage();
     if (action === 'labels-diagram-node') return this.nodeTools.openLabels();

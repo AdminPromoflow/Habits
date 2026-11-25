@@ -237,6 +237,7 @@ document.addEventListener('submit', async (event) => {
     if (d.confirm_password !== undefined && d.password !== d.confirm_password)
       throw new Error(t('password_mismatch'));
     delete d.confirm_password;
+    if (d.recurrence_rule !== undefined) d.recurrence_rule = JSON.parse(d.recurrence_rule);
     if (['saveHabit', 'saveTemplate'].includes(action))
       d.schedule_days = values.getAll('schedule_days').map(Number);
     for (const name of [

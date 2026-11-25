@@ -1,87 +1,114 @@
 'use strict';
 
-function plannerScheduleFields(entry = {}) {
-  const recurrence = entry.recurrence || 'once', start = entry.start_date || S.date || today();
+function plannerRule(entry) {
+  const rule = entry?.recurrence_rule;
+  if (!rule) return {};
+  if (typeof rule === 'string') { try { return JSON.parse(rule) || {}; } catch { return {}; } }
+  return rule;
+}
+
+function plannerChoices(name, label, options, selected, cls = '') {
+  return `<fieldset class="planner-choices ${cls}"><legend>${esc(t(label))}</legend><div>${options.map(([value,text]) => `<label><input type="checkbox" name="${name}" value="${value}" ${selected.includes(value) ? 'checked' : ''}><span>${esc(text)}</span></label>`).join('')}</div></fieldset>`;
+}
+
+function plannerScheduleFields(entry = {}, kind = null) {
+  const recurrence = entry.recurrence || (kind === 'habit' ? 'weekly' : 'once');
+  const start = entry.start_date || S.date || today(), rule = plannerRule(entry);
   const days = Array.isArray(entry.schedule_days) ? entry.schedule_days : [dayNum(start)];
-  return `<div class="planner-schedule">
-    <fieldset class="planner-options"><legend>${t('planner_when')}</legend>
-      <label><input type="radio" name="schedule_mode" value="once" ${recurrence === 'once' ? 'checked' : ''}><span>${t('planner_once')}</span></label>
-      <label><input type="radio" name="schedule_mode" value="repeat" ${recurrence !== 'once' ? 'checked' : ''}><span>${t('planner_repeat')}</span></label>
-    </fieldset>
-    <input type="hidden" name="recurrence" value="${esc(recurrence)}">
-    <div data-repeat-fields>${selectField('', 'planner_frequency', ['daily','weekly','monthly','yearly'].map(v => [v,t('planner_'+v)]), recurrence === 'once' ? 'weekly' : recurrence).replace('<select ', '<select data-repeat-select ')}
-    <div data-week-fields>${daysField(days)}<button class="text-btn planner-weekdays" type="button" data-select-weekdays>${t('planner_weekdays')}</button></div>
-    <p class="field-help" data-anchor-hint>${t('planner_anchor_hint')}</p></div>
-    <div class="form-grid">${field('start_date', 'planner_date', 'date', start, {required:true,min:'1000-01-01',max:'9998-12-31'})}${field('scheduled_time', 'planner_time', 'time', entry.scheduled_time?.slice(0,5) || '')}</div>
-    <div data-end-field>${field('end_date', 'planner_end', 'date', entry.end_date || '', {min:start,max:'9998-12-31'})}</div>
+  const frequency = recurrence === 'once' ? 'weekly' : recurrence;
+  return `<div class="planner-schedule" ${kind ? 'data-quick-schedule' : ''} ${kind && recurrence !== 'once' && kind === 'task' ? 'data-legacy-repeat' : ''}>
+    ${kind ? '' : `<fieldset class="planner-options"><legend>${t('planner_when')}</legend><label><input type="radio" name="schedule_mode" value="once" ${recurrence === 'once' ? 'checked' : ''}><span>${t('planner_once')}</span></label><label><input type="radio" name="schedule_mode" value="repeat" ${recurrence !== 'once' ? 'checked' : ''}><span>${t('planner_repeat')}</span></label></fieldset>`}
+    <input type="hidden" name="recurrence" value="${recurrence}"><input type="hidden" name="recurrence_rule" value="">
+    <div data-repeat-fields>
+      <fieldset class="planner-frequency"><legend>${t('planner_frequency')}</legend><div>${['yearly','monthly','weekly','daily'].map(v => `<label><input type="radio" name="repeat_frequency" value="${v}" ${frequency === v ? 'checked' : ''}><span>${t('planner_'+v)}</span></label>`).join('')}</div></fieldset>
+      <div data-week-fields>${daysField(days)}<button class="text-btn planner-weekdays" type="button" data-select-weekdays>${t('planner_weekdays')}</button></div>
+      <div data-year-fields>
+        ${selectField('month_preset','planner_month_spacing',[[0,t('planner_choose_months')],...[1,2,3,4,6,12].map(n=>[n,t('planner_every_months',{count:n})])],0)}
+        ${plannerChoices('rule_months','planner_months',Array.from({length:12},(_,i)=>[i+1,fmt(`2026-${String(i+1).padStart(2,'0')}-01`,{month:'short'})]),rule.months || [Number(start.slice(5,7))],'planner-month-choices')}
+      </div>
+      <div data-month-interval>${selectField('rule_interval','planner_month_spacing',Array.from({length:12},(_,i)=>[i+1,t('planner_every_months',{count:i+1})]),rule.interval || 1)}</div>
+      <div data-month-fields>
+        <fieldset class="planner-month-mode"><legend>${t('planner_month_pattern')}</legend><div>${['dates','weekdays'].map(v => `<label><input type="radio" name="month_mode" value="${v}" ${(rule.month_mode || 'dates') === v ? 'checked' : ''}><span>${t('planner_month_'+v)}</span></label>`).join('')}</div></fieldset>
+        <div data-month-dates>${plannerChoices('rule_month_days','planner_month_days',Array.from({length:31},(_,i)=>[i+1,String(i+1)]),rule.month_days || [Number(start.slice(8))],'planner-number-choices')}<p class="field-help">${t('planner_short_month')}</p></div>
+        <div data-month-weekdays>${plannerChoices('rule_positions','planner_which_weeks',[1,2,3,4,5,-1].map(n=>[n,t('planner_position_'+n)]),rule.positions || [Math.ceil(Number(start.slice(8))/7)],'planner-position-choices')}${plannerChoices('rule_weekdays','days',[1,2,3,4,5,6,7].map(n=>[n,dayLabel(n)]),rule.weekdays || [dayNum(start)],'planner-weekday-choices')}</div>
+      </div>
+    </div>
+    <div class="form-grid">${field('start_date',kind === 'task' ? 'planner_on_date' : 'start_date','date',start,{required:true,min:'1000-01-01',max:'9998-12-31'})}${field('scheduled_time','planner_time','time',entry.scheduled_time?.slice(0,5) || '')}</div>
+    <details data-end-field ${entry.end_date ? 'open' : ''}><summary>${t('planner_end')}</summary>${field('end_date','end_date','date',entry.end_date || '',{min:start,max:'9998-12-31'})}</details>
   </div>`;
 }
 
 function bindPlannerSchedule(form) {
-  $('[data-repeat-select]', form).setAttribute('aria-label', t('planner_frequency'));
+  const schedule = $('.planner-schedule',form);
   const sync = () => {
-    const repeat = $('[name=schedule_mode]:checked', form).value === 'repeat';
-    const frequency = $('[data-repeat-select]', form).value;
-    $('[name=recurrence]', form).value = repeat ? frequency : 'once';
-    $('[data-repeat-fields]', form).hidden = !repeat;
-    $('[data-week-fields]', form).hidden = frequency !== 'weekly';
-    $('[data-anchor-hint]', form).hidden = !['monthly','yearly'].includes(frequency);
-    $('[data-end-field]', form).hidden = !repeat;
-    $('[name=end_date]', form).disabled = !repeat;
-    $('[name=end_date]', form).min = $('[name=start_date]', form).value;
+    const quick = schedule.hasAttribute('data-quick-schedule');
+    const repeat = quick ? ($('[name=kind]:checked',form)?.value === 'habit' || schedule.hasAttribute('data-legacy-repeat')) : $('[name=schedule_mode]:checked',form).value === 'repeat';
+    const frequency = $('[name=repeat_frequency]:checked',form).value;
+    const monthMode = $('[name=month_mode]:checked',form).value;
+    $('[name=recurrence]',form).value = repeat ? frequency : 'once';
+    const visible = {repeat:repeat,week:repeat && frequency === 'weekly',year:repeat && frequency === 'yearly',month:repeat && ['monthly','yearly'].includes(frequency)};
+    for (const [section,show] of Object.entries(visible)) $(`[data-${section}-fields]`,form).hidden = !show;
+    $('[data-month-interval]',form).hidden = !repeat || frequency !== 'monthly';
+    $('[data-month-dates]',form).hidden = monthMode !== 'dates';
+    $('[data-month-weekdays]',form).hidden = monthMode !== 'weekdays';
+    $('[data-end-field]',form).hidden = !repeat;
+    $('[name=end_date]',form).disabled = !repeat;
+    $('[name=end_date]',form).min = $('[name=start_date]',form).value;
+    if (quick) $('[name=start_date]',form).previousElementSibling.textContent = t(repeat ? 'start_date' : 'planner_on_date');
+    const selected = name => $$(`[name=${name}]:checked`,form).map(input=>Number(input.value));
+    const rule = visible.month ? {month_mode:monthMode,...(monthMode === 'dates' ? {month_days:selected('rule_month_days')} : {positions:selected('rule_positions'),weekdays:selected('rule_weekdays')}),...(frequency === 'yearly' ? {months:selected('rule_months')} : {interval:Number($('[name=rule_interval]',form).value)})} : null;
+    $('[name=recurrence_rule]',form).value = JSON.stringify(rule);
   };
-  form.addEventListener('change', sync);
-  $('[data-select-weekdays]', form).addEventListener('click', () => {
-    $$('[name=schedule_days]', form).forEach(input => { input.checked = Number(input.value) <= 5; });
+  form.addEventListener('change',event => {
+    if (event.target.name === 'month_preset' && Number(event.target.value)) {
+      const interval = Number(event.target.value), startMonth = Number($('[name=start_date]',form).value.slice(5,7));
+      $$('[name=rule_months]',form).forEach(input => { input.checked = ((Number(input.value)-startMonth+12)%12)%interval === 0; });
+    }
+    if (event.target.name === 'rule_months') $('[name=month_preset]',form).value = '0';
+    sync();
+  });
+  $('[data-select-weekdays]',form).addEventListener('click',()=>{
+    $$('[name=schedule_days]',form).forEach(input=>{input.checked=Number(input.value)<=5;}); sync();
   });
   sync();
+  return sync;
 }
 
 function plannerForm(entry = null, defaults = {}) {
-  const value = entry || defaults;
-  const categories = (S.sharedWorkspace ? S.ownedWorkspace?.categories : S.data.categories) || [];
+  const value = entry || defaults, kind = entry?.kind || defaults.kind || 'task';
+  const canDelete = entry && (kind === 'task' || entry.permission === 'owner');
   openModal(entry ? 'planner_edit' : 'planner_add', `<form id="planner-form">
     ${entry ? `<input type="hidden" name="id" value="${entry.id}">` : ''}
-    ${selectField('kind', 'planner_kind', [['task',t('planner_task')],['habit',t('planner_habit')]], entry?.kind || 'task')}
-    ${field('name','planner_name','text',value.name || '',{required:true,maxlength:190})}
-    ${textarea('description','description',value.description || '')}
-    <div data-habit-fields>${selectField('category_id','category',categories.map(c => [c.id,categoryName(c)]),'',t('planner_personal_category'))}<div class="form-grid">${field('goal','goal','number',1,{min:0.01,max:999999,step:0.01})}${field('unit','unit','text','',{maxlength:40})}</div></div>
-    ${plannerScheduleFields(value)}
-    <p class="field-help">${t('planner_private')}</p>
+    ${field('name','planner_kind','text',value.name || '',{required:true,maxlength:190})}
+    <fieldset class="planner-kind"><legend>${t('planner_activity_type')}</legend><div>${['habit','task'].map(v=>`<label><input type="radio" name="kind" value="${v}" ${v === kind ? 'checked' : ''} ${entry ? 'disabled' : ''}><span>${icon(v === 'habit' ? 'habits' : 'calendar')}<strong>${t('planner_'+v)}</strong><small>${t('planner_'+v+'_hint')}</small></span></label>`).join('')}</div></fieldset>
+    ${plannerScheduleFields(value,entry && kind === 'habit' && entry.recurrence === 'once' ? null : kind)}
+    <details class="planner-description" ${value.description ? 'open' : ''}><summary>${t('planner_optional_description')}</summary>${textarea('description','description',value.description || '')}</details>
     ${entry?.recurrence && entry.recurrence !== 'once' ? `<p class="field-help">${t('planner_edit_series')}</p>` : ''}
-    ${formFooter('save', entry ? `<button type="button" class="text-btn danger" data-action="planner-delete" data-id="${entry.id}">${t('delete')}</button>` : '')}
-    </form>`, true);
+    ${formFooter('save',canDelete ? `<button type="button" class="text-btn danger" data-action="${kind === 'habit' ? 'planner-delete-habit' : 'planner-delete'}" data-id="${entry.id}">${icon('trash')}${t(kind === 'habit' ? 'planner_delete_habit' : 'planner_delete_task')}</button>` : '')}
+  </form>`,true);
+  $('#modal').classList.add('planner-dialog');
   const form = $('#planner-form');
-  $('[name=kind]', form).setAttribute('aria-label', t('planner_kind'));
-  $('[name=category_id]', form).setAttribute('aria-label', t('category'));
-  if (entry) $('[name=kind]', form).disabled = true;
-  const syncKind = () => {
-    const habit = $('[name=kind]', form).value === 'habit';
-    $('[data-habit-fields]', form).hidden = !habit;
-    $$('[data-habit-fields] input, [data-habit-fields] select', form).forEach(input => { input.disabled = !habit; });
-  };
-  $('[name=kind]',form).addEventListener('change', syncKind);
-  bindPlannerSchedule(form); syncKind();
-  form.addEventListener('submit', async event => {
+  bindPlannerSchedule(form);
+  form.addEventListener('submit',async event=>{
     event.preventDefault();
-    const submit = $('[type=submit]',form), errorBox = $('.form-error',form);
+    const submit=$('[type=submit]',form), errorBox=$('.form-error',form);
     if (submit.disabled) return;
-    errorBox.textContent = ''; submit.disabled = true;
-    const fields = new FormData(form), data = Object.fromEntries(fields);
-    data.kind = entry?.kind || data.kind;
-    data.schedule_days = fields.getAll('schedule_days').map(Number);
+    errorBox.textContent=''; submit.disabled=true;
+    const fields=new FormData(form), data=Object.fromEntries(fields);
+    data.kind=entry?.kind || data.kind;
+    data.schedule_days=fields.getAll('schedule_days').map(Number);
+    data.recurrence_rule=JSON.parse(data.recurrence_rule);
+    if (entry?.kind === 'habit') for (const key of ['category_id','routine_id','goal','unit','section']) data[key]=entry[key];
+    const source=defaults.source_diagram_id ? defaults : entry;
+    if (source?.source_diagram_id) { data.source_diagram_id=source.source_diagram_id; data.source_node_key=source.source_node_key; }
     try {
       if (data.recurrence === 'weekly' && !data.schedule_days.length) throw new Error(t('error_schedule'));
+      if (data.recurrence_rule && Object.values(data.recurrence_rule).some(v=>Array.isArray(v) && !v.length)) throw new Error(t('error_planner_selection'));
       if ((S.view === 'mindspaces' || S.sharedWorkspace) && !await pageControllers.home.mindspace.flush()) throw new Error(t('error_server'));
-      await ajaxRequest.makeRequest('saveCalendarEntry', data, {}, false);
-      // Once saved, close before refreshing so a failed refresh cannot resubmit a new entry.
-      closeModal();
-      await refresh();
-      toast(t('planner_saved'));
-    } catch (error) {
-      if (form.isConnected) errorBox.textContent = error.message;
-      else toast(error.message, true);
-    } finally { submit.disabled = false; }
+      await ajaxRequest.makeRequest('saveCalendarEntry',data,{},false);
+      closeModal(); await refresh(); toast(t('planner_saved'));
+    } catch(error) { if(form.isConnected) errorBox.textContent=error.message; else toast(error.message,true); }
+    finally { submit.disabled=false; }
   });
 }
 
@@ -95,7 +122,7 @@ function plannerEntry(entry, date, compact = false) {
   const isHabit = entry.kind === 'habit';
   return `<article class="planner-entry ${entry.completed ? 'is-done' : ''} ${isHabit ? 'is-habit' : 'is-task'} ${compact ? 'compact' : ''}">
     ${compact ? '' : `<button class="planner-check" data-action="${isHabit ? 'toggle-habit' : 'planner-complete'}" data-id="${entry.id}" data-date="${date}" aria-label="${esc(t('record_progress') + ': ' + entry.name)}" aria-pressed="${entry.completed}" ${date > today() ? 'disabled' : ''}>${entry.completed ? icon('check') : ''}</button>`}
-    <button class="planner-entry-content" data-action="${isHabit ? 'habit-detail' : 'planner-edit'}" data-id="${entry.id}" data-date="${date}"><strong>${esc(entry.name)}</strong><span>${entry.scheduled_time ? entry.scheduled_time.slice(0,5) + ' · ' : ''}${t('planner_'+entry.kind)}</span></button>
+    <button class="planner-entry-content" data-action="${isHabit ? (entry.permission === 'owner' ? 'planner-edit-habit' : 'habit-detail') : 'planner-edit'}" data-id="${entry.id}" data-date="${date}"><strong>${esc(entry.name)}</strong><span>${entry.scheduled_time ? entry.scheduled_time.slice(0,5) + ' · ' : ''}${t('planner_'+entry.kind)}</span></button>
   </article>`;
 }
 
@@ -154,7 +181,7 @@ function calendarPage() {
 
 class CalendarPage extends PageController {
   constructor() {
-    super(['date-prev','date-next','today','pick-date','calendar-date','month-prev','month-next','planner-view','planner-prev','planner-next','planner-add','planner-edit','planner-delete','planner-complete','planner-day','planner-month']);
+    super(['date-prev','date-next','today','pick-date','calendar-date','month-prev','month-next','planner-view','planner-prev','planner-next','planner-add','planner-edit','planner-delete','planner-delete-habit','planner-edit-habit','planner-complete','planner-day','planner-month']);
     document.addEventListener('change',event => {
       if (event.target.id !== 'planner-date' || !event.target.value || !event.target.validity.valid) return;
       S.date = event.target.value; S.month = S.date.slice(0,7); render();
@@ -171,6 +198,12 @@ class CalendarPage extends PageController {
 
   async handleAction(action, el, id) {
     if (action === 'planner-add') return plannerForm(null,{start_date:el.dataset.date || S.date,scheduled_time:el.dataset.time || ''});
+    if (action === 'planner-edit-habit') {
+      const habit = S.data.habits.find(h => Number(h.id) === id);
+      if (habit?.permission === 'owner') plannerForm({...habit, kind:'habit'});
+      return;
+    }
+    if (action === 'planner-delete-habit') return confirmAction('planner_delete_habit_confirm', async () => { await mutate('deleteHabit',{id}); });
     if (action === 'planner-edit') {
       const task = S.data.calendar?.tasks.find(e => Number(e.id) === id);
       if (task) plannerForm({...task,kind:'task'});

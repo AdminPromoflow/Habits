@@ -11,6 +11,7 @@ final class HabitsController
         return match ($action) {
             'saveHabit' => ['id' => $model->saveHabit($data)],
             'archiveHabit' => $model->archiveHabit($data),
+            'deleteHabit' => $model->deleteHabit($data),
             'complete' => $model->complete($data),
             default => fail('error_not_found', 404),
         };

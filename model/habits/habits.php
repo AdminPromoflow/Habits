@@ -16,6 +16,7 @@ final class Habits extends BaseModel
         foreach ($rows as &$h) {
             $h = array_merge($h, $this->access($h));
             $h['schedule_days'] = json_decode($h['schedule_days'], true);
+            $h['recurrence_rule'] = Schedule::rule($h);
             $h['progress_consent'] =
                 $this->db->one(
                     'SELECT progress_consent FROM habit_collaborators WHERE habit_id=? AND user_id=?',
@@ -77,11 +78,11 @@ final class Habits extends BaseModel
         $description = Validate::text($d, 'description', 5000, false);
         $goal = Validate::number($d['goal'] ?? 1, 0.01);
         $unit = Validate::text($d, 'unit', 40, false);
-        [$recurrence, $days, $start, $end, $time] = Schedule::fields($d + ['recurrence' => $old['recurrence'] ?? 'weekly'], $this->today());
+        [$recurrence, $days, $start, $end, $time, $rule] = Schedule::fields($d + ['recurrence' => $old['recurrence'] ?? 'weekly', 'recurrence_rule' => Schedule::rule($old ?? [])], $this->today());
         $section = Validate::text($d, 'section', 150, false);
         if ($old) {
             $this->db->run(
-                'UPDATE habits SET name=?,description=?,category_id=?,routine_id=?,goal=?,unit=?,schedule_days=?,scheduled_time=?,start_date=?,end_date=?,section=?,recurrence=? WHERE id=?',
+                'UPDATE habits SET name=?,description=?,category_id=?,routine_id=?,goal=?,unit=?,schedule_days=?,scheduled_time=?,start_date=?,end_date=?,section=?,recurrence=?,recurrence_rule=? WHERE id=?',
                 [
                     $name,
                     $description,
@@ -95,6 +96,7 @@ final class Habits extends BaseModel
                     $end,
                     $section,
                     $recurrence,
+                    $rule,
                     $id,
                 ],
             );
@@ -108,7 +110,7 @@ final class Habits extends BaseModel
             $this->activity($id, 'habit_updated');
         } else {
             $this->db->run(
-                'INSERT INTO habits(owner_user_id,category_id,routine_id,name,description,goal,unit,schedule_days,scheduled_time,start_date,end_date,section,recurrence) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                'INSERT INTO habits(owner_user_id,category_id,routine_id,name,description,goal,unit,schedule_days,scheduled_time,start_date,end_date,section,recurrence,recurrence_rule) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                 [
                     $owner,
                     $category,
@@ -123,6 +125,7 @@ final class Habits extends BaseModel
                     $end,
                     $section,
                     $recurrence,
+                    $rule,
                 ],
             );
             $id = $this->db->id();
@@ -136,6 +139,23 @@ final class Habits extends BaseModel
         $h = $this->habit((int) ($d['id'] ?? 0), 'owner', true);
         $status = Validate::choice($d['status'] ?? 'archived', ['active', 'archived']);
         $this->db->run('UPDATE habits SET status=? WHERE id=?', [$status, $h['id']]);
+    }
+
+    public function deleteHabit(array $d): void
+    {
+        $habit = $this->habit((int) ($d['id'] ?? 0), 'owner', true);
+        $id = (int) $habit['id'];
+        // Remove references without deleting the containing MindSpace document.
+        $items = $this->db->all("SELECT id,content_json FROM mindspace_items WHERE kind='habits' AND JSON_CONTAINS(content_json, ?, '$.habit_ids') FOR UPDATE", [json_encode($id)]);
+        foreach ($items as $item) {
+            $content = json_decode($item['content_json'], true);
+            $content['habit_ids'] = array_values(array_filter($content['habit_ids'], static fn($value) => (int) $value !== $id));
+            $this->db->run('UPDATE mindspace_items SET content_json=?,version=version+1 WHERE id=?', [json_encode($content),$item['id']]);
+        }
+        foreach (['habit_completions','habit_collaborators','collaboration_activity','share_habits','invitation_receipts','habit_shares'] as $table) {
+            $this->db->run("DELETE FROM $table WHERE habit_id=?", [$id]);
+        }
+        $this->db->run('DELETE FROM habits WHERE id=? AND owner_user_id=?', [$id,$this->uid()]);
     }
 
     public static function scheduled(array $h, string $date): bool

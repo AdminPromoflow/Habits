@@ -8,7 +8,7 @@ final class CalendarModel extends BaseModel
         // Keep an older installation readable until its migration is applied.
         if (!$this->db->one("SELECT version FROM schema_migrations WHERE version='018_daily_planner.sql'")) return ['tasks'=>[], 'completions'=>[]];
         $tasks = $this->db->all('SELECT * FROM calendar_tasks WHERE owner_user_id=? ORDER BY start_date,scheduled_time,id', [$this->uid()]);
-        foreach ($tasks as &$task) $task['schedule_days'] = json_decode($task['schedule_days'], true);
+        foreach ($tasks as &$task) { $task['schedule_days'] = json_decode($task['schedule_days'], true); $task['recurrence_rule'] = Schedule::rule($task); }
         return ['tasks'=>$tasks, 'completions'=>$this->db->all('SELECT c.task_id,c.completed_on FROM calendar_task_completions c JOIN calendar_tasks t ON t.id=c.task_id WHERE t.owner_user_id=?', [$this->uid()])];
     }
 
@@ -19,6 +19,7 @@ final class CalendarModel extends BaseModel
 
     public function save(array $d): array
     {
+        $source = $this->source($d);
         $kind = Validate::choice($d['kind'] ?? 'task', ['task','habit']);
         if ($kind === 'habit') {
             // Quick creation also works before the user has selected any categories.
@@ -27,21 +28,38 @@ final class CalendarModel extends BaseModel
                 $category = $this->db->one('SELECT id FROM habit_categories WHERE owner_user_id=? AND name=?', [$this->uid(), $name]);
                 $d['category_id'] = $category['id'] ?? (new CategoriesModel($this->db, $this->user))->saveCategory(['name'=>$name]);
             }
-            return ['id'=>(new Habits($this->db, $this->user))->saveHabit($d), 'kind'=>'habit'];
+            $id = (new Habits($this->db, $this->user))->saveHabit($d);
+            if ($source) $this->attachSource('habits', $id, $source);
+            return ['id'=>$id, 'kind'=>'habit'];
         }
         $id = (int) ($d['id'] ?? 0);
         if ($id) $this->task($id);
         $name = Validate::text($d, 'name');
         $description = Validate::text($d, 'description', 5000, false);
-        [$repeat,$days,$start,$end,$time] = Schedule::fields($d, $this->today());
-        $values = [$name,$description,$repeat,$days,$time,$start,$end];
+        [$repeat,$days,$start,$end,$time,$rule] = Schedule::fields($d + ['recurrence'=>'once'], $this->today());
+        $values = [$name,$description,$repeat,$days,$time,$start,$end,$rule];
         if ($id) {
-            $this->db->run('UPDATE calendar_tasks SET name=?,description=?,recurrence=?,schedule_days=?,scheduled_time=?,start_date=?,end_date=? WHERE id=? AND owner_user_id=?', [...$values,$id,$this->uid()]);
+            $this->db->run('UPDATE calendar_tasks SET name=?,description=?,recurrence=?,schedule_days=?,scheduled_time=?,start_date=?,end_date=?,recurrence_rule=? WHERE id=? AND owner_user_id=?', [...$values,$id,$this->uid()]);
         } else {
-            $this->db->run('INSERT INTO calendar_tasks(name,description,recurrence,schedule_days,scheduled_time,start_date,end_date,owner_user_id) VALUES (?,?,?,?,?,?,?,?)', [...$values,$this->uid()]);
+            $this->db->run('INSERT INTO calendar_tasks(name,description,recurrence,schedule_days,scheduled_time,start_date,end_date,recurrence_rule,owner_user_id) VALUES (?,?,?,?,?,?,?,?,?)', [...$values,$this->uid()]);
             $id = $this->db->id();
         }
+        if ($source) $this->attachSource('calendar_tasks', $id, $source);
         return ['id'=>$id, 'kind'=>'task'];
+    }
+
+    private function source(array $d): ?array
+    {
+        if (empty($d['source_diagram_id'])) return null;
+        $id = (int) $d['source_diagram_id'];
+        $key = Validate::text($d, 'source_node_key', 64);
+        if (!$this->db->one('SELECT d.id FROM diagrams d JOIN diagram_nodes n ON n.diagram_id=d.id WHERE d.id=? AND d.owner_user_id=? AND n.node_key=? FOR UPDATE', [$id,$this->uid(),$key])) fail('error_not_found',404);
+        return [$id,$key];
+    }
+
+    private function attachSource(string $table, int $id, array $source): void
+    {
+        $this->db->run("UPDATE $table SET source_diagram_id=?,source_node_key=? WHERE id=? AND owner_user_id=?", [...$source,$id,$this->uid()]);
     }
 
     public function complete(array $d): void
