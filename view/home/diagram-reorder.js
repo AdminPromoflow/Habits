@@ -3,15 +3,15 @@
 // Insertion targets stay in diagram-local coordinates throughout a drag, even
 // when moving a branch changes the scene's bounding box and origin.
 const DiagramReorder = (() => {
-  function slots(nodes, plan, movingId) {
+  function slots(nodes, plan, movingId, parentId = nodes.find(node => node.id === movingId)?.parent_id) {
     const moving = nodes.find(node => node.id === movingId);
-    if (!moving?.parent_id || !plan) return [];
-    const parent = plan.nodes.find(box => box.id === moving.parent_id);
+    if (!moving || !parentId || !plan) return [];
+    const parent = plan.nodes.find(box => box.id === parentId);
     if (!parent) return [];
-    const layout = DiagramLayout.effective(nodes, moving.parent_id);
+    const layout = DiagramLayout.effective(nodes, parentId);
     if (layout.mode === 'free') return [];
-    const siblings = nodes.filter(node => node.parent_id === moving.parent_id);
-    if (siblings.length < 2) return [];
+    const siblings = nodes.filter(node => node.parent_id === parentId);
+    if (!siblings.some(node => node.id !== movingId)) return [];
     const remaining = siblings.filter(node => node.id !== movingId);
     const boxes = new Map(plan.nodes.map(box => [box.id, {
       ...box, x: box.x - plan.origin.x, y: box.y - plan.origin.y,
@@ -92,7 +92,7 @@ const DiagramReorder = (() => {
           : { index, x1: start, y1: position, x2: end, y2: position });
       }
     }
-    return result;
+    return result.map(slot => ({ ...slot, parentId, kind: 'order' }));
   }
 
   function target(slots, point, scale = 1) {
@@ -107,26 +107,68 @@ const DiagramReorder = (() => {
     return nearest;
   }
 
-  function apply(nodes, movingId, index) {
+  function branch(nodes, id) {
+    const ids = new Set([id]);
+    for (let added = true; added;) {
+      added = false;
+      for (const node of nodes) if (ids.has(node.parent_id) && !ids.has(node.id)) {
+        ids.add(node.id); added = true;
+      }
+    }
+    return ids;
+  }
+
+  function canMove(nodes, movingId, parentId) {
     const moving = nodes.find(node => node.id === movingId);
-    if (!moving?.parent_id || DiagramLayout.effective(nodes, moving.parent_id).mode === 'free') return nodes;
-    const siblings = nodes.filter(node => node.parent_id === moving.parent_id && node !== moving);
-    siblings.splice(Math.max(0, Math.min(siblings.length, index)), 0, moving);
-    const affected = new Set(siblings.map(node => node.id));
+    if (!moving || moving.id === 'root' || !nodes.some(node => node.id === parentId) || branch(nodes, movingId).has(parentId)) return false;
+    const byId = new Map(nodes.map(node => [node.id, node]));
+    let depth = 1, parent = byId.get(parentId);
+    while (parent?.parent_id != null) { depth++; parent = byId.get(parent.parent_id); }
+    const height = id => Math.max(0, ...nodes.filter(node => node.parent_id === id).map(node => 1 + height(node.id)));
+    return depth + height(movingId) <= 30;
+  }
+
+  function dropTarget(nodes, plan, movingId, point, scale = 1, cache = {}) {
+    if (!plan || !point || movingId === 'root') return null;
+    if (!cache.candidates) {
+      const excluded = branch(nodes, movingId);
+      cache.candidates = plan.nodes.filter(box => !excluded.has(box.id) && canMove(nodes, movingId, box.id));
+      cache.slots = cache.candidates.flatMap(box => slots(nodes, plan, movingId, box.id));
+    }
+    // The middle of a box means "make this my parent". The gaps mean order.
+    for (const box of cache.candidates) {
+      const x = box.x - plan.origin.x, y = box.y - plan.origin.y;
+      if (point.x >= x + box.width * .15 && point.x <= x + box.width * .85 &&
+          point.y >= y + box.height * .15 && point.y <= y + box.height * .85) {
+        return { kind: 'parent', parentId: box.id,
+          index: nodes.filter(node => node.parent_id === box.id && node.id !== movingId).length };
+      }
+    }
+    return target(cache.slots, point, scale);
+  }
+
+  function apply(nodes, movingId, index, parentId = nodes.find(node => node.id === movingId)?.parent_id) {
+    const moving = nodes.find(node => node.id === movingId);
+    if (!canMove(nodes, movingId, parentId)) return nodes;
+    const siblings = nodes.filter(node => node.parent_id === parentId && node.id !== movingId);
+    const at = Math.max(0, Math.min(siblings.length, index));
+    const previous = nodes.filter(node => node.parent_id === parentId).findIndex(node => node.id === movingId);
+    if (moving.parent_id === parentId && previous === at) return nodes;
+    const ordered = nodes.filter(node => node.id !== movingId);
+    const insertion = at < siblings.length ? ordered.indexOf(siblings[at])
+      : siblings.length ? ordered.indexOf(siblings.at(-1)) + 1 : ordered.findIndex(node => node.id === parentId) + 1;
+    ordered.splice(insertion, 0, { ...moving, parent_id: parentId });
+    const affected = new Set(ordered.filter(node => [moving.parent_id, parentId].includes(node.parent_id)).map(node => node.id));
     // Restore automatic placement for the complete sibling branches, including
     // folded descendants. Their hierarchy, content and layout choices stay intact.
     for (let added = true; added;) {
       added = false;
-      for (const node of nodes) if (affected.has(node.parent_id) && !affected.has(node.id)) {
+      for (const node of ordered) if (affected.has(node.parent_id) && !affected.has(node.id)) {
         affected.add(node.id); added = true;
       }
     }
-    let at = 0;
-    return nodes.map(node => {
-      const next = node.parent_id === moving.parent_id ? siblings[at++] : node;
-      return affected.has(next.id) ? { ...next, x: null, y: null } : next;
-    });
+    return ordered.map(node => affected.has(node.id) ? { ...node, x: null, y: null } : node);
   }
 
-  return { slots, target, apply };
+  return { slots, target, apply, canMove, dropTarget };
 })();

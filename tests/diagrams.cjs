@@ -416,7 +416,7 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
   }
   function dispatch(name, target, options = {}) {
     const event = {
-      target, prevented: false,
+      type: name, target, prevented: false,
       preventDefault() { this.prevented = true; },
       stopPropagation() { this.propagationStopped = true; },
       stopImmediatePropagation() { this.propagationStopped = true; this.immediatePropagationStopped = true; },
@@ -1224,6 +1224,8 @@ test('a node must be selected before dragging, and a click without movement neve
   pointer('pointermove', node, { clientX: 180, clientY: 150 });
   assert.equal(home.drag, null);
   assert.equal(home.nodes[0].x, null);
+  home.nodes.find(node=>node.id==='root').layout = {mode:'free'};
+  home.active.nodes = JSON.parse(JSON.stringify(home.nodes));
   click();
   pointer('pointerdown');
   assert.equal(home.drag.key, 'root');
@@ -1245,6 +1247,7 @@ test('alignment guides appear during an aligned drag and clear for every drag en
       { id: 'peer', parent_id: null, text: 'Peer', x: 400, y: 200 },
     ];
     addNodeElement('peer', 'Peer');
+    home.nodes.find(node=>node.id==='root').layout = {mode:'free'};
     home.positionTree();
     let saves = 0;
     home.save = () => { saves++; };
@@ -1275,6 +1278,7 @@ test('drag guides ignore the full moving branch and vanish when alignment is los
     { id: 'peer', parent_id: null, text: 'Peer', x: 600, y: 200 },
   ];
   for (const item of home.nodes.slice(1)) addNodeElement(item.id, item.text);
+  home.nodes.find(node=>node.id==='root').layout = {mode:'free'};
   home.positionTree();
   click();
   pointer('pointerdown');
@@ -1295,6 +1299,7 @@ test('a selected root moves by screen distance divided by zoom and persists afte
     requests++;
     return { id: data.id, name: data.name, nodes: JSON.parse(JSON.stringify(data.nodes)), version: data.version + 1 };
   };
+  home.nodes.find(node=>node.id==='root').layout = {mode:'free'};
   click();
   pointer('pointerdown');
   pointer('pointermove', node, { clientX: 180, clientY: 60 });
@@ -1319,6 +1324,7 @@ test('a selected root moves by screen distance divided by zoom and persists afte
 
 test('editing, a modal, or an active camera gesture prevents node dragging', () => {
   const { home, pointer, click, doubleClick } = savedEditor();
+  home.nodes.find(node=>node.id==='root').layout = {mode:'free'};
   click();
   home.layoutOpen = true;
   pointer('pointerdown');
@@ -1355,6 +1361,8 @@ function branchDragEditor() {
 
 test('moving a branch carries its manually positioned descendants without changing sibling branches', async () => {
   const { home, branch, pointer, click } = branchDragEditor();
+  home.nodes[1].layout = {...home.nodes[0].layout};
+  home.nodes[0].layout = {mode:'free'};
   home.viewport.scale = 2;
   click(branch.node);
   pointer('pointerdown', branch.node);
@@ -1375,6 +1383,8 @@ test('moving a branch carries its manually positioned descendants without changi
 
 test('dragging a centered parent repeatedly translates its full branch without a position jump', async () => {
   const { home, branch, pointer, click } = branchDragEditor();
+  home.nodes[1].layout = {...home.nodes[0].layout};
+  home.nodes[0].layout = {mode:'free'};
   const layout = vm.runInNewContext(fs.readFileSync('view/home/diagram-layout.js', 'utf8') + '\nDiagramLayout;');
   home.positionTree = () => { home.plan = layout.arrange(home.nodes); };
   home.positionTree();
@@ -1390,8 +1400,8 @@ test('dragging a centered parent repeatedly translates its full branch without a
       const old = before.nodes.find(item => item.id === id);
       const current = home.plan.nodes.find(item => item.id === id);
       const moves = id !== 'sibling';
-      assert.equal(current.x - home.plan.origin.x - (old.x - before.origin.x), moves ? 40 * drag : 0, id);
-      assert.equal(current.y - home.plan.origin.y - (old.y - before.origin.y), moves ? 20 * drag : 0, id);
+      assert.ok(Math.abs(current.x - home.plan.origin.x - (old.x - before.origin.x) - (moves ? 40 * drag : 0)) < .001, id);
+      assert.ok(Math.abs(current.y - home.plan.origin.y - (old.y - before.origin.y) - (moves ? 20 * drag : 0)) < .001, id);
     }
     pointer('pointerup', branch.node);
     await new Promise(setImmediate);
@@ -1482,6 +1492,7 @@ test('pointer cancellation and window blur release node capture and save the fin
       requests++;
       return { id: data.id, name: data.name, nodes: JSON.parse(JSON.stringify(data.nodes)), version: data.version + 1 };
     };
+    home.nodes.find(node=>node.id==='root').layout = {mode:'free'};
     click();
     pointer('pointerdown');
     pointer('pointermove', node, { clientX: 130, clientY: 120 });
@@ -1502,6 +1513,7 @@ test('account reset cancels an unfinished drag without saving it to the next acc
   const { home, node, root, pointer, click } = savedEditor();
   home.positionTree = () => {};
   home.makeRequest = () => { throw new Error('Account reset must not save an in-progress drag'); };
+  home.nodes.find(node=>node.id==='root').layout = {mode:'free'};
   click();
   pointer('pointerdown');
   pointer('pointermove', node, { clientX: 130, clientY: 120 });
@@ -1521,6 +1533,7 @@ test('width alignment guides follow the resized edge and clear on every pointer 
       { id: 'peer', parent_id: null, text: 'Peer', x: 0, y: 200, width: 260 },
     ];
     addNodeElement('peer', 'Peer');
+    home.nodes.find(node=>node.id==='root').layout = {mode:'free'};
     home.positionTree();
     let saves = 0;
     home.save = () => { saves++; };
@@ -1557,6 +1570,7 @@ test('keyboard width adjustments show alignment until key release or loss of foc
       { id: 'peer', parent_id: null, text: 'Peer', x: 0, y: 200, width: 230 },
     ];
     addNodeElement('peer', 'Peer');
+    home.nodes.find(node=>node.id==='root').layout = {mode:'free'};
     home.positionTree();
     let saves = 0;
     home.save = () => { saves++; };
@@ -1590,6 +1604,7 @@ test('moving a sibling measures the current gap and highlights matching sibling 
     const nodes = new Map([['root', fixture.node]]);
     for (const item of home.nodes.filter(item => item.id !== 'root')) nodes.set(item.id, addNodeElement(item.id, item.text).node);
     const moving = nodes.get(movingId);
+    home.nodes.find(node=>node.id==='root').layout = {mode:'free'};
     home.positionTree();
     let saves = 0;
     home.save = () => { saves++; };

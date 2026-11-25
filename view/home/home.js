@@ -103,6 +103,11 @@ class HomePage extends PageController {
     });
     document.addEventListener('keydown', (event) => {
       if (event.isComposing) return;
+      if (event.key === 'Escape' && this.drag && !this.drag.free) {
+        event.preventDefault();
+        this.finishNodeDrag(false);
+        return;
+      }
       if (this.history.handleKey(event)) return;
       if (event.target.closest?.('.diagram-picker')) {
         this.handlePickerKey(event);
@@ -705,8 +710,15 @@ class HomePage extends PageController {
   }
 
   fingerprint(nodes) {
+    const siblings = new Map();
+    const order = new Map(nodes.map(node => {
+      const index = siblings.get(node.parent_id) || 0;
+      siblings.set(node.parent_id, index + 1);
+      return [node.id, index];
+    }));
     return JSON.stringify(nodes.map((node) => ({
       id: node.id, parent_id: node.parent_id, text: node.text,
+      order: order.get(node.id),
       layout: node.layout ? {
         mode: node.layout.mode, direction: node.layout.direction,
         vertical: node.layout.vertical, horizontal: node.layout.horizontal,
@@ -927,7 +939,16 @@ class HomePage extends PageController {
     if (!layer) return;
     const drag = this.drag?.moving ? this.drag : null;
     const key = drag?.key || (this.resizing?.moving ? this.resizing.key : this.resizeGuideKey);
-    if (!key || !this.plan) {
+    if (drag && !drag.free && this.plan) {
+      const slot = drag.target;
+      const {x,y} = this.plan.origin;
+      layer.setAttribute('width', this.plan.width);
+      layer.setAttribute('height', this.plan.height);
+      layer.innerHTML = slot?.kind === 'order' ? `<g class="diagram-reorder-guide is-active"><line
+        x1="${slot.x1+x}" y1="${slot.y1+y}" x2="${slot.x2+x}" y2="${slot.y2+y}"/></g>` : '';
+      return;
+    }
+    if (!key || !this.plan || !this.freePositioning(key)) {
       layer.innerHTML = '';
       return;
     }
@@ -1105,6 +1126,54 @@ class HomePage extends PageController {
     return nodes.filter((node) => ids.has(node.id));
   }
 
+  freePositioning(key) {
+    const nodes = this.ensureTree(), node = nodes.find(item => item.id === key);
+    // A parent's layout places its children; a node's own layout places its branch.
+    return !!node && DiagramLayout.effective(nodes, node.parent_id || node.id).mode === 'free';
+  }
+
+  moveBranch(key, target) {
+    if (!target || !this.mindspace.can('edit')) return false;
+    const oldParent = this.ensureTree().find(node => node.id === key)?.parent_id;
+    const nodes = DiagramReorder.apply(this.ensureTree(), key, target.index, target.parentId);
+    if (nodes === this.nodes) return false;
+    this.nodes = nodes;
+    const affected = new Set(nodes.filter(node => [oldParent, target.parentId].includes(node.parent_id))
+      .flatMap(node => this.branchNodes(node.id).map(child => child.id)));
+    const parents = new Map(nodes.map(node => [node.id, node.parent_id]));
+    const treeEdge = edge => parents.get(edge.to) === edge.from || parents.get(edge.from) === edge.to;
+    this.connections = this.connections.filter(edge => !treeEdge(edge));
+    this.hiddenConnections = this.hiddenConnections.filter(treeEdge);
+    const edges = [...nodes.filter(node => node.parent_id !== null).map(node => ({from:node.parent_id,to:node.id})), ...this.connections];
+    this.connectionStyles = this.connectionStyles.filter(style => edges.some(edge => this.connectionTool.same(edge, style)) &&
+      !this.hiddenConnections.some(edge => this.connectionTool.same(edge, style))).map(style =>
+        affected.has(style.from) || affected.has(style.to) ? {...style, points:null} : style);
+    this.selectedKey = key;
+    this.name = nodes.find(node => node.id === key).text;
+    this.selected = true;
+    this.revealBranchTo(key);
+    return true;
+  }
+
+  previewBranchMove(event) {
+    const drag = this.drag;
+    const dx = (event.clientX - drag.startX) / drag.scale;
+    const dy = (event.clientY - drag.startY) / drag.scale;
+    for (const position of this.plan.nodes) {
+      if (!drag.movingIds.has(position.id)) continue;
+      const root = this.element('root', position.id);
+      if (root) root.style.transform = `translate(${position.x+dx}px, ${position.y+dy}px)`;
+    }
+    const frame = document.getElementById('diagram-scene')?.getBoundingClientRect?.();
+    const point = frame ? {x:(event.clientX-frame.left)/drag.scale-this.plan.origin.x,
+      y:(event.clientY-frame.top)/drag.scale-this.plan.origin.y} : null;
+    drag.target = DiagramReorder.dropTarget(this.nodes, this.plan, drag.key, point, drag.scale, drag.dropCache);
+    for (const node of this.nodes) this.element('node', node.id)?.classList.toggle('is-drop-parent',
+      drag.target?.kind === 'parent' && node.id === drag.target.parentId);
+    document.getElementById('mindmap-stage')?.classList.add('is-reordering');
+    this.renderAlignmentGuides();
+  }
+
   finishNodeDrag(save = true) {
     const drag = this.drag;
     this.drag = null;
@@ -1112,6 +1181,19 @@ class HomePage extends PageController {
     if (!drag) return;
     drag.root.classList.remove('is-dragging');
     if (drag.root.hasPointerCapture?.(drag.pointerId)) drag.root.releasePointerCapture(drag.pointerId);
+    if (!drag.free) {
+      document.getElementById('mindmap-stage')?.classList.remove('is-reordering');
+      for (const node of this.ensureTree()) this.element('node', node.id)?.classList.remove('is-drop-parent');
+      if (!drag.moving) return;
+      this.suppressNodeClick = true;
+      if (save && this.moveBranch(drag.key, drag.target)) {
+        this.drawStage();
+        this.viewport.reveal(this.element('root', drag.key));
+        this.element('node', drag.key)?.focus({preventScroll:true});
+        void this.save();
+      } else this.positionTree();
+      return;
+    }
     if (drag.moving && save) {
       this.suppressNodeClick = true;
       void this.save();
@@ -1125,13 +1207,15 @@ class HomePage extends PageController {
       if (event.target.closest?.('.diagram-task-checkbox')) return;
       const root = box?.closest('.diagram-root');
       if (event.button !== 0 || event.isPrimary === false || !root || this.editing || this.resizing ||
-          this.layoutOpen || this.viewport.isInteracting()) return;
+          this.layoutOpen || this.viewport.isInteracting() || !this.mindspace.can('edit')) return;
       const key = this.keyFor(root);
       if (!this.selected || key !== this.selectedKey) return;
       const node = this.ensureTree().find((item) => item.id === key);
+      const free = this.freePositioning(key);
+      if (!free && (key === 'root' || !this.plan)) return;
       const position = this.plan?.nodes.find((item) => item.id === key);
       this.drag = {
-        key, root, pointerId: event.pointerId,
+        key, root, free, target:null, dropCache:{}, pointerId: event.pointerId,
         startX: event.clientX, startY: event.clientY,
         x: position ? position.baseX ?? position.x - this.plan.origin.x : node.x || 0,
         y: position ? position.baseY ?? position.y - this.plan.origin.y : node.y || 0,
@@ -1154,6 +1238,7 @@ class HomePage extends PageController {
       this.menuOpen = false;
       this.syncNodeState();
       drag.root.classList.add('is-dragging');
+      if (!drag.free) { this.previewBranchMove(event); return; }
       const node = this.nodes.find((item) => item.id === drag.key);
       const limit = (value) => Math.round(Math.max(-1000000, Math.min(1000000, value)) * 100) / 100;
       node.x = limit(drag.x + dx / drag.scale);
@@ -1166,12 +1251,12 @@ class HomePage extends PageController {
       this.positionTree();
     });
     const finish = (event) => {
-      if (this.drag && event.pointerId === this.drag.pointerId) this.finishNodeDrag();
+      if (this.drag && event.pointerId === this.drag.pointerId) this.finishNodeDrag(this.drag.free || event.type === 'pointerup');
     };
     document.addEventListener('pointerup', finish);
     document.addEventListener('pointercancel', finish);
     document.addEventListener('lostpointercapture', finish);
-    window.addEventListener('blur', () => this.finishNodeDrag());
+    window.addEventListener('blur', () => this.finishNodeDrag(this.drag?.free || false));
   }
 
   finishNodeResize(save = true) {
