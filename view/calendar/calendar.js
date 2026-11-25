@@ -18,6 +18,7 @@ function plannerScheduleFields(entry = {}) {
 }
 
 function bindPlannerSchedule(form) {
+  $('[data-repeat-select]', form).setAttribute('aria-label', t('planner_frequency'));
   const sync = () => {
     const repeat = $('[name=schedule_mode]:checked', form).value === 'repeat';
     const frequency = $('[data-repeat-select]', form).value;
@@ -51,6 +52,8 @@ function plannerForm(entry = null, defaults = {}) {
     ${formFooter('save', entry ? `<button type="button" class="text-btn danger" data-action="planner-delete" data-id="${entry.id}">${t('delete')}</button>` : '')}
     </form>`, true);
   const form = $('#planner-form');
+  $('[name=kind]', form).setAttribute('aria-label', t('planner_kind'));
+  $('[name=category_id]', form).setAttribute('aria-label', t('category'));
   if (entry) $('[name=kind]', form).disabled = true;
   const syncKind = () => {
     const habit = $('[name=kind]', form).value === 'habit';

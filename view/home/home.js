@@ -1361,7 +1361,7 @@ class HomePage extends PageController {
       this.commitName();
       const node = this.ensureTree().find(item => item.id === this.selectedKey);
       this.menuOpen = false; this.syncNodeState();
-      return plannerForm(null, {name: node?.text || ''});
+      return plannerForm(null, {name: Array.from((node?.text || '').replace(/\s+/g, ' ').trim()).slice(0, 190).join('')});
     }
     if (action === 'image-diagram-node') return this.nodeTools.openImage();
     if (action === 'labels-diagram-node') return this.nodeTools.openLabels();

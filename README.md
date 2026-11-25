@@ -144,6 +144,16 @@ El menú de tres puntos permite **Copiar**, **Cortar**, **Pegar** y **Eliminar**
 
 **Imagen** permite subir, reemplazar o quitar una imagen PNG, JPG, WebP o GIF de hasta 10 MB. Se optimiza a una imagen fija de hasta 1024 px y 256 KiB; el diagrama admite hasta 2 MiB de imágenes codificadas. Se almacenan con los nodos privados. **Etiqueta** permite añadir, editar y quitar hasta diez etiquetas por cuadro: **Label** aparece fuera y **Label in topic** dentro. Imágenes y etiquetas se guardan automáticamente y se conservan al recargar.
 
+## Mi día a día
+
+El icono de calendario de los tres puntos de un cuadro abre **Agregar actividad**, con el texto del cuadro como nombre inicial. El mismo formulario se abre desde el **+** superior de **Mi día a día**, desde un día del mes o una hora de la agenda. Permite crear una **Tarea** o un **Hábito**, elegir una fecha concreta o repetir cada día, semana, mes o año, seleccionar días de la semana y añadir hora, descripción y fecha final opcionales. Los hábitos se incorporan también a **Mis hábitos**; si no se elige categoría, se crea una categoría privada **Mi día a día**. Las tareas permanecen en la agenda personal.
+
+La sección antes llamada Calendar/Calendario abre en **Día**, con las 24 horas y un bloque para actividades sin hora. **Semana** reúne los siete días; **Mes** muestra las actividades de cada fecha; **Año** muestra los doce meses y cuenta las actividades programadas de cada mes (cada repetición cuenta por separado). Pulsar un mes abre su vista mensual y pulsar un día abre su agenda. Las fechas usan la zona horaria de la cuenta. El selector de fecha, Hoy y las flechas permiten cambiar de período.
+
+Las repeticiones mensuales conservan el día de inicio; si no existe en un mes, se usa su último día. Por ejemplo, el 31 de enero se repite el 28/29 de febrero y el 31 de marzo. El 29 de febrero anual usa el 28 en años no bisiestos. El progreso se registra por fecha y no se puede completar una actividad futura. Las tareas pueden editarse o eliminarse desde su ficha; editar o eliminar una tarea recurrente afecta a toda la serie. Los hábitos conservan sus controles de progreso, edición y archivo.
+
+Requiere **018_daily_planner.sql** mediante `php bin/migrate.php`; la migración conserva los hábitos existentes con su programación semanal. Las pruebas `node --test tests/calendar.cjs` y el módulo `tests/calendar_acceptance.py` de la suite funcional verifican fechas, persistencia, permisos y progreso.
+
 ## Actualizar una instalación existente
 
 Los cambios de esta entrega están guardados localmente y no se publican automáticamente. Tras copiar manualmente el proyecto al servidor, ejecuta con PHP 8.2 o superior:

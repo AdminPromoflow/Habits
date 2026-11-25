@@ -21,7 +21,8 @@ function hasMindSpaceTarget() {
   return ['space', 'folder', 'item', 'diagram'].some(key => params.has(key));
 }
 function initialPersonalView() {
-  return hasMindSpaceTarget() || new URL(location.href).searchParams.get('view') === 'mindspaces' ? 'mindspaces' : 'home';
+  const requested = new URL(location.href).searchParams.get('view');
+  return hasMindSpaceTarget() || requested === 'mindspaces' ? 'mindspaces' : requested === 'calendar' ? 'calendar' : 'home';
 }
 function updateNotificationBadge() {
   const bell = document.querySelector('[data-action="notifications"]');
@@ -132,10 +133,10 @@ async function navigate(view) {
     view !== 'profile'
   )
     view = 'overview';
-  if (S.mode === 'personal' && ['home', 'mindspaces'].includes(view)) {
+  if (S.mode === 'personal' && ['home', 'mindspaces', 'calendar'].includes(view)) {
     const url = new URL(location.href);
     for (const key of ['view', 'diagram', 'topic', 'item', 'folder', 'space', 'cell', 'card', 'column', 'habit']) url.searchParams.delete(key);
-    if (view === 'mindspaces') url.searchParams.set('view', 'mindspaces');
+    if (view !== 'home') url.searchParams.set('view', view);
     history.replaceState(null, '', url.href);
     pageControllers.home.reset();
   }
