@@ -13,7 +13,7 @@
             <div class="mindspace-item-title">{{itemHeading}}<div class="button-row">{{actions}}</div></div>
             <div id="mindspace-save-status" class="mindspace-save-status" role="status" aria-live="polite"></div>
           </header>
-          <div id="mindspace-panel" class="mindspace-panel" role="tabpanel" tabindex="-1" aria-label="{{name}}">{{content}}</div>
+          <div id="mindspace-panel" class="mindspace-panel" role="tabpanel" tabindex="-1" aria-label="{{name}}" data-mobile-document="{{documentKey}}" data-mobile-document-kind="{{documentKind}}">{{content}}</div>
           {{download}}
         </div>
       </div>

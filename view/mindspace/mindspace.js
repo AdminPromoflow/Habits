@@ -284,6 +284,8 @@ class MindSpace extends PageController {
       spaceName:esc(this.spaceName()), intro:t('ms_intro'), tabsLabel:t('ms_tabs'), tabs:this.tabs(), plus:icon('plus'), addLabel:t('ms_add'),
       pathLabel:t('ms_folder_path'), path, linkedFrom:this.linkedFrom(),
       name:esc(this.active?.name || t('ms_files')),
+      documentKey:this.active && this.active.kind !== 'folder' ? `${S.user?.id || ''}:item:${this.active.id}` : '',
+      documentKind:esc(this.active?.kind || ''),
       spaceHeading:`<h1 ${this.spaces().some(space => space.id === this.spaceId() && this.can('edit', space)) ? `data-ms-title="space" title="${esc(t('ms_title_edit_hint'))}"` : ''}>${esc(this.spaceName())}</h1>`,
       itemHeading:`<h2 id="mindspace-item-name" ${this.active && this.can('edit') ? `data-ms-title="item" title="${esc(t('ms_title_edit_hint'))}"` : ''}>${esc(this.active?.name || t('ms_files'))}</h2>`,
       actions:this.active ? `${this.can('edit') ? `<button type="button" class="text-btn" data-action="ms-rename">${esc(t('ms_rename'))}</button>` : ''}${this.can('move') ? `<button type="button" class="text-btn" data-action="ms-move">${esc(t('ms_move'))}</button>` : ''}` : '', content,

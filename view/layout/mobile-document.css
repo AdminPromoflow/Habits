@@ -1,0 +1,52 @@
+.mobile-document-toggle {
+  position: fixed;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 41;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 10px;
+  border: 1px solid var(--lavender);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--purple-dark);
+  box-shadow: 0 3px 14px #34204720;
+}
+.mobile-document-toggle[hidden] { display: none; }
+.mobile-document-toggle svg { width: 22px; height: 22px; }
+.mobile-document-fullscreen { overflow: hidden; overscroll-behavior: none; }
+.mobile-document-fullscreen .mobile-document-ancestor > :not(.mobile-document-ancestor):not(.mobile-document-surface) { display: none !important; }
+.mobile-document-fullscreen .mobile-document-toggle {
+  top: calc(var(--mobile-document-top, 0px) + max(10px, env(safe-area-inset-top)));
+  bottom: auto;
+}
+.mobile-document-fullscreen .mobile-document-surface {
+  position: fixed;
+  top: var(--mobile-document-top, 0px);
+  left: 0;
+  z-index: 40;
+  width: 100%;
+  height: var(--mobile-document-height, 100dvh);
+  min-height: 0;
+  margin: 0;
+  padding: calc(62px + env(safe-area-inset-top)) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--surface);
+  border: 0;
+  border-radius: 0;
+}
+.mobile-document-fullscreen [data-mobile-document-kind="diagram"] { padding: 0; overflow: hidden; }
+.mobile-document-surface .mindmap-workspace,
+.mobile-document-surface .mindmap-stage,
+.mobile-document-surface.mindmap-workspace { min-height: 0; height: 100%; }
+.mobile-document-surface .mindmap-stage.has-tree { height: 100%; min-height: 0; border: 0; border-radius: 0; }
+.mobile-document-surface .diagram-canvas-navigation { top: max(12px, env(safe-area-inset-top)); right: calc(68px + env(safe-area-inset-right)); }
+.mobile-document-surface .diagram-title { width: min(300px, calc(100% - 84px)); }
+.mobile-document-surface .ms-notes { padding: 8px 12px; min-height: 0; }
+.mobile-document-surface .ms-notes textarea { min-height: 180px; resize: none; }
+.mobile-document-surface input,
+.mobile-document-surface select,
+.mobile-document-surface textarea { font-size: max(16px, 1em); }

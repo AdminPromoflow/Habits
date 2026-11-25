@@ -281,6 +281,7 @@ class HomePage extends PageController {
       createLabel: t('create_diagram'),
       createDisabled: this.switching ? 'disabled' : '',
       diagramLabel: t('diagram_canvas'),
+      documentKey:this.active || this.draft ? `${S.user?.id || ''}:diagram:${this.active?.id || this.draft.client_key}` : '',
       diagramToolbar: this.toolbarContent(),
       linkNavigation: this.links.navigation.html(),
       content: this.stageContent(),

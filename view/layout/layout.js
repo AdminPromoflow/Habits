@@ -35,6 +35,7 @@ function render() {
   document.body.dataset.theme = S.user?.theme || 'light';
   document.title = `MyRemarkable Mind · ${t(S.mode === 'admin' ? 'admin_dashboard' : S.view === 'categoryWeek' ? 'weekly_plan' : S.view === 'routine' ? 'routine' : S.view)}`;
   $('#app').innerHTML = S.user && !S.setupToken && !S.resetToken ? shell() : authPage();
+  mobileDocumentView.sync();
   if (S.user && S.mode === 'personal' && ((S.view === 'mindspaces' && hasMindSpaceTarget()) || S.sharedWorkspace)) {
     pageControllers.home.mount();
     if (S.sharedWorkspace) mountSharedWorkspace();

@@ -21,6 +21,7 @@ return [
         'view/home/home.css',
         'view/mindspace/mindspace.css',
         'view/home/diagram-layout-panel.css',
+        'view/layout/mobile-document.css',
     ],
     'scripts' => [
         'view/global/ui.js',
@@ -54,6 +55,7 @@ return [
         'view/profile/profile.js',
         'view/admin/admin.js',
         'view/layout/layout.js',
+        'view/layout/mobile-document.js',
         'view/global/application.js',
     ],
     'templates' => [

@@ -16,7 +16,7 @@
       <button type="button" class="btn primary" id="create-diagram" data-action="create-diagram" {{createDisabled}}>{{plus}}{{createLabel}}</button>
     </div>
     <div class="diagram-toolbar" id="diagram-toolbar">{{diagramToolbar}}</div>
-    <div class="mindmap-workspace">
+    <div class="mindmap-workspace" data-mobile-document="{{documentKey}}" data-mobile-document-kind="diagram">
       <div class="diagram-canvas-navigation" id="diagram-canvas-navigation">{{linkNavigation}}</div>
       <div class="mindmap-stage" id="mindmap-stage" tabindex="-1" aria-label="{{diagramLabel}}">{{content}}</div>
     </div>

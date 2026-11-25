@@ -655,6 +655,8 @@ return [
     'ms_style_preview' => 'Style preview',
     'ms_style_reset' => 'Reset style',
     'ms_download_pdf' => 'Download PDF',
+    'ms_exit_fullscreen' => 'Exit full screen',
+    'ms_enter_fullscreen' => 'View document in full screen',
     'ms_pdf_preparing' => 'Preparing PDF…',
     'ms_pdf_error' => 'The PDF could not be generated. Please try again.',
     'ms_pdf_empty' => 'No content.',
