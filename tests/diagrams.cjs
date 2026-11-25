@@ -40,7 +40,9 @@ test('color themes follow branches for new descendants and color their connector
   home.nodes.push({id:'d',parent_id:'c',text:''});
   assert.equal(home.colors.node(home.nodes[4]).fill,home.colors.node(a).fill);
   home.colorTheme='vivid';
-  assert.equal(home.colors.line({from:'root',to:'a'}),home.colors.node(a).fill,'Night uses light connections against the dark canvas');
+  assert.equal(home.colors.line({from:'root',to:'a'}),home.colors.node(a).border,'Night uses darker connections against its near-white canvas');
+  home.canvasColor='#2c2336';
+  assert.equal(home.colors.line({from:'root',to:'a'}),home.colors.node(a).fill,'custom dark backgrounds keep lighter connections');
   home.canvasColor='#ffffff';
   assert.equal(home.colors.line({from:'root',to:'a'}),home.colors.node(a).border,'custom light backgrounds keep darker connections');
   home.diagramColor='#112233';
@@ -60,7 +62,7 @@ test('color changes reject invalid values and read-only access, and reset return
   assert.equal(home.diagramColor,'#abcdef');
   await home.colors.apply({theme:'default'});
   assert.equal(home.colorTheme,null);assert.equal(home.diagramColor,null);assert.equal(home.canvasColor,null);
-  assert.match(home.colors.css(home.nodes[0]),/--diagram-node-bg:#e8dff1/);assert.equal(home.colors.background(),'#fbf7ef');
+  assert.match(home.colors.css(home.nodes[0]),/--diagram-node-bg:#e8dff1/);assert.equal(home.colors.background(),'#fcfaf7');
 });
 
 test('topic links are included in dirty detection, saved snapshots and their visible open button', async () => {

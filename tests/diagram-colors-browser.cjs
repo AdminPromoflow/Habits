@@ -37,7 +37,7 @@ const base='http://127.0.0.1:8785';
     assert.equal(await page.evaluate(()=>pageControllers.home.colorTheme),null,'preview leaves the document unchanged');
     await page.locator('.diagram-colors-dialog').screenshot({path:'tests/.runtime/diagram-colors-dialog-desktop.png'});
     await page.locator('[data-colors-apply]').click();await settled();
-    assert.equal(await page.locator('#mindmap-stage').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(255, 253, 245)');
+    assert.equal(await page.locator('#mindmap-stage').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(253, 251, 247)');
     assert.equal(await page.locator('#diagram-node').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(232, 220, 240)');
     await page.reload();await page.locator('#diagram-node').waitFor();
     assert.equal(await page.evaluate(()=>pageControllers.home.colorTheme),'rainbow');

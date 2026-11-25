@@ -2,16 +2,16 @@
 
 class DiagramColors {
   static themes = [
-    // Distinct color families share the app's muted accents and purple undertones.
+    // Near-white canvases echo the app's warm white and soft purple undertones.
     // Stable IDs preserve the combinations already saved in existing diagrams.
-    {id:'default', background:'#fbf7ef', root:'#e8dff1', colors:['#e8dff1']},
-    {id:'rainbow', background:'#fffdf5', root:'#e8dcf0', colors:['#f4ccd0','#f4dcc2','#f4edc8','#d5e7d9','#cce6ec','#d9daed','#e6cce4']},
-    {id:'pastel', background:'#fcf0f4', root:'#e4b9cc', colors:['#f0d5df','#e7c5d5','#e2cadf','#eed9cf','#d6bdd3','#f1e2dc','#d9c2ce']},
-    {id:'vivid', background:'#2c2336', root:'#e9d9ba', colors:['#bca7d5','#d5acbd','#b4c8bd','#dcc7a7','#aebfcd','#cab9cf']},
-    {id:'ocean', background:'#edf3f5', root:'#4c6578', colors:['#bdd1dd','#d4e3e8','#b3c7ce','#d5d0e3','#c5d9d1','#c5cede']},
-    {id:'forest', background:'#f1f3e9', root:'#5d705e', colors:['#c6d5ba','#d8ddbd','#bfd2c9','#e5ddbf','#cfc9d9','#d4dfc8']},
-    {id:'sunset', background:'#fbf1e8', root:'#98695e', colors:['#e9c3ae','#e8d4b5','#d9b8b4','#e6d8c7','#d6c2da','#e8cfb9']},
-    {id:'mono', background:'#f6f4f7', root:'#3e3549', colors:['#dfdce3','#eeebef','#cdc7d1','#e7e1dc','#d9d5dd']},
+    {id:'default', background:'#fcfaf7', root:'#e8dff1', colors:['#e8dff1']},
+    {id:'rainbow', background:'#fdfbf7', root:'#e8dcf0', colors:['#f4ccd0','#f4dcc2','#f4edc8','#d5e7d9','#cce6ec','#d9daed','#e6cce4']},
+    {id:'pastel', background:'#fcf8fa', root:'#e4b9cc', colors:['#f0d5df','#e7c5d5','#e2cadf','#eed9cf','#d6bdd3','#f1e2dc','#d9c2ce']},
+    {id:'vivid', background:'#faf8fc', root:'#e9d9ba', colors:['#bca7d5','#d5acbd','#b4c8bd','#dcc7a7','#aebfcd','#cab9cf']},
+    {id:'ocean', background:'#f8fafc', root:'#4c6578', colors:['#bdd1dd','#d4e3e8','#b3c7ce','#d5d0e3','#c5d9d1','#c5cede']},
+    {id:'forest', background:'#f9fbf8', root:'#5d705e', colors:['#c6d5ba','#d8ddbd','#bfd2c9','#e5ddbf','#cfc9d9','#d4dfc8']},
+    {id:'sunset', background:'#fdf9f6', root:'#98695e', colors:['#e9c3ae','#e8d4b5','#d9b8b4','#e6d8c7','#d6c2da','#e8cfb9']},
+    {id:'mono', background:'#faf9fb', root:'#3e3549', colors:['#dfdce3','#eeebef','#cdc7d1','#e7e1dc','#d9d5dd']},
   ];
   static valid(color) { return typeof color === 'string' && /^#[\da-f]{6}$/i.test(color); }
   static theme(id) { return this.themes.find(theme => theme.id === id) || this.themes[0]; }
@@ -59,7 +59,7 @@ class DiagramColors {
     const child=from?.parent_id===to?.id ? from : to;
     const paint=this.node(child);
     if (!paint) return '';
-    // Keep connections visible on Night and on custom backgrounds as well.
+    // Keep connections visible on preset and custom backgrounds alike.
     const background=this.background();
     return DiagramColors.stroke(paint,background);
   }
