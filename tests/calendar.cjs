@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
 const context=vm.createContext({Intl,Date,document:{addEventListener(){}}});
-vm.runInContext(fs.readFileSync('view/global/ui.js','utf8')+'\nclass PageController {}\n'+fs.readFileSync('view/calendar/calendar.js','utf8')+'\nthis.testApi={scheduled,plannerEntries,plannerDay,plannerWeek,plannerMonth,plannerYear,S};',context);
+vm.runInContext(fs.readFileSync('view/global/ui.js','utf8')+'\nclass PageController {}\n'+fs.readFileSync('view/calendar/calendar.js','utf8')+'\nthis.testApi={scheduled,plannerEntries,plannerDay,plannerWeek,plannerMonth,plannerYear,plannerCategoryOptions,plannerCategoryFields,S};',context);
 const {scheduled,plannerEntries,plannerDay,plannerWeek,plannerMonth,plannerYear,S}=context.testApi;
 const base={id:1,name:'<Task>',start_date:'2024-01-31',end_date:null,schedule_days:[1,3,5],recurrence:'monthly'};
 test('calendar recurrence preserves anchors and short-month semantics',()=>{
@@ -35,4 +35,25 @@ test('monthly date lists, month intervals, selected annual months and ordinal we
   for(const [date,expected] of Object.entries({'2024-02-05':true,'2024-03-05':false,'2024-11-20':true,'2025-05-05':true})) assert.equal(scheduled(annual,date),expected,date);
   const ordinal={...monthly,recurrence_rule:{month_mode:'weekdays',positions:[1,-1],weekdays:[1],interval:1}};
   for(const [date,expected] of Object.entries({'2024-02-05':true,'2024-02-12':false,'2024-02-26':true,'2024-02-27':false,'2024-04-29':true})) assert.equal(scheduled(ordinal,date),expected,date);
+});
+test('category choices prioritize current and parent folders, distinguish paths, and restore saved categories',()=>{
+  S.data={categories:[{id:1,name:'Existing'},{id:2,name:'Child',source_folder_id:11}],category_catalog:[],mindspace:{spaces:[{id:1,name:'Home'},{id:2,name:'Other'}],items:[
+    {id:10,kind:'folder',name:'Parent',mindspace_id:1,parent_id:null},
+    {id:11,kind:'folder',name:'Child',mindspace_id:1,parent_id:10},
+    {id:12,kind:'folder',name:'Child',mindspace_id:2,parent_id:null},
+    {id:13,kind:'diagram',diagram_id:7,mindspace_id:1,parent_id:11}
+  ]}};
+  const options=context.testApi.plannerCategoryOptions({source_diagram_id:7});
+  assert.equal(options.selected,'folder:11');
+  assert.deepEqual(Array.from(options.groups[1][1],pair=>pair[0]),['folder:11','folder:10']);
+  assert.ok(options.groups[2][1].some(([key,label])=>key==='folder:12' && label==='Other / Child'));
+  assert.equal(context.testApi.plannerCategoryOptions({category_id:2,kind:'habit'},true).selected,'folder:11');
+  assert.equal(context.testApi.plannerCategoryOptions({category_id:1,kind:'habit'},true).selected,'category:1');
+  assert.equal(context.testApi.plannerCategoryOptions({kind:'task'},true).selected,'none');
+  S.data.categories[0].name='<unsafe>';
+  assert.ok(context.testApi.plannerCategoryFields({},false).includes('&lt;unsafe&gt;'));
+  S.ownedWorkspace={categories:[{id:3,name:'Personal'}],mindspace:{spaces:[],items:[]}}; S.sharedWorkspace={};
+  assert.equal(context.testApi.plannerCategoryOptions({category_id:3},true).selected,'category:3');
+  assert.ok(!context.testApi.plannerCategoryFields({},false).includes('folder:11'));
+  S.sharedWorkspace=null; S.ownedWorkspace=null;
 });

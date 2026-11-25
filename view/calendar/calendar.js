@@ -15,6 +15,39 @@ function plannerMonthInterval(count) {
   return count === 1 ? t('planner_monthly') : t('planner_every_months',{count});
 }
 
+function plannerCategoryOptions(value = {}, existing = false) {
+  const data = S.sharedWorkspace ? {...S.data,...S.ownedWorkspace} : S.data;
+  const items = data.mindspace?.items || [], spaces = data.mindspace?.spaces || [];
+  const folders = new Map(spaces.map(space=>[`space:${space.id}`,space.name]));
+  for (const folder of items.filter(item=>item.kind === 'folder')) {
+    const path = [], seen = new Set(); let node = folder;
+    while (node && !seen.has(node.id)) { seen.add(node.id); path.unshift(node.name); node=items.find(item=>item.kind === 'folder' && Number(item.id) === Number(node.parent_id)); }
+    const space = spaces.find(space=>Number(space.id) === Number(folder.mindspace_id));
+    folders.set(`folder:${folder.id}`,[space?.name,...path].filter(Boolean).join(' / '));
+  }
+  const diagram = value.source_diagram_id && items.find(item=>Number(item.diagram_id) === Number(value.source_diagram_id));
+  const current = diagram ? (diagram.parent_id ? `folder:${diagram.parent_id}` : `space:${diagram.mindspace_id}`) : null;
+  const folder = diagram?.parent_id && items.find(item=>Number(item.id) === Number(diagram.parent_id));
+  const parent = folder ? (folder.parent_id ? `folder:${folder.parent_id}` : `space:${folder.mindspace_id}`) : null;
+  const nearby = [[current,'planner_current_folder'],[parent,'planner_parent_folder']].filter(([key])=>key && folders.has(key)).map(([key,label])=>[key,`${t(label)} — ${folders.get(key)}`]);
+  const categoryKey = category => category.source_folder_id && folders.has(`folder:${category.source_folder_id}`) ? `folder:${category.source_folder_id}` : category.source_mindspace_id && folders.has(`space:${category.source_mindspace_id}`) ? `space:${category.source_mindspace_id}` : `category:${category.id}`;
+  const categories = [...new Map([...(data.categories || []),...(S.data.category_catalog || [])].map(category=>[Number(category.id),category])).values()];
+  const selectedCategory = categories.find(category=>Number(category.id) === Number(value.category_id));
+  const selected = selectedCategory ? categoryKey(selectedCategory) : existing ? (value.kind === 'task' ? 'none' : 'default') : current || 'default';
+  return {selected, groups:[
+    [null,[['default',t('calendar')],...(existing && value.kind === 'task' && !value.category_id ? [['none',t('planner_no_category')]] : [])]],
+    ['planner_nearby_folders',nearby],
+    ['planner_other_folders',[...folders].filter(([key])=>!nearby.some(([near])=>near === key)).sort((a,b)=>a[1].localeCompare(b[1]))],
+    ['planner_existing_categories',categories.filter(category=>categoryKey(category).startsWith('category:')).map(category=>[`category:${category.id}`,categoryName(category)]).sort((a,b)=>a[1].localeCompare(b[1]))],
+    [null,[['new',`+ ${t('new_category')}`]]]
+  ]};
+}
+
+function plannerCategoryFields(value, existing) {
+  const {selected,groups} = plannerCategoryOptions(value,existing);
+  return `<label class="field"><span>${t('category')}</span><select name="category_choice" aria-label="${esc(t('category'))}">${groups.filter(([,options])=>options.length).map(([label,options])=>`${label ? `<optgroup label="${esc(t(label))}">` : ''}${options.map(([key,name])=>`<option value="${esc(key)}" ${key === selected ? 'selected' : ''}>${esc(name)}</option>`).join('')}${label ? '</optgroup>' : ''}`).join('')}</select></label><div data-new-planner-category hidden>${field('new_category_name','planner_new_category_name','text','',{maxlength:100})}</div>`;
+}
+
 function plannerScheduleFields(entry = {}, kind = null) {
   const recurrence = entry.recurrence || (kind === 'habit' ? 'weekly' : 'once');
   const start = entry.start_date || S.date || today(), rule = plannerRule(entry);
@@ -85,6 +118,7 @@ function plannerForm(entry = null, defaults = {}) {
     ${entry ? `<input type="hidden" name="id" value="${entry.id}">` : ''}
     ${field('name','planner_kind','text',value.name || '',{required:true,maxlength:190})}
     <fieldset class="planner-kind"><legend>${t('planner_activity_type')}</legend><div>${['habit','task'].map(v=>`<label><input type="radio" name="kind" value="${v}" ${v === kind ? 'checked' : ''} ${entry ? 'disabled' : ''}><span>${icon(v === 'habit' ? 'habits' : 'calendar')}<strong>${t('planner_'+v)}</strong><small>${t('planner_'+v+'_hint')}</small></span></label>`).join('')}</div></fieldset>
+    ${plannerCategoryFields(value,!!entry)}
     ${plannerScheduleFields(value,entry && kind === 'habit' && entry.recurrence === 'once' ? null : kind)}
     <details class="planner-description" ${value.description ? 'open' : ''}><summary>${t('planner_optional_description')}</summary>${textarea('description','description',value.description || '')}</details>
     ${entry?.recurrence && entry.recurrence !== 'once' ? `<p class="field-help">${t('planner_edit_series')}</p>` : ''}
@@ -93,6 +127,14 @@ function plannerForm(entry = null, defaults = {}) {
   $('#modal').classList.add('planner-dialog');
   const form = $('#planner-form');
   bindPlannerSchedule(form);
+  const syncCategory = () => {
+    const isNew = $('[name=category_choice]',form).value === 'new';
+    $('[data-new-planner-category]',form).hidden = !isNew;
+    const input = $('[name=new_category_name]',form);
+    input.disabled = !isNew; input.required = isNew;
+  };
+  $('[name=category_choice]',form).addEventListener('change',()=>{syncCategory(); if ($('[name=category_choice]',form).value === 'new') $('[name=new_category_name]',form).focus();});
+  syncCategory();
   form.addEventListener('submit',async event=>{
     event.preventDefault();
     const submit=$('[type=submit]',form), errorBox=$('.form-error',form);
@@ -102,7 +144,7 @@ function plannerForm(entry = null, defaults = {}) {
     data.kind=entry?.kind || data.kind;
     data.schedule_days=fields.getAll('schedule_days').map(Number);
     data.recurrence_rule=JSON.parse(data.recurrence_rule);
-    if (entry?.kind === 'habit') for (const key of ['category_id','routine_id','goal','unit','section']) data[key]=entry[key];
+    if (entry?.kind === 'habit') for (const key of ['routine_id','goal','unit','section']) data[key]=entry[key];
     // Existing activities keep their link even if the original node was removed.
     const source=!entry && defaults.source_diagram_id ? defaults : null;
     if (source?.source_diagram_id) { data.source_diagram_id=source.source_diagram_id; data.source_node_key=source.source_node_key; }
@@ -191,7 +233,12 @@ class CalendarPage extends PageController {
       if (event.target.id !== 'planner-date' || !event.target.value || !event.target.validity.valid) return;
       S.date = event.target.value; S.month = S.date.slice(0,7); render();
     });
-    document.addEventListener('keydown',event => {
+    document.addEventListener('keydown',async event => {
+      if (event.target.matches?.('.planner-section-tabs [role=tab]') && ['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) {
+        event.preventDefault();
+        const view = event.key === 'Home' ? 'calendar' : event.key === 'End' ? 'habits' : S.view === 'calendar' ? 'habits' : 'calendar';
+        await navigate(view); $(`#planner-section-${view}`).focus(); return;
+      }
       if (!event.target.matches?.('.planner-tabs [role=tab]') || !['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
       event.preventDefault();
       const views = ['day','week','month','year'];
@@ -202,7 +249,7 @@ class CalendarPage extends PageController {
   }
 
   async handleAction(action, el, id) {
-    if (action === 'planner-add') return plannerForm(null,{start_date:el.dataset.date || S.date,scheduled_time:el.dataset.time || ''});
+    if (action === 'planner-add') return plannerForm(null,{start_date:el.dataset.date || S.date,scheduled_time:el.dataset.time || '',category_id:el.dataset.category || null});
     if (action === 'planner-edit-habit') {
       const habit = S.data.habits.find(h => Number(h.id) === id);
       if (habit?.permission === 'owner') plannerForm({...habit, kind:'habit'});

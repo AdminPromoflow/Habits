@@ -36,6 +36,7 @@ function categoryWeekPage() {
   );
   const routines = S.data.routines.filter((r) => Number(r.category_id) === Number(c.id));
   const f = S.filter;
+  const tasks = (S.data.calendar?.tasks || []).filter(task=>Number(task.category_id) === Number(c.id) && (!f.search || (task.name+' '+task.description).toLocaleLowerCase().includes(f.search.toLocaleLowerCase())));
   const habits = all.filter(
     (h) =>
       (!f.routine || String(h.routine_id) === f.routine) &&
@@ -52,7 +53,7 @@ function categoryWeekPage() {
     heading: heading(
       esc(categoryName(c)),
       t('category_week_intro'),
-      `<div class="button-row">${button('new_routine', 'new-routine', 'secondary')}<button class="btn primary" data-action="new-habit">${icon('plus')}${t('new_habit')}</button></div>`,
+      `<div class="button-row">${button('new_routine', 'new-routine', 'secondary')}<button class="btn primary" data-action="planner-add" data-category="${c.id}">${icon('plus')}${t('planner_add')}</button></div>`,
       t('weekly_plan')
     ),
     searchIcon: icon('search'),
@@ -86,6 +87,7 @@ function categoryWeekPage() {
     startDate: fmt(start),
     endDate: fmt(shift(start, 6)),
     note: t('category_week_note'),
+    tasks: tasks.length ? `<section class="planner-category-tasks"><h2>${t('planner_category_tasks')}</h2>${tasks.map(task=>`<div><p class="field-help">${esc(fmt(task.start_date,{dateStyle:'medium'}))}</p>${plannerEntry({...task,kind:'task'},task.start_date,true)}</div>`).join('')}</section>` : '',
     templates: S.data.templates.some((x) => Number(x.category_id) === Number(c.id))
       ? `<div class="routine-pills">${button('choose_template', 'templates', 'secondary')}</div>`
       : '',

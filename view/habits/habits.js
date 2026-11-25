@@ -5,16 +5,16 @@ function habitsPage() {
       habits: S.data.habits.filter(
         (h) => h.permission === 'owner' && Number(h.category_id) === Number(c.id)
       ),
-    }))
-    .filter((g) => g.habits.length);
+      tasks: (S.data.calendar?.tasks || []).filter(task=>Number(task.category_id) === Number(c.id)),
+    }));
   return renderTemplate('habits', {
     heading: heading(
-      t('habits'),
-      t('habit_categories_intro'),
-      `<div class="button-row">${button('choose_categories', 'manage-categories', 'secondary')}<button class="btn primary" data-action="new-habit">${icon('plus')}${t('new_habit')}</button></div>`
+      t('categories'),
+      t('planner_categories_intro'),
+      `<div class="button-row">${button('new_category', 'new-category', 'secondary')}<button class="btn primary" data-action="planner-add">${icon('plus')}${t('planner_add')}</button></div>`
     ),
     categories: groups.length
-      ? `<div class="category-grid habit-category-grid">${groups.map(({ category: c, habits }) => `<button class="category-card habit-category-tile" style="--category-color:${esc(c.color)}" data-action="filter-category" data-id="${c.id}"><span class="category-icon">${icon(c.icon)}</span><h2>${esc(categoryName(c))}</h2><p>${t('habits_count', { count: habits.length })}</p><span class="category-week-link">${t('open_weekly_plan')}${icon('chevron')}</span></button>`).join('')}</div><p class="field-help">${t('category_first_habit')}</p>`
+      ? `<div class="category-grid habit-category-grid">${groups.map(({ category: c, habits, tasks }) => `<button class="category-card habit-category-tile" style="--category-color:${esc(c.color)}" data-action="filter-category" data-id="${c.id}"><span class="category-icon">${icon(c.icon)}</span><h2>${esc(categoryName(c))}</h2><p>${t('planner_category_counts', { habits:habits.length,tasks:tasks.length })}</p><span class="category-week-link">${t('open_weekly_plan')}${icon('chevron')}</span></button>`).join('')}</div>`
       : empty(
           'no_category_habits',
           'category_first_habit',

@@ -30,7 +30,7 @@ final class CategoriesModel extends BaseModel
             $this->db->one(
                 'SELECT id FROM habits WHERE owner_user_id=? AND category_id=? LIMIT 1',
                 [$this->uid(), $c['id']],
-            )
+            ) || $this->db->one('SELECT id FROM calendar_tasks WHERE owner_user_id=? AND category_id=? LIMIT 1', [$this->uid(),$c['id']])
         ) {
             fail('error_category_has_habits');
         }
@@ -95,6 +95,7 @@ final class CategoriesModel extends BaseModel
         }
         if (
             $this->db->one('SELECT id FROM habits WHERE category_id=? LIMIT 1', [$c['id']]) ||
+            $this->db->one('SELECT id FROM calendar_tasks WHERE category_id=? LIMIT 1', [$c['id']]) ||
             $this->db->one('SELECT id FROM habit_shares WHERE category_id=? LIMIT 1', [$c['id']]) ||
             $this->db->one('SELECT id FROM routines WHERE category_id=? LIMIT 1', [$c['id']]) ||
             $this->db->one('SELECT id FROM habit_templates WHERE category_id=? LIMIT 1', [

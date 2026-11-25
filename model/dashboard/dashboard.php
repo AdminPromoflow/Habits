@@ -31,7 +31,7 @@ final class DashboardModel extends BaseModel
             'calendar' => (new CalendarModel($this->db, $this->user))->data(),
             'completions' => $completions,
             'categories' => $this->db->all(
-                'SELECT c.id,c.owner_user_id,c.name,c.translation_key,c.description,c.icon,c.color FROM habit_categories c WHERE c.owner_user_id=? OR (c.owner_user_id IS NULL AND EXISTS(SELECT 1 FROM user_categories uc WHERE uc.user_id=? AND uc.category_id=c.id)) ORDER BY c.owner_user_id IS NOT NULL DESC,c.id',
+                'SELECT c.id,c.owner_user_id,c.name,c.translation_key,c.description,c.icon,c.color,c.source_mindspace_id,c.source_folder_id FROM habit_categories c WHERE c.owner_user_id=? OR (c.owner_user_id IS NULL AND EXISTS(SELECT 1 FROM user_categories uc WHERE uc.user_id=? AND uc.category_id=c.id)) ORDER BY c.owner_user_id IS NOT NULL DESC,c.id',
                 [$this->uid(), $this->uid()],
             ),
             'category_catalog' => $this->db->all(

@@ -123,6 +123,7 @@ final class MindSpacesModel extends BaseModel
         $space = $this->space(true, (int) ($data['id'] ?? 0));
         $name = Validate::text($data, 'name', 120);
         $this->db->run('UPDATE mindspaces SET name=?,updated_at=UTC_TIMESTAMP() WHERE id=?', [$name, $space['id']]);
+        $this->db->run('UPDATE habit_categories SET name=? WHERE source_mindspace_id=? AND owner_user_id=?', [mb_substr($name,0,100),$space['id'],$this->uid()]);
         return ['id' => $space['id'], 'name' => $name];
     }
 
@@ -254,6 +255,7 @@ final class MindSpacesModel extends BaseModel
         }
         if (strlen($content) > 1000000) fail('error_validation');
         $this->db->run('UPDATE mindspace_items SET name=?,kind=?,content_json=?,version=version+1,updated_at=UTC_TIMESTAMP() WHERE id=?', [$name, self::boardKind($item['kind']), $content, $item['id']]);
+        if ($item['kind'] === 'folder') $this->db->run('UPDATE habit_categories SET name=? WHERE source_folder_id=? AND owner_user_id=?', [mb_substr($name,0,100),$item['id'],$this->uid()]);
         return self::response($this->item((int) $item['id']));
     }
 

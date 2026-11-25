@@ -85,3 +85,55 @@ def run(owner, other, guest, check):
     owner.request('deleteDiagram',{'id':diagram['id'],'version':diagram['version']})
     for tid in [task_id, weekly, monthly, yearly]: owner.request('deleteCalendarTask', {'id':tid})
     check(not any(c['task_id'] in [task_id,weekly,monthly,yearly] for c in owner.data()['calendar']['completions']), 'Deleting recurring tasks also removes their completion records')
+    test_categories(owner, other, task, check)
+
+
+def test_categories(owner, other, task, check):
+    import uuid
+    def folder(client, name, parent=None):
+        return client.request('createMindSpaceItem',dict(kind='folder',name=name,parent_id=parent,client_key=str(uuid.uuid4())))
+    parent=folder(owner,'Planner parent')
+    child=folder(owner,'Planner child',parent['id'])
+    foreign=folder(other,'Private folder')
+    first=owner.request('saveCalendarEntry',dict(task,category_choice=f"folder:{child['id']}"))['id']
+    stored=next(t for t in owner.data()['calendar']['tasks'] if t['id']==first)
+    category=next(c for c in owner.data()['categories'] if c['id']==stored['category_id'])
+    check(category['source_folder_id']==child['id'] and category['name']=='Planner child','Task category persists as a reference to the selected folder')
+    habit=owner.request('saveCalendarEntry',dict(task,kind='habit',recurrence='daily',category_choice=f"folder:{child['id']}"))['id']
+    check(next(h for h in owner.data()['habits'] if h['id']==habit)['category_id']==category['id'],'Tasks and habits reuse the same folder category')
+    owner.request('saveCalendarEntry',dict(task,id=first,name='Edited categorized task'))
+    check(next(t for t in owner.data()['calendar']['tasks'] if t['id']==first)['category_id']==category['id'],'Older clients preserve a task category when omitting the new field')
+    owner.request('deleteCategory',{'id':category['id']},422)
+    child=owner.request('saveMindSpaceItem',dict(id=child['id'],version=child['version'],name='Renamed planner folder'))
+    check(next(c for c in owner.data()['categories'] if c['id']==category['id'])['name']=='Renamed planner folder','Renaming a folder keeps its category and existing activities together')
+    owner.request('saveCalendarEntry',dict(task,id=first,category_choice=f"folder:{parent['id']}"))
+    parent_category=next(t for t in owner.data()['calendar']['tasks'] if t['id']==first)['category_id']
+    check(parent_category!=category['id'],'An existing task can move to its parent folder category')
+    root=owner.request('saveCalendarEntry',dict(task,category_choice=f"space:{parent['mindspace_id']}"))['id']
+    root_category=next(t for t in owner.data()['calendar']['tasks'] if t['id']==root)['category_id']
+    check(next(c for c in owner.data()['categories'] if c['id']==root_category)['source_mindspace_id']==parent['mindspace_id'],'A main space is selectable as a root folder category')
+    owner.request('saveCalendarEntry',dict(task,category_choice=f"folder:{foreign['id']}"),404)
+    other.request('saveCalendarEntry',dict(task,category_choice=f"category:{category['id']}"),404)
+    other.request('saveCalendarEntry',dict(task,category_choice=f"space:{parent['mindspace_id']}"),404)
+    other.request('saveCalendarEntry',dict(task,category_id=category['id']),404)
+    for bad in ['invalid','folder:0','folder:1 OR 1=1']:
+        owner.request('saveCalendarEntry',dict(task,category_choice=bad),422)
+    check(True,'Category and folder selection enforces ownership and validates the submitted choice')
+    before=len(owner.data()['categories'])
+    owner.request('saveCalendarEntry',dict(task,category_choice='new',new_category_name='Rollback category',start_date='invalid'),422)
+    owner.request('saveCalendarEntry',dict(task,category_choice='new',new_category_name='  '),422)
+    check(len(owner.data()['categories'])==before,'A failed activity save does not leave an orphan category')
+    custom=owner.request('saveCalendarEntry',dict(task,category_choice='new',new_category_name='Planner new category'))['id']
+    custom_category=next(t for t in owner.data()['calendar']['tasks'] if t['id']==custom)['category_id']
+    second=owner.request('saveCalendarEntry',dict(task,category_choice='new',new_category_name='Planner new category'))['id']
+    check(next(t for t in owner.data()['calendar']['tasks'] if t['id']==second)['category_id']==custom_category,'Inline category creation saves atomically and reuses an existing private name')
+    owner.request('saveCalendarEntry',dict(task,kind='habit',id=habit,category_choice=f'category:{custom_category}'))
+    check(next(h for h in owner.data()['habits'] if h['id']==habit)['category_id']==custom_category,'Existing habits can change category from the planner')
+    global_category=next(c for c in owner.data()['category_catalog'] if not c['selected'])['id']
+    owner.request('saveCalendarEntry',dict(task,id=second,category_choice=f'category:{global_category}'))
+    check(any(c['id']==global_category for c in owner.data()['categories']),'Explicitly choosing a catalog category enrolls the current user')
+    owner.request('leaveCategory',{'id':global_category},422)
+    owner.request('saveCalendarEntry',dict(task,id=first,category_choice=f"folder:{child['id']}"))
+    owner.request('deleteMindSpaceItem',dict(id=parent['id'],version=parent['version']))
+    after=owner.data()
+    check(next(t for t in after['calendar']['tasks'] if t['id']==first)['category_id']==category['id'] and next(c for c in after['categories'] if c['id']==category['id'])['source_folder_id'] is None,'Deleting a folder preserves its category and planned activities')

@@ -29,5 +29,5 @@
     <span class="badge mint">{{startDate}} – {{endDate}}</span>
   </div>
   <p class="muted">{{note}}</p>
-  {{templates}}{{board}}
+  {{templates}}{{board}}{{tasks}}
 </template>
