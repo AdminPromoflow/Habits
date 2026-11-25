@@ -167,70 +167,62 @@ function plannerEntries(date) {
 
 function plannerEntry(entry, date, compact = false) {
   const isHabit = entry.kind === 'habit';
-  return `<article class="planner-entry ${entry.completed ? 'is-done' : ''} ${isHabit ? 'is-habit' : 'is-task'} ${compact ? 'compact' : ''}">
+  const color = Math.abs(Number(entry.category_id || entry.id) || 0) % 7;
+  return `<article class="planner-entry planner-color-${color} ${entry.completed ? 'is-done' : ''} ${isHabit ? 'is-habit' : 'is-task'} ${compact ? 'compact' : ''}">
     ${compact ? '' : `<button class="planner-check" data-action="${isHabit ? 'toggle-habit' : 'planner-complete'}" data-id="${entry.id}" data-date="${date}" aria-label="${esc(t('record_progress') + ': ' + entry.name)}" aria-pressed="${entry.completed}" ${date > today() ? 'disabled' : ''}>${entry.completed ? icon('check') : ''}</button>`}
     <button class="planner-entry-content" data-action="${isHabit ? (entry.permission === 'owner' ? 'planner-edit-habit' : 'habit-detail') : 'planner-edit'}" data-id="${entry.id}" data-date="${date}"><strong>${esc(entry.name)}</strong><span>${entry.scheduled_time ? entry.scheduled_time.slice(0,5) + ' · ' : ''}${t('planner_'+entry.kind)}</span></button>
   </article>`;
 }
 
-function plannerDay() {
-  const entries = plannerEntries(S.date), untimed = entries.filter(e => !e.scheduled_time);
-  return `<section class="card planner-day">
-    <div class="planner-day-heading"><div><span class="eyebrow">${t('planner_your_day')}</span><h2>${esc(fmt(S.date,{weekday:'long',day:'numeric',month:'long'}))}</h2></div><span class="badge">${t('planner_count',{count:entries.length})}</span></div>
-    <div class="planner-all-day"><span>${t('planner_untimed')}</span><div>${untimed.length ? untimed.map(e => plannerEntry(e,S.date)).join('') : `<p class="muted">${t('planner_nothing_untimed')}</p>`}</div></div>
-    ${!entries.length ? `<p class="planner-empty-day">${t('planner_empty_hint')}</p>` : ''}
-    <div class="planner-timeline" aria-label="${t('planner_hours')}">${Array.from({length:24},(_,hour) => {
-      const time = String(hour).padStart(2,'0')+':00';
-      return `<div class="planner-hour"><time>${time}</time><div class="planner-hour-entries">${entries.filter(e => e.scheduled_time && Number(e.scheduled_time.slice(0,2)) === hour).map(e => plannerEntry(e,S.date)).join('')}</div><button class="icon-btn planner-hour-add" data-action="planner-add" data-date="${S.date}" data-time="${time}" aria-label="${esc(t('planner_add_at',{time}))}">${icon('plus')}</button></div>`;
-    }).join('')}</div></section>`;
-}
-
 function plannerWeek() {
   const dates = Array.from({length:7},(_,i) => shift(monday(S.date),i));
-  return `<div class="planner-week">${dates.map(date => {
-    const entries = plannerEntries(date);
-    return `<section class="card planner-week-day ${date === today() ? 'is-today' : ''}"><button class="planner-week-title" data-action="planner-day" data-date="${date}"><span>${fmt(date,{weekday:'long'})}</span><strong>${Number(date.slice(8))}</strong><small>${t('planner_count',{count:entries.length})}</small></button><div class="planner-week-entries">${entries.map(e => plannerEntry(e,date)).join('') || `<p class="muted">${t('planner_empty')}</p>`}</div><button class="planner-add-day text-btn" data-action="planner-add" data-date="${date}">${icon('plus')}${t('planner_add_short')}</button></section>`;
-  }).join('')}</div>`;
-}
-
-function plannerMonth() {
-  const first = S.date.slice(0,7)+'-01', month = first.slice(0,7), start = monday(first);
-  const weekdays = [1,2,3,4,5,6,7].map(n => `<span>${dayLabel(n)}</span>`).join('');
-  return `<section class="card planner-month"><div class="planner-month-scroll"><div class="planner-weekday-labels">${weekdays}</div><div class="planner-month-grid">${Array.from({length:42},(_,i) => {
-    const date = shift(start,i), entries = plannerEntries(date);
-    return `<div class="planner-month-day ${date.slice(0,7) !== month ? 'outside' : ''} ${date === today() ? 'is-today' : ''}"><div class="planner-cell-heading"><button data-action="planner-day" data-date="${date}" aria-label="${esc(fmt(date,{dateStyle:'full'}))}" class="planner-date-number">${Number(date.slice(8))}</button><button class="icon-btn" data-action="planner-add" data-date="${date}" aria-label="${esc(t('planner_add') + ': ' + fmt(date))}">${icon('plus')}</button></div>${entries.slice(0,3).map(e => plannerEntry(e,date,true)).join('')}${entries.length > 3 ? `<button class="text-btn planner-more" data-action="planner-day" data-date="${date}">${t('planner_more',{count:entries.length-3})}</button>` : ''}</div>`;
-  }).join('')}</div></div></section>`;
-}
-
-function plannerYear() {
-  const year = S.date.slice(0,4);
-  return `<div class="planner-year">${Array.from({length:12},(_,month) => {
-    const first = `${year}-${String(month+1).padStart(2,'0')}-01`, last = dateObj(first);
-    last.setUTCMonth(month+1,0);
-    const entries = Array.from({length:last.getUTCDate()},(_,i) => plannerEntries(shift(first,i)).length), count = entries.reduce((a,b) => a+b,0);
-    return `<button class="card planner-year-month" data-action="planner-month" data-date="${first}"><div class="planner-year-title"><h2>${fmt(first,{month:'long'})}</h2><span>${t('planner_count',{count})}</span></div><div class="planner-mini-grid">${[1,2,3,4,5,6,7].map(n => `<span class="muted">${dayLabel(n).slice(0,2)}</span>`).join('')}${Array.from({length:dayNum(first)-1},() => '<span></span>').join('')}${entries.map((n,i) => `<span class="${n ? 'has-entries' : ''} ${shift(first,i) === today() ? 'is-today' : ''}">${i+1}</span>`).join('')}</div></button>`;
-  }).join('')}</div>`;
+  const days = dates.map(date => ({date,entries:plannerEntries(date)}));
+  const slot = (day, hour = null) => {
+    const time = hour === null ? '' : String(hour).padStart(2,'0')+':00';
+    const entries = day.entries.filter(entry => hour === null ? !entry.scheduled_time : entry.scheduled_time && Number(entry.scheduled_time.slice(0,2)) === hour);
+    const label = `${fmt(day.date,{dateStyle:'full'})} · ${hour === null ? t('planner_add') : t('planner_add_at',{time})}`;
+    return `<div class="planner-slot ${day.date === today() ? 'is-today' : ''}" data-slot-date="${day.date}" data-slot-time="${time}">
+      <button class="planner-slot-add" data-action="planner-add" data-date="${day.date}" data-time="${time}" aria-label="${esc(label)}">${icon('plus')}</button>
+      ${entries.length ? `<div class="planner-slot-entries">${entries.map(entry => plannerEntry(entry,day.date)).join('')}</div>` : ''}
+    </div>`;
+  };
+  return `<section class="planner-week-scroll" aria-labelledby="planner-period" tabindex="0" data-week="${dates[0]}">
+    <div class="planner-week">
+      <div class="planner-week-header">
+        <div class="planner-week-row planner-day-labels">
+          <div class="planner-time-label planner-corner">${icon('clock')}<span>${t('planner_hour_column')}</span></div>
+          ${days.map((day,index) => `<div class="planner-week-title planner-color-${index} ${day.date === today() ? 'is-today' : ''}" ${day.date === today() ? 'aria-current="date"' : ''}>
+            <span>${esc(fmt(day.date,{weekday:'long'}))}</span><strong>${Number(day.date.slice(8))}</strong>
+            <small>${t('planner_count',{count:day.entries.length})}</small>
+          </div>`).join('')}
+        </div>
+        <div class="planner-week-row planner-untimed-row"><div class="planner-time-label">${t('planner_untimed')}</div>${days.map(day => slot(day)).join('')}</div>
+      </div>
+      <div class="planner-week-hours" aria-label="${esc(t('planner_hours'))}">
+        ${Array.from({length:24},(_,hour) => `<div class="planner-week-row planner-hour-row" data-hour="${hour}">
+          <div class="planner-time-label"><time>${String(hour).padStart(2,'0')}:00</time></div>${days.map(day => slot(day,hour)).join('')}
+        </div>`).join('')}
+      </div>
+    </div>
+  </section>`;
 }
 
 function calendarPage() {
-  const view = S.calendarView || 'day';
-  let title = fmt(S.date,{month:'long',year:'numeric'});
-  if (view === 'day') title = fmt(S.date,{day:'numeric',month:'long',year:'numeric'});
-  if (view === 'week') title = `${fmt(monday(S.date))} – ${fmt(shift(monday(S.date),6),{day:'numeric',month:'long',year:'numeric'})}`;
-  if (view === 'year') title = S.date.slice(0,4);
+  const start = monday(S.date), end = shift(start,6);
+  const title = `${fmt(start,{day:'numeric',month:'short',...(start.slice(0,4) !== end.slice(0,4) ? {year:'numeric'} : {})})} – ${fmt(end,{day:'numeric',month:'short',year:'numeric'})}`;
   return renderTemplate('calendar', {
     heading:heading(t('calendar'),t('calendar_subtitle'),`<button class="btn primary" data-action="planner-add">${icon('plus')}${t('planner_add')}</button>`),
-    tabs:['day','week','month','year'].map(v => `<button role="tab" id="planner-tab-${v}" aria-selected="${view === v}" aria-controls="planner-panel" tabindex="${view === v ? 0 : -1}" data-action="planner-view" data-view-mode="${v}" class="${view === v ? 'active' : ''}">${t('planner_'+v)}</button>`).join(''),
-    viewsLabel:t('planner_views'), currentView:view, title:esc(title), todayLabel:t('today'), previousLabel:t('previous'), nextLabel:t('next'), previousIcon:icon('chevron','flip'), nextIcon:icon('chevron'), date:S.date, dateLabel:t('select_date'),
-    content:({day:plannerDay,week:plannerWeek,month:plannerMonth,year:plannerYear}[view])(),
+    weekLabel:t('planner_week'), weekIcon:icon('calendar'), title:esc(title), todayLabel:t('today'), previousLabel:t('previous'), nextLabel:t('next'), previousIcon:icon('chevron','flip'), nextIcon:icon('chevron'), date:S.date, dateLabel:t('select_date'),
+    content:plannerWeek(), hintIcon:icon('clock'), hint:t('planner_week_hint'),
   });
 }
 
 class CalendarPage extends PageController {
   constructor() {
-    super(['date-prev','date-next','today','pick-date','calendar-date','month-prev','month-next','planner-view','planner-prev','planner-next','planner-add','planner-edit','planner-delete','planner-delete-habit','planner-edit-habit','planner-complete','planner-day','planner-month']);
+    super(['date-prev','date-next','today','pick-date','calendar-date','planner-prev','planner-next','planner-add','planner-edit','planner-delete','planner-delete-habit','planner-edit-habit','planner-complete']);
     document.addEventListener('change',event => {
       if (event.target.id !== 'planner-date' || !event.target.value || !event.target.validity.valid) return;
+      this.scrollPosition = null;
       S.date = event.target.value; S.month = S.date.slice(0,7); render();
     });
     document.addEventListener('keydown',async event => {
@@ -239,13 +231,23 @@ class CalendarPage extends PageController {
         const view = event.key === 'Home' ? 'calendar' : event.key === 'End' ? 'habits' : S.view === 'calendar' ? 'habits' : 'calendar';
         await navigate(view); $(`#planner-section-${view}`).focus(); return;
       }
-      if (!event.target.matches?.('.planner-tabs [role=tab]') || !['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
-      event.preventDefault();
-      const views = ['day','week','month','year'];
-      const index = views.indexOf(S.calendarView);
-      S.calendarView = views[event.key === 'Home' ? 0 : event.key === 'End' ? 3 : (index + (event.key === 'ArrowRight' ? 1 : 3)) % 4];
-      render(); $(`#planner-tab-${S.calendarView}`).focus();
     });
+  }
+
+  mount() {
+    const scroller = $('.planner-week-scroll');
+    if (!scroller) return;
+    const saved = this.scrollPosition;
+    if (saved?.week === scroller.dataset.week) {
+      scroller.scrollTop = saved.top;
+      scroller.scrollLeft = saved.left;
+    } else {
+      const firstHour = $('[data-hour="7"]',scroller);
+      scroller.scrollTop = firstHour.offsetTop - $('.planner-week-header',scroller).offsetHeight;
+    }
+    const remember = () => { this.scrollPosition = {week:scroller.dataset.week,top:scroller.scrollTop,left:scroller.scrollLeft}; };
+    scroller.addEventListener('scroll',remember,{passive:true});
+    remember();
   }
 
   async handleAction(action, el, id) {
@@ -271,24 +273,14 @@ class CalendarPage extends PageController {
       } finally { S.busy = false; if (el.isConnected) el.disabled = false; }
       return;
     }
-    if (action === 'planner-view') S.calendarView = el.dataset.viewMode;
-    if (['planner-day','pick-date','calendar-date'].includes(action)) {
+    if (['pick-date','calendar-date'].includes(action)) {
       S.date = el.dataset.date;
-      if (action !== 'pick-date') { S.calendarView = 'day'; S.view = 'calendar'; }
+      if (action === 'calendar-date') { this.scrollPosition = null; S.view = 'calendar'; }
     }
-    if (action === 'planner-month') { S.date = el.dataset.date; S.calendarView = 'month'; }
-    if (action === 'today') S.date = today();
+    if (action === 'today') { S.date = today(); this.scrollPosition = null; }
     if (['date-prev','date-next'].includes(action)) S.date = shift(S.date,action === 'date-next' ? 1 : -1);
-    if (['planner-prev','planner-next','month-prev','month-next'].includes(action)) {
-      const amount = action.endsWith('next') ? 1 : -1, view = action.startsWith('month') ? 'month' : S.calendarView;
-      if (view === 'day' || view === 'week') S.date = shift(S.date,amount*(view === 'week' ? 7 : 1));
-      else {
-        const date = dateObj(S.date.slice(0,7)+'-01');
-        date.setUTCMonth(date.getUTCMonth()+amount*(view === 'year' ? 12 : 1));
-        S.date = iso(date);
-      }
-    }
+    if (['planner-prev','planner-next'].includes(action)) S.date = shift(S.date,action === 'planner-next' ? 7 : -7);
     S.month = S.date.slice(0,7); render();
-    if (action === 'planner-view') $(`#planner-tab-${S.calendarView}`).focus();
+    if (['planner-prev','planner-next','today'].includes(action)) $(`[data-action="${action}"]`)?.focus({preventScroll:true});
   }
 }

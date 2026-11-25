@@ -743,6 +743,8 @@ return [
     'planner_untimed' => 'No set time',
     'planner_nothing_untimed' => 'No activities without a set time.',
     'planner_hours' => 'Hours of the day',
+    'planner_hour_column' => 'Time',
+    'planner_week_hint' => 'Click a time slot to plan an activity. Scroll to see all 24 hours.',
     'planner_add_at' => 'Add at {time}',
     'planner_your_day' => 'Your planner',
     'planner_empty' => 'No activities',

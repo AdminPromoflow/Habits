@@ -11,7 +11,6 @@ const S = {
   mode: 'personal',
   date: '',
   month: '',
-  calendarView: 'day',
   filter: { category: '', routine: '', status: 'active', search: '' },
   sharingTab: 'all',
   sharePerson: null,

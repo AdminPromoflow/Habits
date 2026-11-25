@@ -743,6 +743,8 @@ return [
     'planner_untimed' => 'Sin hora',
     'planner_nothing_untimed' => 'Sin actividades sin hora.',
     'planner_hours' => 'Horas del día',
+    'planner_hour_column' => 'Hora',
+    'planner_week_hint' => 'Pulsa una casilla para agregar una actividad. Desplázate para ver las 24 horas.',
     'planner_add_at' => 'Agregar a las {time}',
     'planner_your_day' => 'Tu agenda',
     'planner_empty' => 'Sin actividades',
