@@ -11,8 +11,7 @@
 .planner-period { font-size:1.2rem; }
 .planner-hint { display:flex; align-items:center; gap:8px; margin-top:13px; color:var(--muted); font-size:.8125rem; }
 .planner-hint .icon { width:15px; height:15px; }
-.planner-entry { display:flex; align-items:center; gap:10px; min-width:0; padding:10px 12px; border-radius:9px; border-left:3px solid var(--purple); background:var(--lavender-wash); }
-.planner-entry.is-task { border-left-color:#568c80; background:color-mix(in srgb,#70b3a3 13%,var(--surface)); }
+.planner-entry { display:flex; align-items:center; gap:10px; min-width:0; padding:10px 12px; border-radius:9px; border-left:3px solid var(--planner-color,var(--purple)); background:color-mix(in srgb,var(--planner-color,var(--purple)) 23%,var(--surface)); }
 .planner-entry.is-done strong { text-decoration:line-through; color:var(--muted); }
 .planner-check { border:1px solid var(--muted); width:22px; height:22px; border-radius:6px; flex:none; display:grid; place-items:center; padding:0; }
 .planner-check[aria-pressed=true] { color:white; background:var(--purple); border-color:var(--purple); }

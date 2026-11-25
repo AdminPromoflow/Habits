@@ -167,8 +167,11 @@ function plannerEntries(date) {
 
 function plannerEntry(entry, date, compact = false) {
   const isHabit = entry.kind === 'habit';
-  const color = Math.abs(Number(entry.category_id || entry.id) || 0) % 7;
-  return `<article class="planner-entry planner-color-${color} ${entry.completed ? 'is-done' : ''} ${isHabit ? 'is-habit' : 'is-task'} ${compact ? 'compact' : ''}">
+  const category = [...(S.data.categories || []),...(S.data.category_catalog || [])].find(item => Number(item.id) === Number(entry.category_id));
+  // Shared habits also carry their category color when it is absent from the personal catalog.
+  const categoryColor = category?.color || entry.color;
+  const color = /^#[0-9a-f]{6}$/i.test(categoryColor || '') ? categoryColor : '#B8A4D4';
+  return `<article class="planner-entry ${entry.completed ? 'is-done' : ''} ${isHabit ? 'is-habit' : 'is-task'} ${compact ? 'compact' : ''}" style="--planner-color:${color}">
     ${compact ? '' : `<button class="planner-check" data-action="${isHabit ? 'toggle-habit' : 'planner-complete'}" data-id="${entry.id}" data-date="${date}" aria-label="${esc(t('record_progress') + ': ' + entry.name)}" aria-pressed="${entry.completed}" ${date > today() ? 'disabled' : ''}>${entry.completed ? icon('check') : ''}</button>`}
     <button class="planner-entry-content" data-action="${isHabit ? (entry.permission === 'owner' ? 'planner-edit-habit' : 'habit-detail') : 'planner-edit'}" data-id="${entry.id}" data-date="${date}"><strong>${esc(entry.name)}</strong><span>${entry.scheduled_time ? entry.scheduled_time.slice(0,5) + ' · ' : ''}${t('planner_'+entry.kind)}</span></button>
   </article>`;
