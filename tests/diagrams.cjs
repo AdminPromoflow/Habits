@@ -590,7 +590,7 @@ test('double click edits with the caret at the end, and clicking inside keeps it
   assert.equal(event.prevented, true);
   assert.equal(home.editing, true);
   assert.equal(home.selected, true);
-  assert.equal(controls.hidden, false);
+  assert.equal(controls.hidden, true);
   assert.equal(field.readOnly, false);
   assert.equal(document.activeElement, field);
   assert.equal(field.selectionStart, field.value.length);
@@ -600,6 +600,7 @@ test('double click edits with the caret at the end, and clicking inside keeps it
   click(field);
   assert.equal(field.selectionStart, 3);
   assert.equal(field.selectionEnd, 3);
+  assert.equal(controls.hidden, true);
 });
 
 test('clicking outside deselects while decorative controls do not start actions', () => {
@@ -699,7 +700,7 @@ test('account reset and reload do not retain a previous node selection or editin
 });
 
 test('Shift Enter allows a native line break while Enter alone saves and leaves editing', async () => {
-  const { home, field, typeName, pressKey } = editor();
+  const { home, field, node, controls, document, typeName, pressKey } = editor();
   const requests = [];
   home.makeRequest = async (action, data) => {
     requests.push({ action, ...data });
@@ -707,10 +708,12 @@ test('Shift Enter allows a native line break while Enter alone saves and leaves 
   };
   home.beginEditing();
   typeName('Primera línea');
+  assert.equal(controls.hidden, true);
   const newline = pressKey('Enter', { shiftKey: true });
   assert.equal(newline.prevented, false);
   assert.equal(field.blurred, false);
   assert.equal(home.editing, true);
+  assert.equal(controls.hidden, true);
   assert.equal(requests.length, 0);
 
   // The browser inserts the newline and dispatches input when keydown is not cancelled.
@@ -721,6 +724,9 @@ test('Shift Enter allows a native line break while Enter alone saves and leaves 
   assert.equal(save.prevented, true);
   assert.equal(field.blurred, true);
   assert.equal(home.editing, false);
+  assert.equal(home.selected, true);
+  assert.equal(controls.hidden, false);
+  assert.equal(document.activeElement, node);
   assert.equal(requests.length, 1);
   assert.equal(requests[0].name, 'Nuevo diagrama');
   assert.equal(requests[0].nodes[0].text, 'Primera línea\nSegunda línea');
@@ -1700,6 +1706,7 @@ test('a new child is empty, focused and editable, then Enter saves only its type
   await home.addChild();
   const key = home.selectedKey;
   const child = fields.get(key);
+  assert.equal(home.element('controls', key).hidden, true);
   assert.equal(document.activeElement, child.field);
   assert.equal(child.field.value, '');
   assert.equal(child.field.readOnly, false);
@@ -1715,6 +1722,8 @@ test('a new child is empty, focused and editable, then Enter saves only its type
   assert.equal(requests[0].nodes.find((n) => n.id === key).text, 'Mi idea\nCon detalle');
   assert.equal(home.childDrafts.has(key), false);
   assert.equal(home.editing, false);
+  assert.equal(home.element('controls', key).hidden, false);
+  assert.equal(document.activeElement, child.node);
   assert.equal(home.hasChanges(), false);
 });
 

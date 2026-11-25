@@ -2,6 +2,56 @@
 
 // A small spreadsheet evaluator. Cell contents are data; no JavaScript is executed.
 class MindSpaceSheet {
+  static clipboardType = 'application/x-myremarkablemind-cells+json';
+  static clipboardText(rows) {
+    return rows.map(row => row.map(value => {
+      const text = value ?? '';
+      return /[\t\r\n"]/.test(text) ? `"${text.replaceAll('"','""')}"` : text;
+    }).join('\t')).join('\n');
+  }
+  static clipboardRows(text) {
+    const rows = [], source = text.replace(/\r\n?/g, '\n');
+    let row = [], value = '', quoted = false, closed = false;
+    const field = () => {
+      if (value.length > 2000 || row.length >= 52) throw new Error('ms_sheet_limit');
+      row.push(value); value = ''; closed = false;
+    };
+    const line = () => {
+      field();
+      if (rows.length >= 200) throw new Error('ms_sheet_limit');
+      rows.push(row); row = [];
+    };
+    for (let index = 0; index < source.length; index++) {
+      const character = source[index];
+      if (quoted) {
+        if (character === '"' && source[index+1] === '"') { value += '"'; index++; }
+        else if (character === '"') { quoted = false; closed = true; }
+        else value += character;
+      } else if (character === '\t') field();
+      else if (character === '\n') line();
+      else if (character === '"' && !value && !closed) quoted = true;
+      else {
+        if (closed) throw new Error('ms_clipboard_invalid');
+        value += character;
+      }
+      if (value.length > 2000) throw new Error('ms_sheet_limit');
+    }
+    if (quoted) throw new Error('ms_clipboard_invalid');
+    if (value || row.length || closed || !source.endsWith('\n')) line();
+    return rows;
+  }
+  static clipboardData(data) {
+    const custom = data.getData(this.clipboardType);
+    if (custom) {
+      try {
+        const saved = JSON.parse(custom), rows = saved.rows;
+        if (saved.version === 1 && Array.isArray(rows) && rows.length > 0 && rows.length <= 200
+          && rows.every(row => Array.isArray(row) && row.length > 0 && row.length <= 52
+            && row.every(value => value === null || (typeof value === 'string' && value.length <= 2000)))) return rows;
+      } catch { /* Standard tab-separated text remains available across applications. */ }
+    }
+    return this.clipboardRows(data.getData('text/plain'));
+  }
   static stylePresets = {
     default: {},
     heading: {background:'#5b427a',color:'#ffffff',bold:true,borders:'all',border_color:'#5b427a'},

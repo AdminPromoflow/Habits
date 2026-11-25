@@ -687,7 +687,7 @@ class HomePage extends PageController {
       }
       root?.classList.toggle('is-selected', selected);
       root?.classList.toggle('is-editing', editing);
-      if (controls) controls.hidden = !selected;
+      if (controls) controls.hidden = !selected || editing;
       if (menu) menu.hidden = !menuVisible;
       more?.setAttribute('aria-expanded', String(menuVisible));
       widthHandle?.setAttribute('aria-valuenow', String(this.nodeWidth(item)));

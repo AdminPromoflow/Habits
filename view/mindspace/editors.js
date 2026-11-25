@@ -178,6 +178,7 @@ class MindSpaceEditors {
   selectCell(key, {extend = false, add = false, toggle = false} = {}) {
     const [row,col] = MindSpaceSheet.address(key), sheet = this.space.draft;
     if (row >= sheet.rows || col >= sheet.columns) return;
+    this.editingCell = null;
     const next = add ? new Set(this.selectedCells) : new Set();
     if (extend) this.cellRange(this.selectionAnchor || this.cell, key).forEach(cell => next.add(cell));
     else if (toggle && next.has(key) && next.size > 1) next.delete(key);
@@ -254,10 +255,75 @@ class MindSpaceEditors {
     }
     this.space.draft.cell_styles = styles;
   }
+  selectionBounds(keys = this.selectionKeys()) {
+    const points = keys.map(MindSpaceSheet.address), rows = points.map(point => point[0]), columns = points.map(point => point[1]);
+    return {top:Math.min(...rows),bottom:Math.max(...rows),left:Math.min(...columns),right:Math.max(...columns)};
+  }
+  copyCells(event) {
+    if (!event.clipboardData) return;
+    const keys = new Set(this.selectionKeys()), {top,bottom,left,right} = this.selectionBounds(), rows = [];
+    for (let row = top; row <= bottom; row++) {
+      const values = [];
+      for (let column = left; column <= right; column++) {
+        const key = `${MindSpaceSheet.column(column)}${row+1}`;
+        values.push(keys.has(key) ? this.space.draft.cells[key] || '' : null);
+      }
+      rows.push(values);
+    }
+    event.clipboardData.setData('text/plain', MindSpaceSheet.clipboardText(rows));
+    // Keep gaps in a non-contiguous selection without copying unselected contents.
+    try { event.clipboardData.setData(MindSpaceSheet.clipboardType, JSON.stringify({version:1,rows})); } catch {}
+    event.preventDefault();
+  }
+  clearCells() {
+    const space = this.space;
+    if (!space.can('edit')) return;
+    const cells = {...space.draft.cells};
+    let changed = false;
+    for (const key of this.selectionKeys()) {
+      if (!MindSpaceSheet.locked(space.draft, key) && Object.hasOwn(cells, key)) { delete cells[key]; changed = true; }
+    }
+    if (!changed) return;
+    space.draft.cells = cells; this.editingCell = null;
+    space.changed(); this.refresh(); this.focusCell(this.cell);
+  }
+  pasteCells(event) {
+    if (!event.clipboardData) return;
+    const types = Array.from(event.clipboardData.types || []);
+    if (types.length && !types.includes('text/plain') && !types.includes(MindSpaceSheet.clipboardType)) return;
+    event.preventDefault();
+    const space = this.space;
+    if (!space.can('edit')) return;
+    let values;
+    try { values = MindSpaceSheet.clipboardData(event.clipboardData); }
+    catch (error) { toast(t(error.message), true); return; }
+    const keys = this.selectionKeys(), bounds = this.selectionBounds(keys), sheet = space.draft;
+    const scalar = values.length === 1 && values[0].length === 1;
+    if (!scalar && keys.length > 1 && (bounds.bottom-bounds.top+1)*(bounds.right-bounds.left+1) !== keys.length) {
+      toast(t('ms_paste_contiguous'), true); return;
+    }
+    const rows = scalar ? sheet.rows : Math.max(sheet.rows, bounds.top + values.length);
+    const columns = scalar ? sheet.columns : Math.max(sheet.columns, bounds.left + Math.max(...values.map(row => row.length)));
+    if (rows > 200 || columns > 52) { toast(t('ms_sheet_limit'), true); return; }
+    const cells = {...sheet.cells}, pasted = [], resized = {...sheet, rows, columns};
+    const write = (key, value) => {
+      if (value === null) return;
+      pasted.push(key);
+      if (MindSpaceSheet.locked(resized, key)) return;
+      if (value) cells[key] = value; else delete cells[key];
+    };
+    if (scalar) keys.forEach(key => write(key, values[0][0]));
+    else values.forEach((row,r) => row.forEach((value,c) => write(`${MindSpaceSheet.column(bounds.left+c)}${bounds.top+r+1}`, value)));
+    if (!pasted.some(key => !MindSpaceSheet.locked(resized, key))) return;
+    sheet.rows = rows; sheet.columns = columns; sheet.cells = cells;
+    MindSpaceSheet.prepare(sheet);
+    this.selectedCells = new Set(pasted); this.cell = pasted[0]; this.selectionAnchor = this.cell; this.editingCell = null;
+    space.changed(); this.refresh(); this.focusCell(this.cell);
+  }
   sheet() {
     const sheet = this.space.draft, evaluator = new MindSpaceSheet(sheet);
     if (this.sheetItemId !== this.space.active.id || this.sheetGeneration !== this.space.generation) {
-      this.endCellSelection(); this.cell = 'A1'; this.selectionAnchor = 'A1'; this.selectedCells = new Set(['A1']);
+      this.endCellSelection(); this.cell = 'A1'; this.selectionAnchor = 'A1'; this.selectedCells = new Set(['A1']); this.editingCell = null;
       this.sheetItemId = this.space.active.id; this.sheetGeneration = this.space.generation;
     }
     const returns = this.space.targetReturnLinks(), ledger = sheet.template === 'ledger', bands = this.sheetBands();
@@ -270,7 +336,7 @@ class MindSpaceEditors {
         const error = this.sheetCellError(key, evaluator);
         const format = MindSpaceSheet.format(sheet.cell_styles?.[key]);
         return `<td role="gridcell" data-ms-grid-cell="${key}" aria-selected="${this.selectedCells.has(key)}" class="${this.selectedCells.has(key) ? 'is-selected' : ''}"${format.border ? ` style="${esc(format.border)}"` : ''}><div class="ms-sheet-cell${back ? ' has-return' : ''}"><input data-ms-cell="${key}" aria-label="${key}${sheet.template && row > 0 ? ` · ${esc(sheet.cells[`${MindSpaceSheet.column(col)}1`] || '')}` : ''}" autocomplete="off" spellcheck="false" maxlength="2000" ${locked ? 'readonly' : ''} ${date ? `aria-haspopup="dialog" title="${esc(error || t('select_date'))}"` : ''} ${ledger && row > 0 && [3,4].includes(col) ? 'inputmode="decimal"' : ''} ${error ? `aria-invalid="true"${date ? '' : ` title="${esc(error)}"`}` : ''} ${format.text ? `style="${esc(format.text)}"` : ''} value="${esc(evaluator.display(key))}">${back}</div></td>`;
-      }).join('')}</tr>`).join('')}</tbody></table></div>${this.space.can('edit') ? `<div class="ms-sheet-settings"><span>${esc(t('ms_selection'))} <strong data-ms-style-address>${esc(this.selectionLabel())}</strong></span><button type="button" class="btn secondary" data-action="ms-sheet-settings" aria-haspopup="dialog">${icon('settings')}${esc(t('settings'))}</button></div><p class="ms-sheet-hint">${esc(t('ms_selection_hint'))}</p>` : ''}<p class="ms-sheet-hint">${esc(t(ledger ? 'ms_ledger_hint' : 'ms_sheet_hint'))}</p>${sheet.template ? `<p class="ms-sheet-hint">${esc(t('ms_template_calculated_hint'))}</p>` : ''}</div>
+      }).join('')}</tr>`).join('')}</tbody></table></div>${this.space.can('edit') ? `<div class="ms-sheet-settings"><span>${esc(t('ms_selection'))} <strong data-ms-style-address>${esc(this.selectionLabel())}</strong></span><button type="button" class="btn secondary" data-action="ms-sheet-settings" aria-haspopup="dialog">${icon('settings')}${esc(t('settings'))}</button></div><p class="ms-sheet-hint">${esc(t('ms_selection_hint'))}</p><p class="ms-sheet-hint">${esc(t('ms_clipboard_hint'))}</p>` : ''}<p class="ms-sheet-hint">${esc(t(ledger ? 'ms_ledger_hint' : 'ms_sheet_hint'))}</p>${sheet.template ? `<p class="ms-sheet-hint">${esc(t('ms_template_calculated_hint'))}</p>` : ''}</div>
       ${ledger ? `<aside class="ms-ledger-summary" aria-label="${esc(t('ms_ledger_totals'))}"><h3>${esc(t('ms_ledger_totals'))}</h3><p>${esc(t('ms_ledger_totals_hint'))}</p><dl aria-live="polite" aria-atomic="true" data-ms-ledger-totals>${this.ledgerTotals(evaluator)}</dl><p class="ms-ledger-error" data-ms-ledger-error ${Object.values(evaluator.ledgerSummary()).every(value => typeof value === 'number') ? 'hidden' : ''}>${esc(t('ms_ledger_amount_error'))}</p><span class="ms-ledger-live">${esc(t('ms_ledger_live'))}</span></aside>` : ''}</div></div>`;
   }
   async datePickerForm(key, input) {
@@ -468,8 +534,23 @@ class MindSpaceEditors {
     if (type === 'change' && input.dataset.msCardStatus) this.moveCard(input.dataset.msCardStatus, input.value);
     if (type === 'change' && input.matches?.('[data-ms-habit-date]')) { S.date = input.value || today(); this.refresh(); }
     const key = input.dataset.msCell;
+    if (key && type === 'copy') {
+      if (this.selectedCells.size > 1 || this.editingCell !== key) this.copyCells(event);
+      return;
+    }
+    if (key && type === 'dblclick') { this.selectCell(key); this.editingCell = key; return; }
     if (type === 'click' && input.closest?.('.ms-sheet-scroll') && this.skipCellClick) { this.skipCellClick = false; event.preventDefault(); return; }
     if (type === 'keydown' && key) {
+      const editing = this.editingCell === key && this.selectedCells.size === 1;
+      if (['Delete','Backspace'].includes(event.key) && !editing) { event.preventDefault(); this.clearCells(); return; }
+      if (event.key === 'F2' && !MindSpaceSheet.locked(space.draft,key)) {
+        event.preventDefault(); this.selectCell(key); this.editingCell = key;
+        input.setSelectionRange?.(input.value.length,input.value.length); return;
+      }
+      if (editing && event.key !== 'Escape' && event.key !== 'Enter') return;
+      if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey && !MindSpaceSheet.locked(space.draft,key)) {
+        this.selectCell(key); this.editingCell = key; input.select?.(); return;
+      }
       const direction = {ArrowUp:[-1,0],ArrowDown:[1,0],ArrowLeft:[0,-1],ArrowRight:[0,1]}[event.key];
       if (event.shiftKey && direction) {
         event.preventDefault();
@@ -504,32 +585,27 @@ class MindSpaceEditors {
     if (type === 'input' && (key || input.matches?.('[data-ms-formula]'))) {
       const address = key || this.cell;
       if (MindSpaceSheet.locked(space.draft, address)) return;
+      if (key) {
+        if (this.selectedCells.size > 1) this.selectCell(key);
+        this.editingCell = key;
+      }
       space.draft.cells = { ...space.draft.cells, [address]:input.value };
       if (!input.value) delete space.draft.cells[address];
       if (key) document.querySelector('[data-ms-formula]').value = input.value;
       space.changed(); this.recalculate();
     }
-    if (type === 'focusout' && key) input.value = new MindSpaceSheet(space.draft).display(key);
+    if (type === 'focusout' && key) {
+      input.value = new MindSpaceSheet(space.draft).display(key);
+      if (this.editingCell === key) this.editingCell = null;
+    }
     if (type === 'keydown' && key && event.key === 'Enter') {
       event.preventDefault();
       const [row,col] = MindSpaceSheet.address(key), next = `${MindSpaceSheet.column(col)}${Math.max(1, Math.min(space.draft.rows, row + (event.shiftKey ? 0 : 2)))}`;
       document.querySelector(`[data-ms-cell="${next}"]`)?.focus();
     }
     if (type === 'paste' && key) {
-      if (MindSpaceSheet.locked(space.draft, key)) { event.preventDefault(); return; }
-      const text = event.clipboardData.getData('text/plain');
-      if (!text.includes('\t') && !text.includes('\n')) return;
-      event.preventDefault();
-      const values = text.replace(/\r/g, '').replace(/\n$/, '').split('\n').map(row => row.split('\t'));
-      const [startRow,startCol] = MindSpaceSheet.address(key), rows = startRow + values.length, columns = startCol + Math.max(...values.map(row => row.length));
-      if (rows > 200 || columns > 52 || values.some(row => row.some(value => value.length > 2000))) { toast(t('ms_sheet_limit'), true); return; }
-      space.draft.rows = Math.max(space.draft.rows, rows); space.draft.columns = Math.max(space.draft.columns, columns);
-      values.forEach((row,r) => row.forEach((value,c) => {
-        const address = `${MindSpaceSheet.column(startCol + c)}${startRow + r + 1}`;
-        if (!MindSpaceSheet.locked(space.draft, address)) space.draft.cells[address] = value;
-      }));
-      MindSpaceSheet.prepare(space.draft);
-      space.changed(); this.refresh(); document.querySelector(`[data-ms-cell="${key}"]`)?.focus();
+      if (this.selectedCells.size === 1 && this.editingCell === key && !MindSpaceSheet.locked(space.draft,key)) return;
+      this.pasteCells(event);
     }
   }
   exportSheet() {
