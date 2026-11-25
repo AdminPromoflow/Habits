@@ -141,6 +141,7 @@ class DiagramLinks {
   }
 
   showPicker(node, diagrams, generation, items = []) {
+    this.disposePreview?.();
     const home = this.home;
     const documents = [...diagrams.map(item => ({...item, kind:'diagram', key:`diagram:${item.id}`})),
       ...items.filter(item => item.kind !== 'diagram').map(item => ({...item, key:`item:${item.id}`}))];
@@ -148,7 +149,7 @@ class DiagramLinks {
     let target = documents.find(item => item.key === savedKey) || documents.find(item => item.key === `diagram:${home.active.id}`) || documents[0];
     if (!target) return;
     let key = target.key === savedKey ? (target.kind === 'diagram' ? node.link.node_id : node.link.target?.id) : null;
-    let scope = key ? (node.link?.target?.type === 'column' ? 'column' : 'part') : 'whole', scale = 1, plan;
+    let scope = key ? (node.link?.target?.type === 'column' ? 'column' : 'part') : 'whole', plan;
     const targetType = () => target.kind === 'diagram' ? 'topic' : scope === 'column' ? 'column' : MindSpaceLinkTargets.type(target);
     const choices = () => target.kind === 'diagram' ? target.nodes.map((item, index) => ({id:item.id, label:item.text || `${t('diagram_link_untitled')} ${index + 1}`})) : MindSpaceLinkTargets.choices(target, undefined, targetType());
     const linkValue = () => target.kind === 'diagram' ? {diagram_id:target.id, node_id:scope === 'part' ? key : null}
@@ -183,6 +184,21 @@ class DiagramLinks {
     const form = document.getElementById('diagram-link-form'), select = form.querySelector('#diagram-link-diagram');
     const topic = form.querySelector('#diagram-link-node'), cell = form.querySelector('#diagram-link-cell'), preview = form.querySelector('.diagram-link-preview');
     const valid = () => generation === home.generation && home.nodes.includes(node) && form.isConnected;
+    const camera = new DiagramViewport({canInteract: () => valid() && target.kind === 'diagram',
+      canPanFrom: element => !element.closest?.('[data-link-target]')});
+    this.previewCamera = camera;
+    const modal = form.closest('dialog');
+    const resize = new ResizeObserver(() => camera.render());
+    const removal = new MutationObserver(() => { if (!form.isConnected) dispose(); });
+    const dispose = () => {
+      camera.detach(); resize.disconnect(); removal.disconnect();
+      modal?.removeEventListener('close', dispose);
+      if (this.previewCamera === camera) { this.previewCamera = null; this.disposePreview = null; }
+    };
+    this.disposePreview = dispose;
+    modal?.addEventListener('close', dispose, {once:true});
+    if (modal) removal.observe(modal, {childList:true});
+    resize.observe(preview);
     const update = () => {
       const type = targetType(), selected = choices().find(item => item.id === key);
       if (!type) scope = 'whole';
@@ -203,16 +219,25 @@ class DiagramLinks {
         : validTarget() ? `${target.name} → ${type === 'cell' ? key : selected.label}` : t(type === 'cell' ? 'ms_link_cell_invalid' : 'ms_link_choose_part');
       form.querySelector('[type="submit"]').disabled = !validTarget();
     };
-    const zoom = value => {
+    const fit = () => {
       if (!plan) return;
-      scale = value; const svg = preview.querySelector('svg');
-      svg.style.width = `${plan.width * scale}px`; svg.style.height = `${plan.height * scale}px`;
+      camera.cancelInteraction();
+      camera.scale = Math.min(1, Math.max(1, preview.clientWidth - 24) / plan.width,
+        Math.max(1, preview.clientHeight - 24) / plan.height);
+      camera.x = camera.y = 0;
+      camera.render();
     };
-    const fit = () => { if (plan) zoom(Math.min(1, Math.max(1, preview.clientWidth - 24) / plan.width, 280 / plan.height)); };
     const draw = () => {
+      camera.reset();
       const result = target.kind === 'diagram' ? this.preview(target) : {html:MindSpaceLinkTargets.preview(target), plan:null};
       plan = result.plan; preview.innerHTML = result.html;
       preview.classList.toggle('is-sheet-preview', target.kind === 'spreadsheet');
+      preview.classList.toggle('is-diagram-preview', !!plan);
+      if (plan) {
+        const svg = preview.querySelector('svg');
+        svg.style.width = `${plan.width}px`; svg.style.height = `${plan.height}px`;
+        camera.mount(preview, svg, {anchorX:plan.width/2, anchorY:plan.height/2, bounds:plan.nodes});
+      }
       fit(); update(); preview.scrollLeft = 0; preview.scrollTop = 0;
     };
     select.value = target.key;
@@ -226,9 +251,14 @@ class DiagramLinks {
       event.preventDefault(); key = item.dataset.linkTarget; scope = item.dataset.linkType === 'column' ? 'column' : 'part'; update();
     };
     preview.addEventListener('click', choose); preview.addEventListener('keydown', choose);
+    preview.addEventListener('focusin', event => {
+      if (plan && event.target.matches('[data-link-target]')) camera.reveal(event.target);
+    });
     form.querySelectorAll('[data-preview-zoom]').forEach(button => button.addEventListener('click', () => {
       const action = button.dataset.previewZoom;
-      if (action === 'fit') fit(); else zoom(Math.max(0.001, Math.min(2, scale * (action === 'in' ? 1.5 : 1 / 1.5))));
+      if (action === 'fit') fit();
+      else if (plan) camera.zoomAt(camera.scale * (action === 'in' ? 1.5 : 1 / 1.5),
+        {x:preview.clientWidth/2,y:preview.clientHeight/2});
     }));
     const apply = async link => {
       if (!valid()) { closeModal(); return; }

@@ -48,9 +48,10 @@ function habitForm(h = null, template = false) {
         .map((r) => [r.id, r.name]),
       h?.routine_id || routine?.id || '',
       t('no_routine')
-    )}</div><div class="form-grid">${field('goal', 'goal', 'number', h?.goal || 1, { required: true, min: 0.01, max: 999999, step: 0.01 })}${field('unit', 'unit', 'text', h?.unit || '', { maxlength: 40 })}</div>${daysField(h?.schedule_days ? (Array.isArray(h.schedule_days) ? h.schedule_days : JSON.parse(h.schedule_days)) : [1, 2, 3, 4, 5, 6, 7])}<div class="form-grid three">${field('scheduled_time', 'time', 'time', h?.scheduled_time?.slice(0, 5) || '')}${field('start_date', 'start_date', 'date', h?.start_date || routine?.start_date || today(), { required: true })}${field('end_date', 'end_date', 'date', h?.end_date || routine?.end_date || '')}</div>${field('section', 'section', 'text', h?.section || '', { maxlength: 150 })}<p class="info-line">${icon('lock')}${t('private_promise')}</p>${formFooter(h && !template ? 'save' : 'create')}</form>`,
+    )}</div><div class="form-grid">${field('goal', 'goal', 'number', h?.goal || 1, { required: true, min: 0.01, max: 999999, step: 0.01 })}${field('unit', 'unit', 'text', h?.unit || '', { maxlength: 40 })}</div>${plannerScheduleFields({...h, start_date: h?.start_date || routine?.start_date || today(), end_date: h?.end_date || routine?.end_date || '', recurrence: h?.recurrence || 'weekly'})}${field('section', 'section', 'text', h?.section || '', { maxlength: 150 })}<p class="info-line">${icon('lock')}${t('private_promise')}</p>${formFooter(h && !template ? 'save' : 'create')}</form>`,
     true
   );
+  bindPlannerSchedule($('#modal form'));
   if (!own) {
     $('[name=category_id]', $('#modal')).disabled = true;
     $('[name=routine_id]', $('#modal')).disabled = true;

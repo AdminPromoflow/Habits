@@ -120,6 +120,7 @@ async function navigate(view) {
     S.sharingTab = 'all'; S.sharePerson = null;
     S.shareFilter = { permission: '', category: '', owner: '', status: '', search: '' };
   }
+  if (view === 'calendar') { S.calendarView = 'day'; S.date = today(); S.month = S.date.slice(0, 7); }
   if (view === 'habits') {
     S.filter = { category: '', routine: '', status: 'active', search: '' };
     S.categoryId = null;

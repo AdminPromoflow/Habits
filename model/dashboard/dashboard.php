@@ -28,6 +28,7 @@ final class DashboardModel extends BaseModel
             'diagrams' => (new DiagramsModel($this->db, $this->user))->list(),
             'today' => $this->today(),
             'habits' => $habits,
+            'calendar' => (new CalendarModel($this->db, $this->user))->data(),
             'completions' => $completions,
             'categories' => $this->db->all(
                 'SELECT c.id,c.owner_user_id,c.name,c.translation_key,c.description,c.icon,c.color FROM habit_categories c WHERE c.owner_user_id=? OR (c.owner_user_id IS NULL AND EXISTS(SELECT 1 FROM user_categories uc WHERE uc.user_id=? AND uc.category_id=c.id)) ORDER BY c.owner_user_id IS NOT NULL DESC,c.id',

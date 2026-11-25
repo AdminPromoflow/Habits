@@ -284,6 +284,10 @@
 .diagram-link-preview-tools .btn { min-width: 36px; padding: 6px 10px; }
 .diagram-link-preview { height: 320px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 12px; margin: 8px 0 16px; }
 .diagram-link-preview > svg { display: block; max-width: none; margin: auto; overflow: visible; }
+.diagram-link-preview.is-diagram-preview { position: relative; padding: 0; overflow: hidden; overscroll-behavior: contain; touch-action: none; cursor: grab; }
+.diagram-link-preview.is-diagram-preview > svg { position: absolute; top: 0; left: 0; margin: 0; }
+.diagram-link-preview.is-diagram-preview.is-panning,
+.diagram-link-preview.is-diagram-preview.is-panning * { cursor: grabbing; user-select: none; }
 .diagram-link-preview-edges { fill: none; stroke: var(--lavender); stroke-width: 2; }
 .diagram-link-preview [data-link-target] { cursor: pointer; outline: none; }
 .diagram-link-preview rect { fill: var(--lavender-wash); stroke: var(--lavender); stroke-width: 2; }

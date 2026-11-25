@@ -3,7 +3,7 @@ DirectoryIndex index.php
 <IfModule mod_rewrite.c>
 RewriteEngine On
 RewriteRule ^(?:app|model|config|database|bin|tests|docs|storage|tmp|translations)(?:/|$) - [F,L,NC]
-RewriteRule ^controller/(?:dashboard|users|habits|categories|routines|sharing|profile|admin|diagrams|mindspaces)/index\.php$ - [L]
+RewriteRule ^controller/(?:dashboard|users|habits|calendar|categories|routines|sharing|profile|admin|diagrams|mindspaces)/index\.php$ - [L]
 RewriteRule ^controller(?:/|$) - [F,L,NC]
 RewriteRule ^view/.*\.php$ - [F,L,NC]
 RewriteRule (^|/)\. - [F,L]

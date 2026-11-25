@@ -111,7 +111,7 @@
         <button type="button" role="menuitem" id="diagram-checkbox-tool{{suffix}}" data-action="diagram-checkbox-menu"
           aria-haspopup="menu" aria-expanded="false" aria-controls="diagram-checkbox-menu{{suffix}}"
           aria-label="{{checkboxLabel}}" title="{{checkboxLabel}}">{{checkboxIcon}}</button>
-        <button type="button" role="menuitem" disabled aria-label="{{calendarLabel}}" title="{{calendarLabel}}">{{calendarIcon}}</button>
+        <button type="button" role="menuitem" data-action="schedule-diagram-node" aria-label="{{calendarLabel}}" title="{{calendarLabel}}">{{calendarIcon}}</button>
         <button type="button" role="menuitem" data-action="labels-diagram-node" aria-label="{{tagLabel}}" title="{{tagLabel}}">{{tagIcon}}</button>
         <button type="button" role="menuitem" data-action="diagram-layout" aria-label="{{branchLabel}}" title="{{branchLabel}}">{{branchIcon}}</button>
         <button type="button" role="menuitem" disabled aria-label="{{resizeLabel}}" title="{{resizeLabel}}">{{resizeIcon}}</button>

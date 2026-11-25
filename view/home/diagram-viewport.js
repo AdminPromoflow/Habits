@@ -2,10 +2,12 @@
 
 // The camera is view state only. Diagram coordinates and saved layouts stay intact.
 class DiagramViewport {
-  constructor({ canInteract = () => true, onInteractionStart = () => {}, onPinchStart = () => {} } = {}) {
+  constructor({ canInteract = () => true, onInteractionStart = () => {}, onPinchStart = () => {},
+    canPanFrom = target => !target.closest?.('.diagram-root, .diagram-connection') } = {}) {
     this.canInteract = canInteract;
     this.onInteractionStart = onInteractionStart;
     this.onPinchStart = onPinchStart;
+    this.canPanFrom = canPanFrom;
     this.x = 0;
     this.y = 0;
     this.scale = 1;
@@ -208,7 +210,7 @@ class DiagramViewport {
     this.suppressClickUntil = 0;
     this.lastPoint = this.point(event);
     if (event.button !== 0 || this.pan || this.gesture || !this.allowed(event) ||
-        event.target.closest?.('.diagram-root') || event.target.closest?.('.diagram-connection')) return;
+        !this.canPanFrom(event.target)) return;
     event.preventDefault();
     this.pan = {
       id: event.pointerId,

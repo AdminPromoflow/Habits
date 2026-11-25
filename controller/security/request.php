@@ -64,6 +64,7 @@ final class Request
                 'dashboard' => DashboardController::class,
                 'users' => AuthController::class,
                 'habits' => HabitsController::class,
+                'calendar' => CalendarController::class,
                 'categories' => CategoriesController::class,
                 'routines' => RoutinesController::class,
                 'sharing' => SharingController::class,

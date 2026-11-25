@@ -11,6 +11,7 @@ const S = {
   mode: 'personal',
   date: '',
   month: '',
+  calendarView: 'day',
   filter: { category: '', routine: '', status: 'active', search: '' },
   sharingTab: 'all',
   sharePerson: null,
@@ -134,11 +135,17 @@ function habitCategory(h) {
 }
 
 function scheduled(h, date) {
-  return (
-    date >= (h.tracking_start || h.start_date) &&
-    (!h.end_date || date <= h.end_date) &&
-    h.schedule_days.includes(dayNum(date))
-  );
+  if (date < (h.tracking_start || h.start_date) || date < h.start_date || (h.end_date && date > h.end_date)) return false;
+  const recurrence = h.recurrence || 'weekly';
+  const day = Number(date.slice(8)), anchor = Number(h.start_date.slice(8));
+  const d = dateObj(date);
+  d.setUTCMonth(d.getUTCMonth() + 1, 0);
+  const monthDay = Math.min(anchor, d.getUTCDate());
+  if (recurrence === 'once') return date === h.start_date;
+  if (recurrence === 'daily') return true;
+  if (recurrence === 'monthly') return day === monthDay;
+  if (recurrence === 'yearly') return date.slice(5, 7) === h.start_date.slice(5, 7) && day === monthDay;
+  return recurrence === 'weekly' && h.schedule_days.includes(dayNum(date));
 }
 
 function completion(h, date) {
@@ -197,6 +204,7 @@ function streak() {
 }
 
 function scheduleLabel(h) {
+  if (h.recurrence && h.recurrence !== 'weekly') return h.recurrence === 'once' ? fmt(h.start_date, {dateStyle:'medium'}) : t('planner_' + h.recurrence);
   return h.schedule_days.length === 7
     ? t('schedule_daily')
     : h.schedule_days.map((n) => dayLabel(n)).join(' · ');

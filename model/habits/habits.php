@@ -77,26 +77,11 @@ final class Habits extends BaseModel
         $description = Validate::text($d, 'description', 5000, false);
         $goal = Validate::number($d['goal'] ?? 1, 0.01);
         $unit = Validate::text($d, 'unit', 40, false);
-        $days = Validate::days($d['schedule_days'] ?? [1, 2, 3, 4, 5, 6, 7]);
-        $start = Validate::date($d['start_date'] ?? $this->today());
-        $end = !empty($d['end_date']) ? Validate::date($d['end_date']) : null;
-        if ($end && $end < $start) {
-            fail('error_date');
-        }
-        $time = $d['scheduled_time'] ?? null;
-        if ($time === '') {
-            $time = null;
-        }
-        if (
-            $time !== null &&
-            (!is_string($time) || !preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d(?::00)?$/D', $time))
-        ) {
-            fail('error_validation');
-        }
+        [$recurrence, $days, $start, $end, $time] = Schedule::fields($d + ['recurrence' => $old['recurrence'] ?? 'weekly'], $this->today());
         $section = Validate::text($d, 'section', 150, false);
         if ($old) {
             $this->db->run(
-                'UPDATE habits SET name=?,description=?,category_id=?,routine_id=?,goal=?,unit=?,schedule_days=?,scheduled_time=?,start_date=?,end_date=?,section=? WHERE id=?',
+                'UPDATE habits SET name=?,description=?,category_id=?,routine_id=?,goal=?,unit=?,schedule_days=?,scheduled_time=?,start_date=?,end_date=?,section=?,recurrence=? WHERE id=?',
                 [
                     $name,
                     $description,
@@ -109,6 +94,7 @@ final class Habits extends BaseModel
                     $start,
                     $end,
                     $section,
+                    $recurrence,
                     $id,
                 ],
             );
@@ -122,7 +108,7 @@ final class Habits extends BaseModel
             $this->activity($id, 'habit_updated');
         } else {
             $this->db->run(
-                'INSERT INTO habits(owner_user_id,category_id,routine_id,name,description,goal,unit,schedule_days,scheduled_time,start_date,end_date,section) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+                'INSERT INTO habits(owner_user_id,category_id,routine_id,name,description,goal,unit,schedule_days,scheduled_time,start_date,end_date,section,recurrence) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
                 [
                     $owner,
                     $category,
@@ -136,6 +122,7 @@ final class Habits extends BaseModel
                     $start,
                     $end,
                     $section,
+                    $recurrence,
                 ],
             );
             $id = $this->db->id();
@@ -153,12 +140,7 @@ final class Habits extends BaseModel
 
     public static function scheduled(array $h, string $date): bool
     {
-        $days = is_array($h['schedule_days'])
-            ? $h['schedule_days']
-            : json_decode($h['schedule_days'], true);
-        return $date >= $h['start_date'] &&
-            (!$h['end_date'] || $date <= $h['end_date']) &&
-            in_array((int) (new DateTimeImmutable($date))->format('N'), $days, true);
+        return Schedule::occurs($h, $date);
     }
 
     public function complete(array $d): void

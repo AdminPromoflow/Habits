@@ -131,6 +131,22 @@ function almost(actual, expected) {
   assert.ok(Math.abs(actual - expected) < 0.00001, `${actual} != ${expected}`);
 }
 
+test('preview topics keep normal clicks while wheel and pinch gestures still navigate over them', () => {
+  const {camera,surface,element}=harness();
+  const topic=element({tag:'g',parent:surface});
+  camera.canPanFrom=target=>target!==topic;
+  const down=surface.emit('pointerdown',{target:topic});
+  assert.equal(camera.pan,null);
+  assert.equal(down.prevented,false);
+  surface.emit('wheel',{target:topic,deltaX:30,deltaY:20});
+  assert.equal(camera.x,-30);assert.equal(camera.y,-20);
+  surface.emit('wheel',{target:topic,ctrlKey:true,deltaY:-40});
+  assert.ok(camera.scale>1);
+  surface.emit('pointerdown');
+  surface.emit('pointermove',{clientX:440,clientY:270});
+  assert.equal(camera.pan.moving,true,'background dragging remains available');
+});
+
 function worldAt(camera, surface, localX, localY) {
   return [(localX - surface.clientWidth / 2 - camera.x) / camera.scale,
     (localY - surface.clientHeight / 2 - camera.y) / camera.scale];

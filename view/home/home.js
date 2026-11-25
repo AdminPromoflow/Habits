@@ -5,7 +5,7 @@ class HomePage extends PageController {
     super(['create-diagram', 'retry-diagram', 'toggle-diagram-menu', 'toggle-diagram-branch', 'diagram-layout', 'diagram-colors', 'add-diagram-child', 'add-diagram-sibling',
       'diagram-checkbox-menu', 'diagram-checkbox-state', 'toggle-diagram-picker', 'select-diagram',
       'copy-diagram-node', 'cut-diagram-node', 'paste-diagram-node', 'delete-diagram-node', 'image-diagram-node', 'labels-diagram-node',
-      'link-diagram-node', 'open-diagram-link', 'open-diagram-return', 'choose-diagram-return', 'diagram-link-ancestor', 'diagram-link-child',
+      'schedule-diagram-node', 'link-diagram-node', 'open-diagram-link', 'open-diagram-return', 'choose-diagram-return', 'diagram-link-ancestor', 'diagram-link-child',
       'diagram-link-branch', 'diagram-link-menu', 'diagram-link-order']);
     this.nodeTools = new DiagramNodeTools(this);
     this.links = new DiagramLinks(this);
@@ -217,6 +217,7 @@ class HomePage extends PageController {
     this.links?.navigation.memory.clear();
     this.links?.navigation.closeMenu();
     this.links?.hideTooltip();
+    this.links?.disposePreview?.();
     this.connectionTool?.cancel();
     this.connectionTool?.clearSelection();
     this.finishNodeDrag(false);
@@ -1356,6 +1357,12 @@ class HomePage extends PageController {
     if (action === 'cut-diagram-node') return this.nodeTools.copy(true);
     if (action === 'paste-diagram-node') return this.nodeTools.paste();
     if (action === 'delete-diagram-node') return this.nodeTools.remove();
+    if (action === 'schedule-diagram-node') {
+      this.commitName();
+      const node = this.ensureTree().find(item => item.id === this.selectedKey);
+      this.menuOpen = false; this.syncNodeState();
+      return plannerForm(null, {name: node?.text || ''});
+    }
     if (action === 'image-diagram-node') return this.nodeTools.openImage();
     if (action === 'labels-diagram-node') return this.nodeTools.openLabels();
     if (action === 'link-diagram-node') return this.links.open();
