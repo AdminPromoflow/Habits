@@ -17,7 +17,7 @@ test('diagram palettes and background save without changing structure, reload, a
   restored.home.render();restored.home.drawStage();
   assert.equal(restored.home.colorTheme,'pastel');
   assert.equal(restored.stage.style.backgroundColor,'#fff4dd');
-  assert.match(JSON.parse(restored.home.nodeContent(restored.home.nodes[0])).colorStyle,/--diagram-node-bg:#d7c6e8/);
+  assert.match(JSON.parse(restored.home.nodeContent(restored.home.nodes[0])).colorStyle,/--diagram-node-bg:#e4b9cc/);
   await home.colors.apply({theme:'pastel',diagramColor:'#354052',canvasColor:'#e6f4ee'});
   assert.equal(home.colors.node(home.nodes[0]).text,'#ffffff');
   await home.history.undo();
@@ -39,6 +39,10 @@ test('color themes follow branches for new descendants and color their connector
   assert.equal(home.colors.line({from:'root',to:'a'}),home.colors.node(a).border);
   home.nodes.push({id:'d',parent_id:'c',text:''});
   assert.equal(home.colors.node(home.nodes[4]).fill,home.colors.node(a).fill);
+  home.colorTheme='vivid';
+  assert.equal(home.colors.line({from:'root',to:'a'}),home.colors.node(a).fill,'Night uses light connections against the dark canvas');
+  home.canvasColor='#ffffff';
+  assert.equal(home.colors.line({from:'root',to:'a'}),home.colors.node(a).border,'custom light backgrounds keep darker connections');
   home.diagramColor='#112233';
   assert.ok(home.nodes.every(node=>home.colors.node(node).fill==='#112233'));
 });
