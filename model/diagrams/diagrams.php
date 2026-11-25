@@ -30,7 +30,7 @@ final class DiagramsModel extends BaseModel
         $name = self::name($data, 'name');
         $nodes = array_key_exists('nodes', $data) ? self::validateNodes($data['nodes']) : null;
         $theme = $data['color_theme'] ?? null;
-        if ($theme !== null) $theme = Validate::choice($theme, ['pastel','vivid','ocean','forest','sunset','mono']);
+        if ($theme !== null) $theme = Validate::choice($theme, ['pastel','vivid','ocean','forest','sunset','mono','rainbow']);
         foreach (['diagram_color','canvas_color'] as $field) {
             $color = $data[$field] ?? null;
             if ($color !== null && (!is_string($color) || !preg_match('/^#[0-9a-fA-F]{6}$/D', $color))) fail('error_validation');

@@ -43,6 +43,11 @@ const markup = (kind, key=kind) => template('view/layout/layout.php','layout', {
     const frame=()=>page.locator('#mindspace-panel').boundingBox();
     for(const kind of ['diagram','spreadsheet','notes','scrum','habits']) {
       await open(kind);
+      assert.equal(await page.locator('.topbar').isVisible(),true,`${kind} opens in normal view`);
+      assert.equal(await page.getByRole('button',{name:'Salir de pantalla completa'}).isVisible(),false);
+      await page.evaluate(()=>mobileDocumentView.sync());
+      assert.equal(await page.locator('.topbar').isVisible(),true,'refresh keeps normal view');
+      await page.getByRole('button',{name:'Ver documento en pantalla completa'}).click();
       assert.deepEqual(await frame(),{x:0,y:0,width:390,height:844},`${kind} fills the viewport`);
       for(const selector of ['.topbar','.sidebar','.workspace-footer','.home-heading','.mindspace-tabbar','.mindspace-item-header','.mindspace-item-footer']) {
         assert.equal(await page.locator(selector).isVisible(),false,`${kind}: ${selector} is hidden`);
@@ -69,6 +74,7 @@ const markup = (kind, key=kind) => template('view/layout/layout.php','layout', {
       if(['diagram','spreadsheet'].includes(kind)) await page.screenshot({path:`tests/.runtime/mobile-fullscreen-${kind}.png`});
     }
     await open('notes');
+    await page.getByRole('button',{name:'Ver documento en pantalla completa'}).click();
     await page.setViewportSize({width:844,height:390});
     await page.waitForFunction(()=>document.getElementById('mindspace-panel').getBoundingClientRect().height===390);
     assert.deepEqual(await frame(),{x:0,y:0,width:844,height:390},'landscape remains full screen');
@@ -88,6 +94,9 @@ const markup = (kind, key=kind) => template('view/layout/layout.php','layout', {
     await page.setViewportSize({width:1280,height:800});
     for (const kind of ['diagram','spreadsheet','notes','scrum','habits']) {
       await open(kind,`desktop-${kind}`);
+      assert.equal(await page.locator('.topbar').isVisible(),true,`${kind} opens in normal desktop view`);
+      assert.equal(await page.locator('.sidebar').isVisible(),true);
+      await page.getByRole('button',{name:'Ver documento en pantalla completa'}).click();
       assert.deepEqual(await frame(),{x:0,y:0,width:1280,height:800},`${kind} fills the desktop viewport`);
       assert.equal(await page.locator('.topbar').isVisible(),false);
       assert.equal(await page.locator('.sidebar').isVisible(),false);
@@ -114,6 +123,7 @@ const markup = (kind, key=kind) => template('view/layout/layout.php','layout', {
     assert.equal(await page.locator('.mobile-document-toggle').isVisible(),false);
     await page.setViewportSize({width:390,height:844});
     await open('diagram');
+    await page.getByRole('button',{name:'Ver documento en pantalla completa'}).click();
     await page.evaluate(()=>{
       const stage=document.getElementById('mindmap-stage'),root=document.getElementById('diagram-root');
       stage.classList.add('has-diagram');window.camera=new DiagramViewport();

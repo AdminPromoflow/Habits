@@ -1,11 +1,11 @@
 'use strict';
 
-// Expand documents on every screen, preserving their draft, selection and camera.
+// Expand documents only on request, preserving their draft, selection and camera.
 // Keep the existing asset/class names so mobile and desktop share the same view.
 class MobileDocumentView {
   constructor() {
     this.ancestors = [];
-    this.dismissedKey = null;
+    this.expandedKey = null;
     window.addEventListener('resize', () => this.sync());
     window.visualViewport?.addEventListener('resize', () => this.size());
     window.visualViewport?.addEventListener('scroll', () => this.size());
@@ -14,9 +14,9 @@ class MobileDocumentView {
   sync() {
     const surface = document.querySelector('[data-mobile-document]:not([data-mobile-document=""])');
     const key = surface?.dataset.mobileDocument || null;
-    if (key !== this.key) this.dismissedKey = null;
+    if (key !== this.key) this.expandedKey = null;
     this.key = key;
-    const active = !!surface && this.dismissedKey !== key;
+    const active = !!surface && this.expandedKey === key;
     const wasActive = this.active;
     this.surface?.classList.remove('mobile-document-surface');
     this.ancestors.forEach(element => element.classList.remove('mobile-document-ancestor'));
@@ -61,7 +61,7 @@ class MobileDocumentView {
   }
 
   toggle() {
-    this.dismissedKey = this.active ? this.key : null;
+    this.expandedKey = this.active ? null : this.key;
     this.sync();
     // Re-measure diagram bounds after expanding or restoring the same DOM.
     window.dispatchEvent(new Event('resize'));

@@ -5,6 +5,7 @@ class DiagramColors {
     // Distinct color families share the app's muted accents and purple undertones.
     // Stable IDs preserve the combinations already saved in existing diagrams.
     {id:'default', background:'#fbf7ef', root:'#e8dff1', colors:['#e8dff1']},
+    {id:'rainbow', background:'#fffdf5', root:'#e8dcf0', colors:['#f4ccd0','#f4dcc2','#f4edc8','#d5e7d9','#cce6ec','#d9daed','#e6cce4']},
     {id:'pastel', background:'#fcf0f4', root:'#e4b9cc', colors:['#f0d5df','#e7c5d5','#e2cadf','#eed9cf','#d6bdd3','#f1e2dc','#d9c2ce']},
     {id:'vivid', background:'#2c2336', root:'#e9d9ba', colors:['#bca7d5','#d5acbd','#b4c8bd','#dcc7a7','#aebfcd','#cab9cf']},
     {id:'ocean', background:'#edf3f5', root:'#4c6578', colors:['#bdd1dd','#d4e3e8','#b3c7ce','#d5d0e3','#c5d9d1','#c5cede']},
@@ -64,8 +65,9 @@ class DiagramColors {
   }
   background() { return this.home.canvasColor || DiagramColors.theme(this.home.colorTheme).background; }
   preview(theme) {
-    const nodes = [[104,54,theme.root],[13,17,theme.colors[0]],[195,17,theme.colors[1%theme.colors.length]],
-      [13,91,theme.colors[2%theme.colors.length]],[195,91,theme.colors[3%theme.colors.length]]];
+    const samples=Array.from({length:4},(_,index)=>theme.colors[Math.round(index*(theme.colors.length-1)/3)]);
+    const nodes = [[104,54,theme.root],[13,17,samples[0]],[195,17,samples[1]],
+      [13,91,samples[2]],[195,91,samples[3]]];
     return `<svg viewBox="0 0 280 130" aria-hidden="true"><rect width="280" height="130" rx="10" fill="${theme.background}"/>${nodes.slice(1).map(([x,y,color])=>`<path d="M140 65 Q${x<100?95:185} 65 ${x+36} ${y+11}" fill="none" stroke="${DiagramColors.stroke(DiagramColors.paint(color),theme.background)}" stroke-width="2"/>`).join('')}${nodes.map(([x,y,color])=>`<rect x="${x}" y="${y}" width="72" height="22" rx="8" fill="${color}" stroke="${DiagramColors.paint(color).border}"/><path d="M${x+18} ${y+11}h36" stroke="${DiagramColors.paint(color).text}" stroke-opacity=".45" stroke-linecap="round"/>`).join('')}</svg>`;
   }
   open() {

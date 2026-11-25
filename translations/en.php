@@ -529,6 +529,7 @@ return [
     'diagram_color_background' => 'Background color',
     'diagram_color_reset' => 'Reset colors',
     'diagram_theme_default' => 'Cream',
+    'diagram_theme_rainbow' => 'Pastel rainbow',
     'diagram_theme_pastel' => 'Rose',
     'diagram_theme_vivid' => 'Night',
     'diagram_theme_ocean' => 'Mist',

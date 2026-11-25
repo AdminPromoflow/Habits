@@ -529,6 +529,7 @@ return [
     'diagram_color_background' => 'Color del fondo',
     'diagram_color_reset' => 'Restablecer colores',
     'diagram_theme_default' => 'Crema',
+    'diagram_theme_rainbow' => 'Arcoíris pastel',
     'diagram_theme_pastel' => 'Rosa',
     'diagram_theme_vivid' => 'Noche',
     'diagram_theme_ocean' => 'Bruma',
