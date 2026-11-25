@@ -3,6 +3,12 @@
 class MindSpaceEditors {
   constructor(space) {
     this.space = space; this.cell = 'A1';
+    this.selectedCells = new Set(['A1']); this.selectionAnchor = 'A1';
+    document.addEventListener('pointerdown', event => this.startCellSelection(event));
+    document.addEventListener('pointermove', event => this.dragCellSelection(event));
+    document.addEventListener('pointerup', event => this.endCellSelection(event));
+    document.addEventListener('pointercancel', event => this.endCellSelection(event));
+    document.defaultView?.addEventListener('blur', () => this.endCellSelection());
     document.addEventListener('dragstart', event => {
       const card = event.target.closest?.('[data-ms-card]');
       if (!card || !this.space.can('edit')) return;
@@ -146,30 +152,219 @@ class MindSpaceEditors {
     }); });
   }
 
+  cellRange(start, end) {
+    const [r1,c1] = MindSpaceSheet.address(start), [r2,c2] = MindSpaceSheet.address(end), keys = [];
+    for (let row = Math.min(r1,r2); row <= Math.max(r1,r2); row++) {
+      for (let col = Math.min(c1,c2); col <= Math.max(c1,c2); col++) keys.push(`${MindSpaceSheet.column(col)}${row+1}`);
+    }
+    return keys;
+  }
+  selectionKeys() {
+    const sheet = this.space.draft;
+    const keys = [...this.selectedCells].filter(key => {
+      const [row,col] = MindSpaceSheet.address(key);
+      return row < sheet.rows && col < sheet.columns;
+    });
+    return keys.length ? keys : [this.cell];
+  }
+  selectionLabel(keys = this.selectionKeys()) {
+    if (keys.length === 1) return keys[0];
+    const points = keys.map(MindSpaceSheet.address), rows = points.map(point => point[0]), cols = points.map(point => point[1]);
+    const first = `${MindSpaceSheet.column(Math.min(...cols))}${Math.min(...rows)+1}`;
+    const last = `${MindSpaceSheet.column(Math.max(...cols))}${Math.max(...rows)+1}`;
+    const rectangle = (Math.max(...rows)-Math.min(...rows)+1)*(Math.max(...cols)-Math.min(...cols)+1) === keys.length;
+    return `${rectangle ? `${first}:${last} · ` : ''}${t('ms_selected_cells', {count:keys.length})}`;
+  }
+  selectCell(key, {extend = false, add = false, toggle = false} = {}) {
+    const [row,col] = MindSpaceSheet.address(key), sheet = this.space.draft;
+    if (row >= sheet.rows || col >= sheet.columns) return;
+    const next = add ? new Set(this.selectedCells) : new Set();
+    if (extend) this.cellRange(this.selectionAnchor || this.cell, key).forEach(cell => next.add(cell));
+    else if (toggle && next.has(key) && next.size > 1) next.delete(key);
+    else next.add(key);
+    this.selectedCells = next;
+    this.cell = next.has(key) ? key : [...next].at(-1);
+    if (!extend) this.selectionAnchor = this.cell;
+    this.syncCellSelection();
+  }
+  syncCellSelection() {
+    document.querySelectorAll('[data-ms-grid-cell]').forEach(cell => {
+      const selected = this.selectedCells.has(cell.dataset.msGridCell);
+      cell.classList.toggle('is-selected', selected);
+      cell.setAttribute('aria-selected', String(selected));
+    });
+    const label = document.querySelector('[data-ms-style-address]');
+    if (label) label.textContent = this.selectionLabel();
+  }
+  focusCell(key) {
+    this.keepCellSelection = true;
+    try { document.querySelector(`[data-ms-cell="${key}"]`)?.focus({preventScroll:true}); }
+    finally { this.keepCellSelection = false; }
+  }
+  startCellSelection(event) {
+    const input = event.target.closest?.('[data-ms-cell]');
+    if (!input?.closest('#mindspace-panel') || event.button !== 0 || this.space.active?.kind !== 'spreadsheet' || !this.space.can('edit')) return;
+    // A double click still allows normal caret placement and text selection.
+    if (event.detail > 1 && !event.shiftKey && !event.ctrlKey && !event.metaKey) return;
+    this.endCellSelection(); this.skipCellClick = false;
+    const key = input.dataset.msCell, add = event.ctrlKey || event.metaKey;
+    const base = add ? new Set(this.selectedCells) : new Set();
+    this.selectCell(key, {extend:event.shiftKey, add, toggle:add && !event.shiftKey});
+    this.cellDrag = {pointer:event.pointerId, input, start:key, end:key, anchor:this.selectionAnchor, base,
+      modified:Boolean(add || event.shiftKey), moved:false, id:this.space.active.id, generation:this.space.generation};
+    event.preventDefault(); this.focusCell(this.cell);
+    input.setPointerCapture?.(event.pointerId);
+    input.closest('.ms-sheet-scroll')?.classList.add('is-selecting');
+  }
+  dragCellSelection(event) {
+    const drag = this.cellDrag;
+    if (!drag || event.pointerId !== drag.pointer) return;
+    if (this.space.active?.id !== drag.id || this.space.generation !== drag.generation || !event.buttons) { this.endCellSelection(event); return; }
+    const hit = document.elementFromPoint(event.clientX, event.clientY);
+    const input = hit?.closest?.('[data-ms-cell]') || hit?.closest?.('td')?.querySelector('[data-ms-cell]');
+    if (!input?.closest('#mindspace-panel') || input.dataset.msCell === drag.end) return;
+    drag.end = input.dataset.msCell; drag.moved = true;
+    this.selectedCells = new Set([...drag.base, ...this.cellRange(drag.anchor, drag.end)]);
+    this.cell = drag.end; this.syncCellSelection(); this.focusCell(this.cell);
+    event.preventDefault();
+  }
+  endCellSelection(event) {
+    const drag = this.cellDrag;
+    if (!drag || (event && event.pointerId !== drag.pointer)) return;
+    this.skipCellClick = drag.moved || drag.modified;
+    if (drag.input.hasPointerCapture?.(drag.pointer)) drag.input.releasePointerCapture(drag.pointer);
+    drag.input.closest('.ms-sheet-scroll')?.classList.remove('is-selecting');
+    this.cellDrag = null;
+  }
+  selectionStyle(keys) {
+    const style = {...this.space.draft.cell_styles?.[keys[0]]};
+    for (const property of Object.keys(style)) {
+      if (keys.some(key => this.space.draft.cell_styles?.[key]?.[property] !== style[property])) delete style[property];
+    }
+    return style;
+  }
+  applyCellStyle(keys, value, properties, replace = false) {
+    const styles = {...this.space.draft.cell_styles};
+    for (const key of keys) {
+      const style = replace ? {...value} : {...styles[key]};
+      if (!replace) for (const property of properties) {
+        if (Object.hasOwn(value, property)) style[property] = value[property]; else delete style[property];
+      }
+      if (Object.keys(style).length) styles[key] = style; else delete styles[key];
+    }
+    this.space.draft.cell_styles = styles;
+  }
   sheet() {
     const sheet = this.space.draft, evaluator = new MindSpaceSheet(sheet);
-    if (this.sheetItemId !== this.space.active.id) { this.cell = 'A1'; this.sheetItemId = this.space.active.id; }
+    if (this.sheetItemId !== this.space.active.id || this.sheetGeneration !== this.space.generation) {
+      this.endCellSelection(); this.cell = 'A1'; this.selectionAnchor = 'A1'; this.selectedCells = new Set(['A1']);
+      this.sheetItemId = this.space.active.id; this.sheetGeneration = this.space.generation;
+    }
     const returns = this.space.targetReturnLinks(), ledger = sheet.template === 'ledger', bands = this.sheetBands();
     return `<div class="ms-sheet${ledger ? ' ms-ledger' : ''}">
       <div class="ms-sheet-layout"><div class="ms-sheet-main"><div class="ms-formula-bar"><span id="ms-cell-address">${this.cell}</span><span aria-hidden="true">ƒx</span><input data-ms-formula aria-label="${esc(t('ms_formula'))}" maxlength="2000" ${MindSpaceSheet.locked(sheet, this.cell) ? 'readonly' : ''} value="${esc(sheet.cells?.[this.cell] || '')}"></div>
-      <div class="ms-sheet-scroll"><table aria-label="${esc(this.space.active.name)}"><thead><tr><th></th>${Array.from({ length:sheet.columns }, (_,col) => `<th scope="col">${MindSpaceSheet.column(col)}</th>`).join('')}</tr></thead><tbody>
+      <div class="ms-sheet-scroll"><table role="grid" aria-multiselectable="true" aria-label="${esc(this.space.active.name)}"><thead><tr><th></th>${Array.from({ length:sheet.columns }, (_,col) => `<th scope="col">${MindSpaceSheet.column(col)}</th>`).join('')}</tr></thead><tbody>
       ${Array.from({ length:sheet.rows }, (_,row) => `<tr data-ms-sheet-row="${row + 1}" class="${row === 0 && sheet.template ? 'ms-template-header' : bands[row + 1]?.className || ''}" ${bands[row + 1]?.style || ''}><th scope="row">${row + 1}</th>${Array.from({ length:sheet.columns }, (_,col) => {
         const key = `${MindSpaceSheet.column(col)}${row + 1}`;
-        const back = returns.get(key) || '', locked = MindSpaceSheet.locked(sheet, key);
+        const back = returns.get(key) || '', locked = MindSpaceSheet.locked(sheet, key), date = MindSpaceSheet.dateCell(sheet, key);
         const error = this.sheetCellError(key, evaluator);
         const format = MindSpaceSheet.format(sheet.cell_styles?.[key]);
-        return `<td${format.border ? ` style="${esc(format.border)}"` : ''}><div class="ms-sheet-cell${back ? ' has-return' : ''}"><input data-ms-cell="${key}" aria-label="${key}${sheet.template && row > 0 ? ` · ${esc(sheet.cells[`${MindSpaceSheet.column(col)}1`] || '')}` : ''}" autocomplete="off" spellcheck="false" maxlength="2000" ${locked ? 'readonly' : ''} ${ledger && row > 0 && [3,4].includes(col) ? 'inputmode="decimal"' : ''} ${error ? `aria-invalid="true" title="${esc(error)}"` : ''} ${format.text ? `style="${esc(format.text)}"` : ''} value="${esc(evaluator.display(key))}">${back}</div></td>`;
-      }).join('')}</tr>`).join('')}</tbody></table></div>${this.space.can('edit') ? `<div class="ms-sheet-settings"><span>${esc(t('ms_selected_cell'))} <strong data-ms-style-address>${this.cell}</strong></span><button type="button" class="btn secondary" data-action="ms-sheet-settings" aria-haspopup="dialog">${icon('settings')}${esc(t('settings'))}</button></div>` : ''}<p class="ms-sheet-hint">${esc(t(ledger ? 'ms_ledger_hint' : 'ms_sheet_hint'))}</p>${sheet.template ? `<p class="ms-sheet-hint">${esc(t('ms_template_calculated_hint'))}</p>` : ''}</div>
+        return `<td role="gridcell" data-ms-grid-cell="${key}" aria-selected="${this.selectedCells.has(key)}" class="${this.selectedCells.has(key) ? 'is-selected' : ''}"${format.border ? ` style="${esc(format.border)}"` : ''}><div class="ms-sheet-cell${back ? ' has-return' : ''}"><input data-ms-cell="${key}" aria-label="${key}${sheet.template && row > 0 ? ` · ${esc(sheet.cells[`${MindSpaceSheet.column(col)}1`] || '')}` : ''}" autocomplete="off" spellcheck="false" maxlength="2000" ${locked ? 'readonly' : ''} ${date ? `aria-haspopup="dialog" title="${esc(error || t('select_date'))}"` : ''} ${ledger && row > 0 && [3,4].includes(col) ? 'inputmode="decimal"' : ''} ${error ? `aria-invalid="true"${date ? '' : ` title="${esc(error)}"`}` : ''} ${format.text ? `style="${esc(format.text)}"` : ''} value="${esc(evaluator.display(key))}">${back}</div></td>`;
+      }).join('')}</tr>`).join('')}</tbody></table></div>${this.space.can('edit') ? `<div class="ms-sheet-settings"><span>${esc(t('ms_selection'))} <strong data-ms-style-address>${esc(this.selectionLabel())}</strong></span><button type="button" class="btn secondary" data-action="ms-sheet-settings" aria-haspopup="dialog">${icon('settings')}${esc(t('settings'))}</button></div><p class="ms-sheet-hint">${esc(t('ms_selection_hint'))}</p>` : ''}<p class="ms-sheet-hint">${esc(t(ledger ? 'ms_ledger_hint' : 'ms_sheet_hint'))}</p>${sheet.template ? `<p class="ms-sheet-hint">${esc(t('ms_template_calculated_hint'))}</p>` : ''}</div>
       ${ledger ? `<aside class="ms-ledger-summary" aria-label="${esc(t('ms_ledger_totals'))}"><h3>${esc(t('ms_ledger_totals'))}</h3><p>${esc(t('ms_ledger_totals_hint'))}</p><dl aria-live="polite" aria-atomic="true" data-ms-ledger-totals>${this.ledgerTotals(evaluator)}</dl><p class="ms-ledger-error" data-ms-ledger-error ${Object.values(evaluator.ledgerSummary()).every(value => typeof value === 'number') ? 'hidden' : ''}>${esc(t('ms_ledger_amount_error'))}</p><span class="ms-ledger-live">${esc(t('ms_ledger_live'))}</span></aside>` : ''}</div></div>`;
+  }
+  async datePickerForm(key, input) {
+    const space = this.space, id = space.active?.id, generation = space.generation;
+    if (space.active?.kind !== 'spreadsheet' || !space.can('edit') || !MindSpaceSheet.dateCell(space.draft, key)) return;
+    if (this.datePicker?.generation === generation) return;
+    const picker = this.datePicker = {id, generation, key};
+    if (!await space.flush() || space.active?.id !== id || space.generation !== generation || !input.isConnected || document.activeElement !== input) {
+      if (this.datePicker === picker) this.datePicker = null;
+      return;
+    }
+    // Calculate today when opening, so a tab left open overnight uses the new day.
+    picker.today = new Intl.DateTimeFormat('en-CA', {timeZone:'America/Bogota', year:'numeric', month:'2-digit', day:'2-digit'}).format(new Date());
+    picker.selected = MindSpaceSheet.date(space.draft.cells[key])?.iso || picker.today;
+    const lang = S.language === 'es' ? 'es-CO' : 'en-US';
+    const monthName = month => new Intl.DateTimeFormat(lang, {month:'long',timeZone:'UTC'}).format(new Date(Date.UTC(2000,month-1,1)));
+    const fullDate = value => new Intl.DateTimeFormat(lang, {dateStyle:'full',timeZone:'UTC'}).format(new Date(`${value}T12:00:00Z`));
+    openModal('select_date', `<form id="ms-date-form" class="ms-date-picker"><p class="ms-date-context">${esc(key)} · ${esc(t('ms_date_picker_hint'))}</p>
+      <fieldset><div class="ms-date-navigation"><button type="button" class="icon-btn" data-ms-date-prev aria-label="${esc(t('previous'))}">${icon('chevron','flip')}</button>
+        <label><span class="sr-only">${esc(t('month'))}</span><select name="month">${Array.from({length:12}, (_,index) => `<option value="${index+1}">${esc(monthName(index+1))}</option>`).join('')}</select></label>
+        <label><span class="sr-only">${esc(t('ms_date_year'))}</span><input type="number" name="year" min="1000" max="9999" step="1" required></label>
+        <button type="button" class="icon-btn" data-ms-date-next aria-label="${esc(t('next'))}">${icon('chevron')}</button></div>
+      <p class="ms-date-selected" data-ms-date-selected aria-live="polite"></p><div data-ms-date-calendar class="ms-date-calendar" role="group"></div></fieldset>
+      ${formFooter('ms_date_ok', `<button type="button" class="btn ghost" data-ms-date-today>${esc(t('today'))}</button>`)}</form>`);
+    const form = document.getElementById('ms-date-form'), calendar = form.querySelector('[data-ms-date-calendar]');
+    document.getElementById('modal').addEventListener('close', () => { if (this.datePicker === picker) this.datePicker = null; }, {once:true});
+    const paint = () => {
+      const {year,month} = MindSpaceSheet.date(picker.selected);
+      form.elements.namedItem('month').value = month; form.elements.namedItem('year').value = year;
+      form.querySelector('[data-ms-date-selected]').textContent = fullDate(picker.selected);
+      form.querySelector('[data-ms-date-prev]').disabled = year === 1000 && month === 1;
+      form.querySelector('[data-ms-date-next]').disabled = year === 9999 && month === 12;
+      const offset = (new Date(Date.UTC(year,month-1,1)).getUTCDay()+6)%7, count = new Date(Date.UTC(year,month,0)).getUTCDate();
+      calendar.setAttribute('aria-label', `${monthName(month)} ${year}`);
+      calendar.innerHTML = Array.from({length:7}, (_,day) => `<span class="ms-date-weekday">${esc(new Intl.DateTimeFormat(lang, {weekday:'short',timeZone:'UTC'}).format(new Date(Date.UTC(2000,0,3+day))))}</span>`).join('')
+        + '<span aria-hidden="true"></span>'.repeat(offset)
+        + Array.from({length:count}, (_,index) => {
+          const value = `${year}-${String(month).padStart(2,'0')}-${String(index+1).padStart(2,'0')}`;
+          return `<button type="button" data-ms-date-day="${value}" aria-label="${esc(fullDate(value))}" aria-pressed="${value === picker.selected}" ${value === picker.today ? 'aria-current="date"' : ''}>${index+1}</button>`;
+        }).join('');
+    };
+    const changeMonth = (year, month) => {
+      if (!Number.isInteger(year) || year < 1000 || year > 9999 || month < 1 || month > 12) return;
+      const day = Math.min(MindSpaceSheet.date(picker.selected).day, new Date(Date.UTC(year,month,0)).getUTCDate());
+      picker.selected = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+      paint();
+    };
+    const commit = value => {
+      if (picker.saving) return;
+      void space.submit(form, async () => {
+        if (space.active?.id !== id || space.generation !== generation || !space.can('edit') || !MindSpaceSheet.dateCell(space.draft,key)) throw new Error(t('error_forbidden'));
+        if (!MindSpaceSheet.date(value)) throw new Error(t('ms_ledger_date_error'));
+        picker.saving = true; form.querySelector('fieldset').disabled = true;
+        try {
+          picker.selected = value; paint();
+          space.draft.cells = {...space.draft.cells, [key]:value};
+          space.changed();
+          if (!await space.save()) throw new Error(space.error);
+          if (space.active?.id !== id || space.generation !== generation) return;
+          if (this.datePicker === picker && form.isConnected) closeModal();
+          if (input.isConnected) input.value = value;
+          this.recalculate();
+        } finally { picker.saving = false; form.querySelector('fieldset')?.removeAttribute('disabled'); }
+      });
+    };
+    form.addEventListener('submit', event => { event.preventDefault(); commit(picker.selected); });
+    const updateMonth = event => {
+      if (['year','month'].includes(event.target.name)) changeMonth(Number(form.elements.namedItem('year').value), Number(form.elements.namedItem('month').value));
+    };
+    form.addEventListener('input', updateMonth);
+    form.addEventListener('change', updateMonth);
+    form.addEventListener('click', event => {
+      if (picker.saving) return;
+      const day = event.target.closest('[data-ms-date-day]');
+      if (day) { commit(day.dataset.msDateDay); return; }
+      if (event.target.closest('[data-ms-date-today]')) { picker.selected = picker.today; paint(); }
+      const previous = event.target.closest('[data-ms-date-prev]'), next = event.target.closest('[data-ms-date-next]');
+      if (previous || next) {
+        const {year,month} = MindSpaceSheet.date(picker.selected), date = new Date(Date.UTC(year,month-1+(previous ? -1 : 1),1));
+        changeMonth(date.getUTCFullYear(),date.getUTCMonth()+1);
+      }
+    });
+    paint();
   }
   async cellSettings() {
     const space = this.space, id = space.active?.id, generation = space.generation, key = this.cell;
     if (space.active?.kind !== 'spreadsheet' || !space.can('edit')) return;
+    const keys = this.selectionKeys(), label = this.selectionLabel(keys);
     if (!await space.flush() || space.active?.id !== id || space.generation !== generation) return;
-    const style = space.draft.cell_styles?.[key] || {};
+    const style = this.selectionStyle(keys), changed = new Set();
+    let replaceStyle = false;
     const choices = (values, prefix) => values.map(value => `<option value="${value}">${esc(t(`${prefix}${value}`))}</option>`).join('');
     const colors = ['background','color','border_color'];
-    openModal('ms_cell_style', `<form id="ms-cell-style-form"><p class="ms-style-context">${esc(t('ms_selected_cell'))} <strong>${key}</strong></p>
+    openModal('ms_cell_style', `<form id="ms-cell-style-form"><p class="ms-style-context">${esc(t('ms_selection'))} <strong>${esc(label)}</strong></p>${keys.length > 1 ? `<p class="ms-sheet-hint">${esc(t('ms_style_multiple_hint'))}</p>` : ''}
       <label class="field"><span>${esc(t('ms_style_preset'))}</span><select name="preset"><option value="custom">${esc(t('ms_style_custom'))}</option>${choices(Object.keys(MindSpaceSheet.stylePresets), 'ms_style_')}</select></label>
       <div class="ms-style-colors">${colors.map(name => `<div class="ms-style-color"><label for="ms-style-${name}">${esc(t(`ms_style_${name}`))}</label><input type="color" id="ms-style-${name}" name="${name}" value="#ffffff"><label class="ms-style-auto"><input type="checkbox" name="${name}_auto">${esc(t('ms_style_auto'))}</label></div>`).join('')}</div>
       <div class="form-grid"><label class="field"><span>${esc(t('ms_style_size'))}</span><select name="font_size"><option value="">${esc(t('ms_style_auto'))}</option>${[12,13,14,16,18,20,24].map(size => `<option value="${size}">${size}</option>`).join('')}</select></label>
@@ -204,22 +399,21 @@ class MindSpaceEditors {
     fill(style);
     form.addEventListener('input', event => {
       if (event.target.name === 'preset') {
-        if (Object.hasOwn(MindSpaceSheet.stylePresets, field('preset').value)) fill(MindSpaceSheet.stylePresets[field('preset').value]);
+        if (Object.hasOwn(MindSpaceSheet.stylePresets, field('preset').value)) { replaceStyle = true; fill(MindSpaceSheet.stylePresets[field('preset').value]); }
         return;
       }
+      changed.add(event.target.name.replace(/_auto$/, ''));
       if (['bold','italic'].includes(event.target.name)) emphasis[event.target.name] = event.target.checked;
       field('preset').value = 'custom'; preview();
     });
-    form.querySelector('[data-ms-style-reset]').addEventListener('click', () => { field('preset').value = 'default'; fill({}); });
+    form.querySelector('[data-ms-style-reset]').addEventListener('click', () => { replaceStyle = true; field('preset').value = 'default'; fill({}); });
     form.addEventListener('submit', event => { event.preventDefault(); void space.submit(form, async () => {
       if (space.active?.id !== id || space.generation !== generation || !space.can('edit')) throw new Error(t('error_forbidden'));
-      const value = read();
-      space.draft.cell_styles = {...space.draft.cell_styles};
-      if (Object.keys(value).length) space.draft.cell_styles[key] = value; else delete space.draft.cell_styles[key];
+      this.applyCellStyle(keys, read(), changed, replaceStyle);
       space.changed();
       if (!await space.save()) throw new Error(space.error);
       if (space.active?.id !== id || space.generation !== generation) return;
-      closeModal(); this.refresh(); document.querySelector(`[data-ms-cell="${key}"]`)?.focus();
+      closeModal(); this.refresh(); this.focusCell(key);
     }); });
   }
   sheetBands() {
@@ -256,7 +450,7 @@ class MindSpaceEditors {
       const error = this.sheetCellError(input.dataset.msCell, evaluator);
       input.toggleAttribute('aria-invalid', Boolean(error));
       if (error) input.setAttribute('aria-invalid', 'true');
-      input.title = error;
+      input.title = error || (MindSpaceSheet.dateCell(this.space.draft, input.dataset.msCell) ? t('select_date') : '');
     });
     document.querySelectorAll('[data-ms-sheet-row]').forEach(row => {
       if (Number(row.dataset.msSheetRow) === 1) return;
@@ -274,12 +468,35 @@ class MindSpaceEditors {
     if (type === 'change' && input.dataset.msCardStatus) this.moveCard(input.dataset.msCardStatus, input.value);
     if (type === 'change' && input.matches?.('[data-ms-habit-date]')) { S.date = input.value || today(); this.refresh(); }
     const key = input.dataset.msCell;
+    if (type === 'click' && input.closest?.('.ms-sheet-scroll') && this.skipCellClick) { this.skipCellClick = false; event.preventDefault(); return; }
+    if (type === 'keydown' && key) {
+      const direction = {ArrowUp:[-1,0],ArrowDown:[1,0],ArrowLeft:[0,-1],ArrowRight:[0,1]}[event.key];
+      if (event.shiftKey && direction) {
+        event.preventDefault();
+        const [row,col] = MindSpaceSheet.address(this.cell);
+        const next = `${MindSpaceSheet.column(Math.max(0,Math.min(space.draft.columns-1,col+direction[1])))}${Math.max(0,Math.min(space.draft.rows-1,row+direction[0]))+1}`;
+        this.selectCell(next, {extend:true}); this.focusCell(next);
+        document.querySelector(`[data-ms-cell="${next}"]`)?.scrollIntoView({block:'nearest',inline:'nearest'});
+        return;
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a') {
+        event.preventDefault(); this.selectedCells = new Set(this.cellRange('A1', `${MindSpaceSheet.column(space.draft.columns-1)}${space.draft.rows}`));
+        this.selectionAnchor = 'A1'; this.syncCellSelection(); return;
+      }
+      if (event.key === 'Escape') { event.preventDefault(); this.selectCell(key); return; }
+    }
+    if (key && this.selectedCells.size === 1 && !event.shiftKey && !event.ctrlKey && !event.metaKey && MindSpaceSheet.dateCell(space.draft, key) && (type === 'click' || (type === 'keydown' && event.key === 'Enter'))) {
+      event.preventDefault();
+      void this.datePickerForm(key, input).catch(error => { this.datePicker = null; toast(error.message, true); });
+      return;
+    }
     if (type === 'focusin' && key) {
       this.cell = key;
+      if (!this.keepCellSelection) this.selectCell(key);
       if (!MindSpaceSheet.locked(space.draft, key)) input.value = space.draft.cells?.[key] || '';
       document.getElementById('ms-cell-address').textContent = key;
       const selected = document.querySelector('[data-ms-style-address]');
-      if (selected) selected.textContent = key;
+      if (selected) selected.textContent = this.selectionLabel();
       const formula = document.querySelector('[data-ms-formula]');
       formula.value = space.draft.cells?.[key] || '';
       formula.readOnly = MindSpaceSheet.locked(space.draft, key);

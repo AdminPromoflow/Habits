@@ -115,6 +115,8 @@ La edición de títulos con doble clic se aplica a los encabezados del área de 
 
 Validación: 223 pruebas JavaScript aprobadas y sintaxis PHP/JavaScript correcta. En el navegador se comprobó clic simple sin edición, doble clic con selección completa, renombrado y recarga de diagrama, hoja y carpeta, guardado al hacer clic fuera y cancelación con Escape. Evidencia: `tests/.runtime/mindspace-title-edit.jpg`.
 
+El selector de fechas abre un calendario desde las celdas Fecha/Date y las fechas de proyectos, con el día actual preseleccionado en celdas vacías, OK para confirmar y guardado directo al elegir un día. Las fechas existentes se conservan al abrir y se guardan en formato `AAAA-MM-DD` usando el contenido de la hoja existente; no requiere SQL. El paquete incremental `tests/.runtime/hostinger-date-picker-2026-11-24.zip` contiene seis archivos de interfaz/traducciones y sigue pendiente de publicación. En el navegador se verificaron hoy, otro día, cancelación, cambio de mes/año, 29 de febrero de 2028 y persistencia al recargar. Evidencia: `tests/.runtime/mindspace-date-picker.jpg`. Las pruebas `tests/mindspace-dates.cjs` cubren el cambio de día en Bogotá, años bisiestos, permisos y errores de guardado.
+
 ## Plantillas de hojas de cálculo
 
 Crear una hoja abre un selector con Libro de contabilidad, Presupuesto mensual, Inventario, Seguimiento de proyectos y Hoja en blanco. El endpoint de creación genera la plantilla de forma atómica y conserva la idempotencia de `client_key`. Las hojas anteriores siguen siendo cuadrículas libres. Las nuevas guardan `template` y `template_language` dentro de `mindspace_items.content_json`; no hay migración SQL.

@@ -75,6 +75,21 @@
 [data-ms-title]:has(.ms-title-editor) { flex: 1; min-width: 0; }
 .ms-title-editor { display: block; width: 100%; min-width: 0; box-sizing: border-box; margin: 0; padding: 0; border: 0; border-radius: 3px; background: var(--surface); color: inherit; font: inherit; letter-spacing: inherit; line-height: inherit; outline: 2px solid var(--purple); outline-offset: 3px; }
 .ms-title-editor::selection { background: var(--lavender); }
+.ms-date-picker { max-width: 390px; margin: 0 auto; }
+.ms-date-picker fieldset { border: 0; min-width: 0; padding: 0; margin: 0; }
+.ms-date-context { margin: 0 0 16px; color: var(--muted); font-size: .8125rem; }
+.ms-date-navigation { display: grid; grid-template-columns: 34px minmax(0,1fr) 90px 34px; align-items: center; gap: 6px; }
+.ms-date-navigation label { min-width: 0; }
+.ms-date-navigation select, .ms-date-navigation input { width: 100%; padding: 8px; }
+.ms-date-selected { margin: 16px 0; font-size: .875rem; text-align: center; }
+.ms-date-calendar { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 4px; }
+.ms-date-weekday { padding: 6px 0; text-align: center; color: var(--muted); font-size: .75rem; }
+.ms-date-calendar button { min-height: 40px; padding: 4px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--ink); font: inherit; cursor: pointer; }
+.ms-date-calendar button:hover { background: var(--lavender-wash); }
+.ms-date-calendar button[aria-current="date"] { border-color: var(--purple); }
+.ms-date-calendar button[aria-pressed="true"] { background: var(--purple-dark); color: #fff; }
+.ms-date-calendar button:focus-visible { outline: 2px solid var(--purple); outline-offset: 1px; }
+.ms-date-picker .form-footer { justify-content: space-between; gap: 8px; }
 .mindspace-item-title .text-btn { font-size: .75rem; }
 .mindspace-save-status { color: var(--muted); font-size: .75rem; margin-top: 5px; }
 .mindspace-save-status:empty { display: none; }
@@ -143,6 +158,9 @@
 .ms-sheet thead th { position: sticky; top: 0; z-index: 2; }.ms-sheet tbody th { position: sticky; left: 0; z-index: 1; }
 .ms-sheet td input { display: block; border: 0; border-radius: 0; box-shadow: none; padding: 6px 8px; width: 112px; height: 32px; background: var(--surface); color: var(--ink); font: inherit; }
 .ms-sheet td input:focus { outline: 2px solid var(--purple); outline-offset: -2px; }
+.ms-sheet td.is-selected .ms-sheet-cell::after { content: ''; position: absolute; inset: 0; background: #9071bd26; box-shadow: inset 0 0 0 1px var(--purple); pointer-events: none; z-index: 3; }
+.ms-sheet-scroll.is-selecting, .ms-sheet-scroll.is-selecting input { user-select: none; }
+.ms-sheet-scroll.is-selecting input { cursor: cell; }
 .ms-sheet-hint { color: var(--muted); font-size: .75rem; margin: 10px 0 0; }
 .ms-template-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
 .ms-template-card { display: grid; grid-template-columns: 18px minmax(0,1fr); gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; background: var(--surface); }

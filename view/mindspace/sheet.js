@@ -37,14 +37,25 @@ class MindSpaceSheet {
       if (sheet.template === 'inventory') sheet.cells[`E${row}`] = `=C${row}*D${row}`;
     }
   }
-  static month(raw) {
+  static dateCell(sheet, key) {
+    const [row, col] = this.address(key);
+    if (!row || row >= sheet.rows || col >= sheet.columns || this.locked(sheet, key)) return false;
+    if (sheet.template === 'ledger' && col === 0) return true;
+    if (sheet.template === 'projects' && [3,4].includes(col)) return true;
+    return /^(date|fecha|start date|due date|fecha de inicio|fecha de vencimiento)$/.test(String(sheet.cells?.[`${this.column(col)}1`] || '').trim().toLowerCase());
+  }
+  static date(raw) {
     const source = String(raw || '').trim();
     const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(source), local = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(source);
     if (!iso && !local) return null;
     const [year, month, day] = iso ? iso.slice(1).map(Number) : [Number(local[3]), Number(local[2]), Number(local[1])];
     const date = new Date(Date.UTC(year, month - 1, day));
     if (year < 1000 || date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
-    return { key:`${year}-${String(month).padStart(2, '0')}`, month, year };
+    return {year, month, day, iso:`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`};
+  }
+  static month(raw) {
+    const date = this.date(raw);
+    return date ? {key:date.iso.slice(0,7), month:date.month, year:date.year} : null;
   }
   static cents(value) {
     if (typeof value !== 'number') throw new Error('#VALUE!');

@@ -8,7 +8,7 @@ class MindSpace extends PageController {
     this.home = home;
     this.editor = new MindSpaceEditors(this);
     this.reset();
-    for (const type of ['input','change','focusin','focusout','keydown','paste']) document.addEventListener(type, event => {
+    for (const type of ['click','input','change','focusin','focusout','keydown','paste']) document.addEventListener(type, event => {
       if (this.enabled() && this.can('edit') && event.target.closest?.('#mindspace-panel')) this.editor.event(type, event);
       if (type === 'keydown' && event.target.closest?.('[role="tablist"]') && ['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) {
         const tabs = [...document.querySelectorAll('#mindspace-tabs [role="tab"]')];
