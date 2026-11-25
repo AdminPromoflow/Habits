@@ -222,8 +222,8 @@
   display: none;
 }
 
-/* Only the light theme's top bar uses the purple navigation palette. */
-body:not([data-theme='dark']) .topbar {
+/* Purple navigation frames the light workspace without changing document colors. */
+body:not([data-theme='dark']) :is(aside.sidebar, .topbar) {
   --ink: #f4effa;
   --muted: #cbbdd9;
   --surface: #342640;
@@ -233,10 +233,16 @@ body:not([data-theme='dark']) .topbar {
   --purple-dark: #dfc3f6;
   color: var(--ink);
 }
+body:not([data-theme='dark']) .sidebar .nav-item:not(.active),
+body:not([data-theme='dark']) .sidebar .nav-caption,
+body:not([data-theme='dark']) .sidebar .sidebar-reminder span,
 body:not([data-theme='dark']) .topbar .breadcrumb {
   color: var(--muted);
 }
-body:not([data-theme='dark']) .topbar .avatar {
+body:not([data-theme='dark']) .sidebar-reminder {
+  background: var(--canvas);
+}
+body:not([data-theme='dark']) :is(aside.sidebar, .topbar) .avatar {
   background: var(--lavender-wash);
   border-color: var(--line);
   color: var(--purple-dark);
