@@ -402,6 +402,7 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
   vm.runInContext(fs.readFileSync('view/home/diagram-links.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('view/home/diagram-layout.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('view/home/diagram-alignment.js', 'utf8'), context);
+  vm.runInContext(fs.readFileSync('view/home/diagram-reorder.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('view/home/diagram-routing.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('view/home/diagram-connections.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('view/home/diagram-history.js', 'utf8'), context);

@@ -34,6 +34,7 @@ return [
         'view/home/diagram-layout-panel.js',
         'view/home/diagram-viewport.js',
         'view/home/diagram-alignment.js',
+        'view/home/diagram-reorder.js',
         'view/home/diagram-node-tools.js',
         'view/home/diagram-link-navigation.js',
         'view/home/diagram-links.js',

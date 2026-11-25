@@ -67,6 +67,7 @@ const base = 'http://127.0.0.1:8785';
     await toggle(a).click();
     await page.evaluate(id=>pageControllers.home.links.focus(id),grandchild);
     assert.equal(await node(grandchild).isVisible(),true,'links reveal hidden targets');
+    await page.evaluate(()=>pageControllers.home.viewport.focusElement(document.getElementById('diagram-node')));
     await toggle('root').click();
     assert.equal(await visible(),2,'independent roots stay visible');
     await toggle('root').focus(); await page.keyboard.press('Enter');

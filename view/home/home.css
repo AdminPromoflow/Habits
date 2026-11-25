@@ -634,6 +634,11 @@ button.diagram-handle-arrows { cursor: ew-resize; touch-action: none; }
 .diagram-spacing-guide text { fill: #df4652; stroke: var(--surface, white); paint-order: stroke; stroke-linejoin: round; font-family: inherit; font-weight: 500; }
 .diagram-spacing-guide.is-equal line { stroke-width: 2; }
 .diagram-spacing-guide.is-equal text { font-weight: 700; }
+.diagram-reorder-guide { opacity: .5; }
+.diagram-alignment-guides .diagram-reorder-guide line { stroke: #2185f5; stroke-width: 2; stroke-dasharray: 5 4; stroke-linecap: round; }
+.diagram-reorder-guide circle { fill: var(--surface, white); stroke: #2185f5; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.diagram-reorder-guide.is-active { opacity: 1; }
+.diagram-alignment-guides .diagram-reorder-guide.is-active line { stroke-width: 3; stroke-dasharray: none; }
 .diagram-connections { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
 .diagram-connections path { fill: none; stroke: var(--diagram-line-color, var(--lavender)); stroke-width: 2; }
 .diagram-connection { cursor: pointer; outline: none; }
