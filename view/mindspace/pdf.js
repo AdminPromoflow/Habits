@@ -183,7 +183,7 @@ class MindSpacePDF {
         onclone:doc => { doc.getElementById(host.id).style.left = '0'; },
       });
       const availableWidth = this.width - this.margin * 2, availableHeight = this.bottom - this.y;
-      const scale = Math.min(availableWidth / width, availableHeight / height);
+      const scale = Math.min(25.4 / 96, availableWidth / width, availableHeight / height);
       this.doc.addImage(canvas, 'PNG', this.margin + (availableWidth - width * scale) / 2, this.y, width * scale, height * scale);
     } finally { host.remove(); }
   }

@@ -58,6 +58,14 @@ test('spreadsheet supports column boundaries and recalculation after a cell edit
   cells.A1='4'; assert.equal(evaluate(cells).display('B1'),'12');
 });
 
+test('cell style rendering accepts safe formatting and rejects CSS injection and unsupported values',()=>{
+  const formatted=Sheet.format({background:'#eee8f6',color:'#493663',bold:true,italic:false,font_size:18,align:'center',borders:'all',border_color:'#b39bce'});
+  assert.match(formatted.text,/background-color:#eee8f6/);assert.match(formatted.text,/font-weight:700/);
+  assert.match(formatted.text,/font-size:1.125rem/);assert.equal(formatted.border,'border:1px solid #b39bce');
+  const invalid=Sheet.format({background:'red;position:fixed',color:'url(https://example.test)',font_size:'18;display:none',align:'left;display:none',borders:'all',border_color:'#000000;display:none'});
+  assert.equal(invalid.text,'');assert.equal(invalid.border,'border:1px solid var(--line)');
+});
+
 const LinkTargets = vm.runInNewContext(fs.readFileSync('view/mindspace/link-targets.js','utf8')+'\nMindSpaceLinkTargets;', {
   MindSpaceSheet:Sheet,S:{data:{habits:[]}},t:key=>key,esc:value=>String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;')
 });
@@ -196,6 +204,20 @@ function cellReturnFixture() {
   state.data.diagrams=[{id:10,name:'Source map',nodes:[{id:'root',text:'Budget topic',link:{item_id:3,target:{type:'cell',id:'B3'}}}]}];
   return fixture;
 }
+test('cell formatting preserves formulas, backlinks and editor permissions',async()=>{
+  const {space,context}=cellReturnFixture();
+  space.draft.cells.B3='=2*21';space.draft.cell_styles={B3:{background:'#eee8f6',bold:true,borders:'bottom',border_color:'#493663'}};
+  const html=space.editor.sheet();
+  assert.match(html,/data-ms-cell="B3"[^>]*style="background-color:#eee8f6;font-weight:700"[^>]*value="42"/);
+  assert.match(html,/border-bottom:2px solid #493663/);assert.match(html,/data-action="ms-link-return"/);
+  assert.match(html,/data-action="ms-sheet-settings"/);assert.doesNotMatch(html,/data-action="ms-sheet-(row|column|export)"/);
+  assert.equal(space.draft.cells.B3,'=2*21');
+  space.can=()=>false;
+  assert.doesNotMatch(space.editor.sheet(),/data-action="ms-sheet-settings"/);
+  context.openModal=()=>{throw new Error('A viewer must not open cell settings');};
+  await space.editor.cellSettings();
+  await assert.rejects(space.handleAction('ms-sheet-settings',{}),/error_forbidden/);
+});
 test('ledger renders editable entries, protected balances, month bands and right-side totals',()=>{
   const {space}=cellReturnFixture();
   space.draft={template:'ledger',rows:4,columns:6,cells:{A1:'Date',B1:'Description',C1:'Category',D1:'Income',E1:'Expense',F1:'Balance',A2:'2026-01-31',D2:'1000',A3:'2026-02-01',E3:'250'}};

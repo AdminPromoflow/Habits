@@ -72,6 +72,8 @@ Al pulsar **Crear** en una nueva hoja de cálculo aparece el selector de **Libro
 
 Aplica **013_mindspaces.sql** y **014_mindspace_folders.sql** mediante `php bin/migrate.php` después de subir los archivos. Si faltan estas migraciones, se mantiene el editor anterior: las carpetas no aparecen todavía. Véase [la actualización de MindSpace](docs/MINDSPACE-MIGRATION.md).
 
+Al final de cada documento de MindSpace, **Descargar PDF** guarda los cambios pendientes y descarga el elemento abierto: diagramas completos, hojas con valores calculados y totales del libro contable, tableros con sus columnas y tarjetas, hábitos de la fecha seleccionada y notas. Las hojas anchas se dividen por grupos de columnas y los textos largos continúan en otras páginas. También está disponible con acceso compartido de lectura. La generación se realiza en el navegador con bibliotecas locales, sin servicios externos ni requisitos adicionales en el servidor.
+
 ## Sharing & collaboration
 
 Los espacios, carpetas y documentos se comparten desde **Share**, entre Rename y Delete. La invitación se dirige a un correo y permite marcar **Edit, Move, Delete y Share** de forma independiente; el acceso de lectura comienza al aceptar. Edit permite crear y cambiar contenido; Move permite trasladar elementos dentro del contenido compartido; Delete permite eliminarlo; Share permite invitar a otras personas con un subconjunto de los permisos recibidos. **Manage permissions** permite cambiarlos después. Revocar o abandonar una colaboración cierra el acceso y el de las invitaciones que dependan de ella.
@@ -184,6 +186,7 @@ El importador utiliza identificadores de origen para no duplicar rutinas ni ejer
 PHP_BIN=/opt/homebrew/bin/php python3 tests/functional.py
 node --test tests/diagrams.cjs tests/diagram-layout.cjs tests/diagram-viewport.cjs tests/diagram-routing.cjs tests/diagram-link-navigation.cjs
 node --test tests/mindspace.cjs
+node --test tests/mindspace-pdf.cjs
 ```
 
 Requiere Python 3, PHP con PDO MySQL y un usuario de MySQL autorizado para crear una base aislada `mi_rutina_test_*`. Configura `RUTINA_TEST_DB_USER` y `RUTINA_TEST_DB_PASSWORD` según tu entorno; el valor predeterminado `root` sin contraseña corresponde únicamente al XAMPP local. No usa la base real de Aleina.

@@ -56,6 +56,18 @@ def run(owner, stranger, guest, check):
  for bad in [{'rows':201,'columns':10,'cells':{}},{'rows':2,'columns':2,'cells':{'C1':'x'}},{'rows':2,'columns':2,'cells':{'A1':'x'*2001}}]:
   call('saveMindSpaceItem',{'id':sheet['id'],'version':sheet['version'],'content':bad},422)
  check(current(sheet['id'])['version']==sheet['version'], 'Spreadsheet size and cell limits reject invalid writes atomically')
+ styles={'B1':{'background':'#eee8f6','color':'#493663','bold':True,'italic':False,'font_size':18,'align':'center','borders':'all','border_color':'#b39bce'},'A3':{'borders':'bottom'}}
+ sheet=save(sheet,dict(sheet['content'],cell_styles=styles))
+ check(current(sheet['id'])['content']['cell_styles']==styles and sheet['content']['cells']['B1']=='=SUM(A1:A2)', 'Cell styles persist independently of formulas, including styles on empty cells')
+ legacy=dict(sheet['content']);legacy.pop('cell_styles');legacy['cells']['A1']='15'
+ sheet=save(sheet,legacy)
+ check(current(sheet['id'])['content']['cell_styles']==styles, 'Content saves from older clients preserve cell styles')
+ for bad in [None,{'Z1':{'bold':True}},{'A201':{'bold':True}},{'a1':{'bold':True}},{'A1':'red'},{'A1':{'background':'red;position:fixed'}},{'A1':{'bold':1}},{'A1':{'font_size':999}},{'A1':{'align':'justify'}},{'A1':{'borders':'dotted'}},{'A1':{'position':'fixed'}}]:
+  call('saveMindSpaceItem',{'id':sheet['id'],'version':sheet['version'],'content':dict(sheet['content'],cell_styles=bad)},422)
+ call('saveMindSpaceItem',{'id':sheet['id'],'version':sheet['version'],'content':dict(sheet['content'],cell_styles={})},404,client=stranger)
+ check(current(sheet['id'])==sheet, 'Invalid styles and foreign writes cannot alter cells or formatting')
+ sheet=save(sheet,dict(sheet['content'],cell_styles={}))
+ check(not current(sheet['id'])['content'].get('cell_styles') and sheet['content']['cells']['B1']=='=SUM(A1:A2)', 'Resetting styles preserves cell contents and formulas')
  for template,columns in [('ledger',6),('budget',4),('inventory',5),('projects',6),('blank',10)]:
   payload={'kind':'spreadsheet','name':template,'parent_id':root['id'],'client_key':str(uuid.uuid4()),'template':template,'language':'es'}
   created=call('createMindSpaceItem',payload)
@@ -64,6 +76,9 @@ def run(owner, stranger, guest, check):
    check([created['content']['cells'][c+'1'] for c in 'ABCDEF']==['Fecha','Descripción','Categoría','Entrada','Salida','Saldo'], 'Ledger contains all six requested column headers')
    ledger=save(created,{'rows':32,'columns':6,'cells':{'A1':'Overwrite','A2':'2026-01-31','D2':'1000','E3':'150','F2':'wrong'}})
    restored=current(ledger['id'])['content']
+   ledger=save(ledger,dict(restored,cell_styles={'F2':{'bold':True,'borders':'bottom'}}))
+   restored=current(ledger['id'])['content']
+   check(restored['cell_styles']['F2']['bold'] and restored['cells']['F2']=='=SUM(D2:D2)-SUM(E2:E2)', 'Calculated cells accept styles without unlocking or replacing formulas')
    check(restored['template']=='ledger' and restored['template_language']=='es' and restored['cells']['A1']=='Fecha' and restored['cells']['F2']=='=SUM(D2:D2)-SUM(E2:E2)' and restored['cells']['F32']=='=SUM(D2:D32)-SUM(E2:E32)' and restored['cells']['D2']=='1000', 'Ledger metadata survives older clients; headers and balances are protected and extended, while transactions persist')
    for bad in [dict(restored,template='blank'),dict(restored,rows=1,cells={}),dict(restored,columns=5,cells={})]:
     call('saveMindSpaceItem',{'id':ledger['id'],'version':ledger['version'],'content':bad},422)
