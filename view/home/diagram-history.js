@@ -33,6 +33,9 @@ class DiagramHistory {
     const diagram = saved ? home.active : null;
     return this.clone({
       name: diagram ? diagram.name : home.titleName(),
+      colorTheme: diagram ? diagram.color_theme || null : home.colorTheme || null,
+      diagramColor: diagram ? diagram.diagram_color || null : home.diagramColor || null,
+      canvasColor: diagram ? diagram.canvas_color || null : home.canvasColor || null,
       nodes: diagram ? home.treeFor(diagram) : home.snapshot(),
       connections: diagram ? home.connectionsFor(diagram) : home.connections,
       hiddenConnections: diagram ? home.connectionsFor(diagram, 'hidden_connections') : home.hiddenConnections,
@@ -43,7 +46,7 @@ class DiagramHistory {
 
   same(left, right) {
     const home = this.home;
-    return left.name === right.name && home.fingerprint(left.nodes) === home.fingerprint(right.nodes) &&
+    return left.name === right.name && left.colorTheme === right.colorTheme && left.diagramColor === right.diagramColor && left.canvasColor === right.canvasColor && home.fingerprint(left.nodes) === home.fingerprint(right.nodes) &&
       home.connectionFingerprint(left.connections) === home.connectionFingerprint(right.connections) &&
       home.connectionFingerprint(left.hiddenConnections) === home.connectionFingerprint(right.hiddenConnections) &&
       home.styleFingerprint(left.connectionStyles) === home.styleFingerprint(right.connectionStyles);
@@ -115,6 +118,9 @@ class DiagramHistory {
     home.hiddenConnections = restored.hiddenConnections;
     home.connectionStyles = restored.connectionStyles;
     home.diagramTitle = restored.name;
+    home.colorTheme = restored.colorTheme || null;
+    home.diagramColor = restored.diagramColor || null;
+    home.canvasColor = restored.canvasColor || null;
     home.selectedKey = home.nodes.some(node => node.id === restored.selectedKey) ? restored.selectedKey : 'root';
     home.name = home.nodes.find(node => node.id === home.selectedKey)?.text || '';
     home.childDrafts.clear();

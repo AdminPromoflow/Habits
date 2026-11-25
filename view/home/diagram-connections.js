@@ -159,15 +159,17 @@ class DiagramConnections {
         ? this.editingRoute.preview : edge.points && DiagramRouting.anchored(style.points, edge.points, this.home.plan.origin);
       return { ...edge, points, path: points ? DiagramLayout.orthogonalPath(points, edge.cornerRadius) : edge.path, style };
     });
-    svg.innerHTML = `<defs><marker id="diagram-arrow-end" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto"><path class="diagram-arrow" d="M1 1 L9 5 L1 9"/></marker>
-      <marker id="diagram-arrow-start" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto"><path class="diagram-arrow" d="M9 1 L1 5 L9 9"/></marker></defs>` + this.drawn.map(edge => {
+    const colors = ['', ...new Set(this.drawn.map(edge => this.home.colors.line(edge)).filter(Boolean))];
+    svg.innerHTML = '<defs>' + colors.map(color => ['start','end'].map(side => `<marker id="diagram-arrow-${side}${color ? '-'+color.slice(1) : ''}" viewBox="0 0 10 10" refX="${side === 'start' ? 1 : 9}" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto"><path class="diagram-arrow" d="${side === 'start' ? 'M9 1 L1 5 L9 9' : 'M1 1 L9 5 L1 9'}"${color ? ` style="stroke:${color}"` : ''}/></marker>`).join('')).join('') + '</defs>' + this.drawn.map(edge => {
       const selected = this.same(edge, this.selected);
+      const color = this.home.colors.line(edge);
       const label = t('diagram_connection_label', { from: names.get(edge.from), to: names.get(edge.to) });
       const arrows = edge.style.arrows;
-      const markers = `${['start', 'both'].includes(arrows) ? ' marker-start="url(#diagram-arrow-start)"' : ''}${['end', 'both'].includes(arrows) ? ' marker-end="url(#diagram-arrow-end)"' : ''}`;
+      const suffix = color ? '-'+color.slice(1) : '';
+      const markers = `${['start', 'both'].includes(arrows) ? ` marker-start="url(#diagram-arrow-start${suffix})"` : ''}${['end', 'both'].includes(arrows) ? ` marker-end="url(#diagram-arrow-end${suffix})"` : ''}`;
       const middle = edge.points && DiagramRouting.midpoint(edge.points);
       const text = edge.style.label && middle ? `<text class="diagram-connection-label" x="${middle[0]}" y="${middle[1]}" dy=".35em">${esc(edge.style.label)}</text>` : '';
-      return `<g class="diagram-connection${selected ? ' is-selected' : ''}" data-from="${esc(edge.from)}" data-to="${esc(edge.to)}"
+      return `<g class="diagram-connection${selected ? ' is-selected' : ''}" data-from="${esc(edge.from)}" data-to="${esc(edge.to)}"${color ? ` style="--diagram-line-color:${color}"` : ''}
         tabindex="0" role="button" aria-pressed="${selected}" aria-label="${esc(label)}">
         <path class="diagram-connection-hit" d="${edge.path}"/><path class="diagram-connection-line" d="${edge.path}"${markers}/>${text}</g>`;
     }).join('');

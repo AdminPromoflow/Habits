@@ -124,6 +124,9 @@ class DiagramNodeTools {
         if (S.data.mindspace) S.data.mindspace.items = S.data.mindspace.items.filter(item => item.diagram_id !== id);
         home.reset();
         home.active = S.data.diagrams[0] || null;
+        home.colorTheme = home.active?.color_theme || null;
+        home.diagramColor = home.active?.diagram_color || null;
+        home.canvasColor = home.active?.canvas_color || null;
         home.nodes = home.treeFor(home.active);
         home.connections = home.connectionsFor(home.active);
         home.hiddenConnections = home.connectionsFor(home.active, 'hidden_connections');

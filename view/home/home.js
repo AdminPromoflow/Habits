@@ -2,7 +2,7 @@
 
 class HomePage extends PageController {
   constructor() {
-    super(['create-diagram', 'retry-diagram', 'toggle-diagram-menu', 'diagram-layout', 'add-diagram-child', 'add-diagram-sibling',
+    super(['create-diagram', 'retry-diagram', 'toggle-diagram-menu', 'diagram-layout', 'diagram-colors', 'add-diagram-child', 'add-diagram-sibling',
       'diagram-checkbox-menu', 'diagram-checkbox-state', 'toggle-diagram-picker', 'select-diagram',
       'copy-diagram-node', 'cut-diagram-node', 'paste-diagram-node', 'delete-diagram-node', 'image-diagram-node', 'labels-diagram-node',
       'link-diagram-node', 'open-diagram-link', 'open-diagram-return', 'choose-diagram-return', 'diagram-link-ancestor', 'diagram-link-child',
@@ -10,6 +10,7 @@ class HomePage extends PageController {
     this.nodeTools = new DiagramNodeTools(this);
     this.links = new DiagramLinks(this);
     this.history = new DiagramHistory(this);
+    this.colors = new DiagramColors(this);
     this.mindspace = new MindSpace(this);
     this.generation = 0;
     this.viewport = new DiagramViewport({
@@ -219,6 +220,7 @@ class HomePage extends PageController {
     this.history.reset();
     this.suppressNodeClick = false;
     this.layoutPanel?.close();
+    this.colors?.close();
     this.layoutPanel = null;
     this.layoutOpen = false;
     this.nodes = null;
@@ -237,6 +239,9 @@ class HomePage extends PageController {
     this.draft = null;
     this.name = '';
     this.diagramTitle = '';
+    this.colorTheme = null;
+    this.diagramColor = null;
+    this.canvasColor = null;
     this.titleEditing = false;
     this.selected = false;
     this.menuOpen = false;
@@ -273,6 +278,9 @@ class HomePage extends PageController {
       this.connectionStyles = this.stylesFor(this.active);
       this.name = this.nodes.find((node) => node.id === 'root')?.text || '';
       this.diagramTitle = this.active?.name || '';
+      this.colorTheme = this.active?.color_theme || null;
+      this.diagramColor = this.active?.diagram_color || null;
+      this.canvasColor = this.active?.canvas_color || null;
       this.rememberDiagram();
       this.history.reconcile();
     }
@@ -482,6 +490,8 @@ class HomePage extends PageController {
       ...menuFields,
       ...this.nodeTools.content(node),
       topicLink: this.links.badge(node),
+      colorStyle: this.colors.css(node),
+      colorsLabel: esc(t('diagram_colors')),
       pasteDisabled: this.nodeTools.clipboard() ? '' : 'disabled',
       checkboxNoneLabel: esc(t('diagram_checkbox_none')),
       checkboxToggleLabel: esc(t('diagram_checkbox_toggle')),
@@ -598,6 +608,9 @@ class HomePage extends PageController {
     if (!this.active && !this.draft) return false;
     const nodes = this.snapshot();
     return !!this.draft || this.titleName() !== this.active.name ||
+      (this.colorTheme || null) !== (this.active.color_theme || null) ||
+      (this.diagramColor || null) !== (this.active.diagram_color || null) ||
+      (this.canvasColor || null) !== (this.active.canvas_color || null) ||
       this.connectionFingerprint(this.connections) !== this.connectionFingerprint(this.connectionsFor(this.active)) ||
       this.connectionFingerprint(this.hiddenConnections) !== this.connectionFingerprint(this.connectionsFor(this.active, 'hidden_connections')) ||
       this.styleFingerprint(this.connectionStyles) !== this.styleFingerprint(this.stylesFor(this.active)) ||
@@ -765,6 +778,7 @@ class HomePage extends PageController {
   positionTree() {
     this.syncViewport();
     const stage = document.getElementById('mindmap-stage');
+    if (stage) stage.style.backgroundColor = this.colors.background();
     const scene = document.getElementById('diagram-scene');
     const enabled = !!(this.active || this.draft);
     stage?.classList.toggle('has-diagram', enabled);
@@ -1176,6 +1190,7 @@ class HomePage extends PageController {
       return this.links.follow({ diagram_id: Number(button.dataset.returnDiagram), node_id: button.dataset.returnNode }, { returning: true });
     }
     if (action === 'diagram-layout') return this.openLayout();
+    if (action === 'diagram-colors') return this.colors.open();
     if (action === 'add-diagram-child') return this.addChild();
     if (action === 'add-diagram-sibling') return this.addSibling();
     if (action === 'diagram-checkbox-menu') {
@@ -1297,6 +1312,9 @@ class HomePage extends PageController {
     data.connections = this.connections.map((edge) => ({ ...edge }));
     data.hidden_connections = this.hiddenConnections.map((edge) => ({ ...edge }));
     data.connection_styles = this.stylesFor({ connection_styles: this.connectionStyles });
+    data.color_theme = this.colorTheme;
+    data.diagram_color = this.diagramColor;
+    data.canvas_color = this.canvasColor;
     this.saving = true;
     for (const node of nodes) {
       if (this.childDrafts.has(node.id)) this.submittedChildren.set(node.id, node.text);

@@ -43,7 +43,7 @@
 </template>
 
 <template id="view-diagram-node">
-  <div class="diagram-root" data-node-key="{{nodeKey}}" id="diagram-root{{suffix}}">
+  <div class="diagram-root" data-node-key="{{nodeKey}}" id="diagram-root{{suffix}}" style="{{colorStyle}}">
     <div class="diagram-node-body">
     <div
       class="diagram-node"
@@ -81,9 +81,9 @@
         aria-controls="diagram-menu{{suffix}}" aria-expanded="false" aria-haspopup="menu">
         <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2 10h4v4H2zm8 0h4v4h-4zm8 0h4v4h-4z"/></svg>
       </button>
-      <span class="diagram-handle diagram-handle-text" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="M3 4h18M12 4v18"/></svg>
-      </span>
+      <button type="button" class="diagram-handle diagram-handle-text" data-action="diagram-colors" aria-label="{{colorsLabel}}" title="{{colorsLabel}}" aria-haspopup="dialog">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 1.5-3.3 1.6 1.6 0 0 1 1.2-2.7H18a3 3 0 0 0 3-3 9 9 0 0 0-9-9Z"/><circle cx="7" cy="10" r="1" fill="currentColor"/><circle cx="10" cy="7" r="1" fill="currentColor"/><circle cx="15" cy="7" r="1" fill="currentColor"/><circle cx="17" cy="11" r="1" fill="currentColor"/></svg>
+      </button>
       <button type="button" class="diagram-handle diagram-handle-add" data-action="add-diagram-child" aria-label="{{addChildLabel}}" title="{{addChildHint}}">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="M12 2v20M2 12h20"/></svg>
       </button>

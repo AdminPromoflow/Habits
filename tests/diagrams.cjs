@@ -4,6 +4,61 @@ const { randomUUID } = require('node:crypto');
 const vm = require('node:vm');
 const { test } = require('node:test');
 
+test('diagram palettes and background save without changing structure, reload, and undo together', async () => {
+  const {home,state} = savedEditor();
+  const original=JSON.stringify(home.snapshot());
+  home.makeRequest=async(action,data)=>({...JSON.parse(JSON.stringify(data)),version:data.version+1});
+  await home.colors.apply({theme:'pastel',canvasColor:'#fff4dd'});
+  assert.equal(home.active.color_theme,'pastel');
+  assert.equal(home.active.canvas_color,'#fff4dd');
+  assert.equal(JSON.stringify(home.snapshot()),original);
+  assert.equal(home.hasChanges(),false);
+  const restored=editor({draft:false,state:JSON.parse(JSON.stringify(state))});
+  restored.home.render();restored.home.drawStage();
+  assert.equal(restored.home.colorTheme,'pastel');
+  assert.equal(restored.stage.style.backgroundColor,'#fff4dd');
+  assert.match(JSON.parse(restored.home.nodeContent(restored.home.nodes[0])).colorStyle,/--diagram-node-bg:#efd2b8/);
+  await home.colors.apply({theme:'pastel',diagramColor:'#354052',canvasColor:'#e6f4ee'});
+  assert.equal(home.colors.node(home.nodes[0]).text,'#ffffff');
+  await home.history.undo();
+  assert.equal(home.diagramColor,null);assert.equal(home.canvasColor,'#fff4dd');
+  await home.history.undo();
+  assert.equal(home.colorTheme,null);assert.equal(home.canvasColor,null);
+  assert.equal(JSON.stringify(home.snapshot()),original);
+});
+
+test('color themes follow branches for new descendants and color their connectors', async () => {
+  const {home}=savedEditor();
+  home.nodes=[{id:'root',parent_id:null,text:'Root'},{id:'a',parent_id:'root',text:'A'},
+    {id:'b',parent_id:'root',text:'B'},{id:'c',parent_id:'a',text:'C'}];
+  home.colorTheme='pastel';
+  const [root,a,b,c]=home.nodes;
+  assert.notEqual(home.colors.node(a).fill,home.colors.node(b).fill);
+  assert.equal(home.colors.node(a).fill,home.colors.node(c).fill);
+  assert.notEqual(home.colors.node(root).fill,home.colors.node(a).fill);
+  assert.equal(home.colors.line({from:'root',to:'a'}),home.colors.node(a).border);
+  home.nodes.push({id:'d',parent_id:'c',text:''});
+  assert.equal(home.colors.node(home.nodes[4]).fill,home.colors.node(a).fill);
+  home.diagramColor='#112233';
+  assert.ok(home.nodes.every(node=>home.colors.node(node).fill==='#112233'));
+});
+
+test('color changes reject invalid values and read-only access, and reset returns to the original colors', async () => {
+  const {home,state}=savedEditor();
+  let requests=0;
+  home.makeRequest=async(action,data)=>{requests++;return {...data,version:data.version+1};};
+  for(const choice of [{theme:'unknown'},{theme:'pastel',diagramColor:'red'},{theme:'pastel',canvasColor:'url(bad)'}]) await home.colors.apply(choice);
+  assert.equal(requests,0);
+  state.sharedWorkspace={permissions:{edit:false}};
+  await home.colors.apply({theme:'pastel'});assert.equal(requests,0);
+  state.sharedWorkspace=null;
+  await home.colors.apply({theme:'ocean',diagramColor:'#ABCDEF',canvasColor:'#000000'});
+  assert.equal(home.diagramColor,'#abcdef');
+  await home.colors.apply({theme:'default'});
+  assert.equal(home.colorTheme,null);assert.equal(home.diagramColor,null);assert.equal(home.canvasColor,null);
+  assert.equal(home.colors.css(home.nodes[0]),'');assert.equal(home.colors.background(),'');
+});
+
 test('topic links are included in dirty detection, saved snapshots and their visible open button', async () => {
   const { home } = savedEditor();
   home.nodes[0].link = { diagram_id: 52, node_id: 'root' };
@@ -297,6 +352,7 @@ function editor({ draft = true, state = { user: { name: 'Aleina' }, data: { diag
   vm.runInContext(fs.readFileSync('view/home/diagram-routing.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('view/home/diagram-connections.js', 'utf8'), context);
   vm.runInContext(fs.readFileSync('view/home/diagram-history.js', 'utf8'), context);
+  vm.runInContext(fs.readFileSync('view/home/diagram-colors.js', 'utf8'), context);
   for (const file of ['sheet', 'link-targets', 'editors', 'mindspace']) vm.runInContext(fs.readFileSync(`view/mindspace/${file}.js`, 'utf8'), context);
   const HomePage = vm.runInContext(fs.readFileSync('view/home/home.js', 'utf8') + '\nHomePage;', context);
   const home = new HomePage();

@@ -7,7 +7,7 @@ final class DiagramsModel extends BaseModel
     {
         $mindspace = (new MindSpacesModel($this->db, $this->user))->available();
         $diagrams = $this->db->all(
-            'SELECT d.id,d.name,d.version,d.created_at,d.updated_at,d.connections_json,' . ($mindspace ? 'i.id' : 'NULL') . ' AS mindspace_item_id FROM diagrams d ' .
+            'SELECT d.id,d.name,d.version,d.created_at,d.updated_at,d.connections_json,d.color_theme,d.diagram_color,d.canvas_color,' . ($mindspace ? 'i.id' : 'NULL') . ' AS mindspace_item_id FROM diagrams d ' .
             ($mindspace ? 'LEFT JOIN mindspace_items i ON i.diagram_id=d.id ' : '') .
             'WHERE d.owner_user_id=?' . ($id === null ? '' : ' AND d.id=?') . ' ORDER BY d.updated_at DESC,d.id DESC',
             $id === null ? [$this->uid()] : [$this->uid(), $id],
@@ -29,6 +29,12 @@ final class DiagramsModel extends BaseModel
     {
         $name = self::name($data, 'name');
         $nodes = array_key_exists('nodes', $data) ? self::validateNodes($data['nodes']) : null;
+        $theme = $data['color_theme'] ?? null;
+        if ($theme !== null) $theme = Validate::choice($theme, ['pastel','vivid','ocean','forest','sunset','mono']);
+        foreach (['diagram_color','canvas_color'] as $field) {
+            $color = $data[$field] ?? null;
+            if ($color !== null && (!is_string($color) || !preg_match('/^#[0-9a-fA-F]{6}$/D', $color))) fail('error_validation');
+        }
         $id = (int) ($data['id'] ?? 0);
         $writeNodes = true;
         if ($id) {
@@ -53,8 +59,12 @@ final class DiagramsModel extends BaseModel
         // The diagram title and the central idea are independent. A title-only
         // update preserves every node, including the root text and its styling.
         if ($writeNodes && $nodes !== null) $this->replaceNodes($id, $nodes);
+        if ($writeNodes && array_key_exists('color_theme', $data)) $this->db->run('UPDATE diagrams SET color_theme=? WHERE id=?', [$theme, $id]);
+        foreach (['diagram_color','canvas_color'] as $field) {
+            if ($writeNodes && array_key_exists($field, $data)) $this->db->run("UPDATE diagrams SET $field=? WHERE id=?", [$data[$field] === null ? null : strtolower($data[$field]), $id]);
+        }
         if ($writeNodes && ($nodes !== null || array_key_exists('connections', $data) || array_key_exists('hidden_connections', $data) || array_key_exists('connection_styles', $data))) $this->saveConnections($id, $data);
-        $diagram = $this->db->one('SELECT id,name,version,created_at,updated_at,connections_json FROM diagrams WHERE id=? AND owner_user_id=?', [$id, $this->uid()]);
+        $diagram = $this->db->one('SELECT id,name,version,created_at,updated_at,connections_json,color_theme,diagram_color,canvas_color FROM diagrams WHERE id=? AND owner_user_id=?', [$id, $this->uid()]);
         $diagram['nodes'] = array_map(self::nodeResponse(...), $this->db->all('SELECT * FROM diagram_nodes WHERE diagram_id=? ORDER BY sort_order', [$id]));
         $diagram['mindspace_item_id'] = (new MindSpacesModel($this->db, $this->user))->attachDiagram($id);
         return self::diagramResponse($diagram);

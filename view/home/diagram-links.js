@@ -304,6 +304,9 @@ class DiagramLinks {
         home.hiddenConnections = home.connectionsFor(target, 'hidden_connections');
         home.connectionStyles = home.stylesFor(target);
         home.diagramTitle = target.name;
+        home.colorTheme = target.color_theme || null;
+        home.diagramColor = target.diagram_color || null;
+        home.canvasColor = target.canvas_color || null;
         home.selectedKey = link.node_id || 'root';
         home.name = home.nodes.find(node => node.id === home.selectedKey)?.text || '';
         home.editing = false; home.menuOpen = false;

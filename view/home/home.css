@@ -223,8 +223,8 @@
   display: grid;
   place-items: center;
   border-radius: 16px;
-  background: var(--lavender-wash);
-  border: 2px solid var(--lavender);
+  background: var(--diagram-node-bg, var(--lavender-wash));
+  border: 2px solid var(--diagram-node-border, var(--lavender));
   box-shadow: 0 8px 28px #70579512;
   cursor: default;
   touch-action: manipulation;
@@ -235,7 +235,7 @@
 
 .diagram-root.is-selected .diagram-node,
 .diagram-root.is-editing .diagram-node {
-  border-color: var(--purple);
+  border-color: var(--diagram-node-border, var(--purple));
   box-shadow: 0 0 0 5px #b8a4d420;
 }
 
@@ -616,7 +616,7 @@ button.diagram-handle-arrows { cursor: ew-resize; touch-action: none; }
 .diagram-spacing-guide.is-equal line { stroke-width: 2; }
 .diagram-spacing-guide.is-equal text { font-weight: 700; }
 .diagram-connections { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
-.diagram-connections path { fill: none; stroke: var(--lavender); stroke-width: 2; }
+.diagram-connections path { fill: none; stroke: var(--diagram-line-color, var(--lavender)); stroke-width: 2; }
 .diagram-connection { cursor: pointer; outline: none; }
 .diagram-connections .diagram-connection-hit { stroke: transparent; stroke-width: 14; vector-effect: non-scaling-stroke; pointer-events: stroke; }
 .diagram-connection-line { pointer-events: none; }
