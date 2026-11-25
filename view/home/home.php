@@ -2,6 +2,13 @@
     http_response_code(404);
     exit();
 } ?>
+<template id="view-home-spaces">
+  <section class="home-page home-spaces-page">
+    <div class="page-heading home-heading"><h1>{{heading}}</h1></div>
+    {{spaces}}
+  </section>
+</template>
+
 <template id="view-home">
   <section class="home-page">
     <div class="page-heading home-heading">

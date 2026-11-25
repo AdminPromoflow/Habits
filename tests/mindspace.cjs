@@ -378,11 +378,17 @@ test('switching spaces saves the open document and preserves the other spaces in
   assert.equal(params.get('space'),'100'); assert.equal(params.get('folder'),'0'); assert.equal(params.has('item'),false);
   assert.equal(state.data.mindspace.items.length,6); assert.equal(state.data.mindspace.items.find(i=>i.id===6).content.text,'new work');
 });
-test('sidebar collapse leaves the active editor and unsaved draft intact',()=>{
-  const {space}=multiple('http://localhost/?item=6'); space.draft.text='still typing';
-  assert.equal(space.sidebarOpen(),true); space.toggleSidebar(); assert.equal(space.sidebarOpen(),false);
-  assert.equal(space.draft.text,'still typing'); assert.equal(space.dirty(),true);
-  space.toggleSidebar(); assert.equal(space.sidebarOpen(),true); assert.equal(space.active.id,6);
+test('Home lists only spaces without selecting a document or showing its contents',()=>{
+  const {space,context,state}=multiple('http://localhost/');
+  context.renderTemplate=(name,values)=>values;
+  space.active=null;
+  const html=space.homeList().spaces;
+  assert.equal((html.match(/data-action="ms-space-open"/g)||[]).length,2);
+  assert.match(html,/>MindSpace<\/span>/); assert.match(html,/>Work<\/span>/);
+  assert.doesNotMatch(html,/Note|Map|Parent|Work folder|ms-entry-menu|ms-new/);
+  assert.equal(space.active,null);
+  state.data.mindspace.spaces=[];
+  assert.match(space.homeList().spaces,/ms_no_spaces/);
 });
 
 
@@ -405,8 +411,8 @@ function modalFixture(url='http://localhost/?item=6') {
   return fixture;
 }
 
-test('sidebar includes documents in every space, nested folders and contextual Add buttons',()=>{
-  const {space}=multiple(); const html=space.sidebar();
+test('All main spaces includes documents in every space, nested folders and contextual Add buttons',()=>{
+  const {space}=multiple(); const html=space.directory();
   for (const name of ['Note','Map','Work note','Parent','Child','Work folder']) assert.ok(html.includes(`>${name}</span>`), name);
   assert.ok(html.includes('data-space="100" data-parent="2"'));
   assert.ok(html.includes('data-space="200" data-parent="5"'));

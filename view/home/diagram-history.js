@@ -86,7 +86,7 @@ class DiagramHistory {
     if (event.defaultPrevented || event.isComposing || event.altKey || event.shiftKey ||
         !(event.metaKey || event.ctrlKey) || event.key?.toLowerCase() !== 'z') return false;
     const home = this.home, target = event.target;
-    if ((S.view && S.view !== 'home') || S.mode === 'admin' || (!home.active && !home.draft) ||
+    if ((S.view && S.view !== 'mindspaces' && !S.sharedWorkspace) || S.mode === 'admin' || (!home.active && !home.draft) ||
         document.querySelector('dialog[open]') || target.isContentEditable ||
         target.closest?.('[contenteditable="true"]') ||
         (home.isNameField(target) && !target.readOnly) || target.id === 'diagram-title-input' ||

@@ -1,4 +1,4 @@
-const personalNav = ['home', 'habits', 'calendar', 'progress', 'sharing', 'settings', 'profile'];
+const personalNav = ['home', 'mindspaces', 'habits', 'calendar', 'progress', 'sharing', 'settings', 'profile'];
 const adminNav = [
   'overview',
   'users',
@@ -16,6 +16,13 @@ function langSwitch() {
 function notificationCount() { return S.data.unread_notifications ?? S.data.notifications.filter(n => !Number(n.is_read)).length; }
 function notificationLabel() { const count = notificationCount(); return count ? t('notifications_unread', {count}) : t('notifications'); }
 function notificationBadge() { const count = notificationCount(); return count ? `<span class="notification-badge" aria-hidden="true">${count > 99 ? '99+' : count}</span>` : ''; }
+function hasMindSpaceTarget() {
+  const params = new URL(location.href).searchParams;
+  return ['space', 'folder', 'item', 'diagram'].some(key => params.has(key));
+}
+function initialPersonalView() {
+  return hasMindSpaceTarget() || new URL(location.href).searchParams.get('view') === 'mindspaces' ? 'mindspaces' : 'home';
+}
 function updateNotificationBadge() {
   const bell = document.querySelector('[data-action="notifications"]');
   if (!bell) return;
@@ -28,7 +35,7 @@ function render() {
   document.body.dataset.theme = S.user?.theme || 'light';
   document.title = `MyRemarkable Mind · ${t(S.mode === 'admin' ? 'admin_dashboard' : S.view === 'categoryWeek' ? 'weekly_plan' : S.view === 'routine' ? 'routine' : S.view)}`;
   $('#app').innerHTML = S.user && !S.setupToken && !S.resetToken ? shell() : authPage();
-  if (S.user && S.mode === 'personal' && (S.view === 'home' || S.sharedWorkspace)) {
+  if (S.user && S.mode === 'personal' && ((S.view === 'mindspaces' && hasMindSpaceTarget()) || S.sharedWorkspace)) {
     pageControllers.home.mount();
     if (S.sharedWorkspace) mountSharedWorkspace();
   }
@@ -48,7 +55,7 @@ function shell() {
       .map(
         (v) =>
           !admin && v === 'sharing' ? sharingSidebar(pending) :
-          `<button data-view="${v}" class="nav-item ${S.view === v || (v === 'habits' && ['routine', 'categoryWeek'].includes(S.view)) ? 'active' : ''}">${icon({ users: 'sharing', requests: 'book', templates: 'habits', statistics: 'progress' }[v] || v)}<span>${t(v)}</span>${v === 'sharing' && pending ? `<span class="nav-count">${pending}</span>` : ''}</button>${!admin && v === 'home' ? pageControllers.home.mindspace.sidebar() : ''}`
+          `<button data-view="${v}" class="nav-item ${S.view === v || (v === 'habits' && ['routine', 'categoryWeek'].includes(S.view)) ? 'active' : ''}" ${S.view === v ? 'aria-current="page"' : ''}>${icon({ mindspaces: 'overview', users: 'sharing', requests: 'book', templates: 'habits', statistics: 'progress' }[v] || v)}<span>${t(v)}</span>${v === 'sharing' && pending ? `<span class="nav-count">${pending}</span>` : ''}</button>`
       )
       .join(''),
     reminderIcon: icon('leaf'),
@@ -84,7 +91,8 @@ function shell() {
 function personalPage() {
   return (
     {
-      home: homePage,
+      home: () => pageControllers.home.mindspace.homeList(),
+      mindspaces: () => hasMindSpaceTarget() ? homePage() : pageControllers.home.mindspace.directory(),
       habits: habitsPage,
       categoryWeek: categoryWeekPage,
       routine: routinePage,
@@ -94,7 +102,7 @@ function personalPage() {
       categories: categoriesPage,
       sharing: sharingPage,
       profile: profilePage,
-    }[S.view] || homePage
+    }[S.view] || (() => pageControllers.home.mindspace.homeList())
   )();
 }
 
@@ -103,7 +111,7 @@ async function navigate(view) {
     if (!await pageControllers.home.mindspace.flush()) return;
     leaveSharedWorkspace();
   }
-  if (S.view === 'home' && view !== 'home' && pageControllers.home.mindspace.enabled() && !await pageControllers.home.mindspace.flush()) return;
+  if (S.view === 'mindspaces' && pageControllers.home.mindspace.enabled() && !await pageControllers.home.mindspace.flush()) return;
   if (S.mode === 'personal' && view === 'categories') view = 'settings';
   if (view === 'sharing') {
     setSharingSidebarOpen(true);
@@ -121,6 +129,13 @@ async function navigate(view) {
     view !== 'profile'
   )
     view = 'overview';
+  if (S.mode === 'personal' && ['home', 'mindspaces'].includes(view)) {
+    const url = new URL(location.href);
+    for (const key of ['view', 'diagram', 'topic', 'item', 'folder', 'space', 'cell', 'card', 'column', 'habit']) url.searchParams.delete(key);
+    if (view === 'mindspaces') url.searchParams.set('view', 'mindspaces');
+    history.replaceState(null, '', url.href);
+    pageControllers.home.reset();
+  }
   S.view = view;
   S.filter.routine = '';
   document.body.classList.remove('menu-open');

@@ -70,7 +70,7 @@ class ApplicationActions extends PageController {
         break;
       }
       case 'logout':
-        if ((S.view === 'home' || S.sharedWorkspace) && pageControllers.home.mindspace.enabled() && !await pageControllers.home.mindspace.flush()) return;
+        if ((S.view === 'mindspaces' || S.sharedWorkspace) && pageControllers.home.mindspace.enabled() && !await pageControllers.home.mindspace.flush()) return;
         if (S.sharedWorkspace) leaveSharedWorkspace();
         await this.makeRequest('logout', {});
         S.mode = 'personal';
@@ -80,7 +80,7 @@ class ApplicationActions extends PageController {
         await bootstrap();
         break;
       case 'switch-mode':
-        if ((S.view === 'home' || S.sharedWorkspace) && pageControllers.home.mindspace.enabled() && !await pageControllers.home.mindspace.flush()) return;
+        if ((S.view === 'mindspaces' || S.sharedWorkspace) && pageControllers.home.mindspace.enabled() && !await pageControllers.home.mindspace.flush()) return;
         if (S.sharedWorkspace) leaveSharedWorkspace();
         S.mode = S.mode === 'admin' ? 'personal' : 'admin';
         S.view = S.mode === 'admin' ? 'overview' : 'home';
@@ -366,6 +366,7 @@ window.addEventListener('focus', syncQuietly);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) void syncQuietly(); });
 setInterval(syncQuietly, 15000);
 (async () => {
+  S.view = initialPersonalView();
   const m = location.hash.match(/^#(setup|reset)=([a-f0-9]{64})$/);
   if (m) {
     S[m[1] === 'setup' ? 'setupToken' : 'resetToken'] = m[2];

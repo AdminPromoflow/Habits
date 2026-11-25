@@ -3309,6 +3309,8 @@ test('undo leaves Shift combinations, native text undo, other pages and dialogs 
   state.view = 'profile';
   assert.equal(handleKey('z', node, { ctrlKey: true }).prevented, false);
   state.view = 'home';
+  assert.equal(handleKey('z', node, { ctrlKey: true }).prevented, false);
+  state.view = 'mindspaces';
   const query = document.querySelector;
   document.querySelector = selector => selector === 'dialog[open]' ? {} : query(selector);
   assert.equal(handleKey('z', node, { metaKey: true }).prevented, false);
