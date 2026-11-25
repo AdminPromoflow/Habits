@@ -85,6 +85,14 @@ El modelo documentado desde las migraciones está en [database-model](database-m
 
 Para esta instalación, verificar siempre la base publicada desde Hostinger/phpMyAdmin en Chrome al revisar cambios o incidencias; las pruebas locales no sustituyen esa comprobación. Utilizar consultas de solo lectura para revisar migraciones, columnas y datos, y comprobar también la carga real del sitio.
 
+### Categorías y navegación del planificador — 25 de noviembre de 2026
+
+Se aplicó `020_planner_categories.sql` tanto en local como en Hostinger mediante phpMyAdmin, registrando el SHA-256 `8e6994d38bd11b612a2b9dd9ea609f9d4fd6cc2346096f7657835406fb0f5edc`. Añade la categoría opcional de las tareas y el vínculo de las categorías con carpetas o espacios principales. Los conteos de producción antes y después se conservaron: 42 hábitos, 0 tareas, 14 diagramas y 7 categorías.
+
+Se publicaron los 13 archivos de aplicación y migración del paquete `mrm-categories-20261125.zip`, conservando la configuración y las sesiones. Chrome confirmó el acceso único **My day to day** en la barra lateral, las pestañas **My day to day / Categories**, **Day** como vista inicial y el selector **Category** con carpetas, categorías existentes y **New category**. La pestaña Categories mostró los conteos de hábitos y tareas y la acción **View activities**. No se crearon actividades de prueba en producción.
+
+La validación aislada pasó 297 comprobaciones HTTP, 9 comprobaciones de esquema/código y 4 pruebas JavaScript. Incluye reutilización de categorías de carpetas, cambios de categoría, permisos, compatibilidad con clientes anteriores y reversión completa cuando falla el guardado. La revisión visual local confirmó la creación de una categoría desde el formulario y su recuperación al editar una tarea.
+
 ### Planificador — 24 de noviembre de 2026
 
 El error «The database is unavailable» del formulario correspondía a la ausencia de la migración 018 en producción. Se aplicaron mediante phpMyAdmin `018_daily_planner.sql` (SHA-256 `a7b90378878401bdce41d8338f0e1f5ae512a9fb43122e9a47722c7e0bb6ff47`) y `019_planner_recurrence.sql` (SHA-256 `ae33f9f20f6e2065ab2841624c23a4516b9a009e81e23ea0aaaf6bae26233b25`), y se registraron en `schema_migrations`.

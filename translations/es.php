@@ -783,6 +783,7 @@ return [
     'planner_no_category' => 'Sin categoría',
     'planner_sections' => 'Secciones de la agenda',
     'planner_categories_intro' => 'Tus tareas y hábitos, organizados por categoría.',
-    'planner_category_counts' => '{habits} hábitos · {tasks} tareas',
+    'planner_category_counts' => 'Hábitos: {habits} · Tareas: {tasks}',
+    'planner_open_category' => 'Ver actividades',
     'planner_category_tasks' => 'Tareas de esta categoría',
 ];

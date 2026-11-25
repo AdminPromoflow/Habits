@@ -783,6 +783,7 @@ return [
     'planner_no_category' => 'No category',
     'planner_sections' => 'Planner sections',
     'planner_categories_intro' => 'Your tasks and habits, organized by category.',
-    'planner_category_counts' => '{habits} habits · {tasks} tasks',
+    'planner_category_counts' => 'Habits: {habits} · Tasks: {tasks}',
+    'planner_open_category' => 'View activities',
     'planner_category_tasks' => 'Tasks in this category',
 ];

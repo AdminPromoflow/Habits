@@ -14,7 +14,7 @@ function habitsPage() {
       `<div class="button-row">${button('new_category', 'new-category', 'secondary')}<button class="btn primary" data-action="planner-add">${icon('plus')}${t('planner_add')}</button></div>`
     ),
     categories: groups.length
-      ? `<div class="category-grid habit-category-grid">${groups.map(({ category: c, habits, tasks }) => `<button class="category-card habit-category-tile" style="--category-color:${esc(c.color)}" data-action="filter-category" data-id="${c.id}"><span class="category-icon">${icon(c.icon)}</span><h2>${esc(categoryName(c))}</h2><p>${t('planner_category_counts', { habits:habits.length,tasks:tasks.length })}</p><span class="category-week-link">${t('open_weekly_plan')}${icon('chevron')}</span></button>`).join('')}</div>`
+      ? `<div class="category-grid habit-category-grid">${groups.map(({ category: c, habits, tasks }) => `<button class="category-card habit-category-tile" style="--category-color:${esc(c.color)}" data-action="filter-category" data-id="${c.id}"><span class="category-icon">${icon(c.icon)}</span><h2>${esc(categoryName(c))}</h2><p>${t('planner_category_counts', { habits:habits.length,tasks:tasks.length })}</p><span class="category-week-link">${t('planner_open_category')}${icon('chevron')}</span></button>`).join('')}</div>`
       : empty(
           'no_category_habits',
           'category_first_habit',
