@@ -1217,6 +1217,63 @@ test('moving or zooming the camera is not a diagram edit and survives a redraw',
   assert.equal(home.viewport.scale, 1);
 });
 
+test('preset dragging previews the branch without changing coordinates and commits only a valid parent', async () => {
+  const {home,node,click,pointer,addNodeElement,addAlignmentLayer} = savedEditor();
+  const layer=addAlignmentLayer();
+  home.nodes=[{id:'root',parent_id:null,text:home.name,layout:{mode:'horizontal'}},
+    {id:'a',parent_id:'root',text:'A'}, {id:'b',parent_id:'root',text:'B'},
+    {id:'child',parent_id:'a',text:'Child'}];
+  home.active.nodes=JSON.parse(JSON.stringify(home.nodes));
+  const a=addNodeElement('a','A'); addNodeElement('b','B'); addNodeElement('child','Child');
+  home.positionTree();
+  let saves=0;
+  home.makeRequest=async(action,data)=>{saves++;return {...data,version:data.version+1};};
+  const before=home.fingerprint(home.snapshot());
+  click(a.node); pointer('pointerdown',a.node); pointer('pointermove',a.node,{clientX:160,clientY:200});
+  assert.equal(home.fingerprint(home.snapshot()),before);
+  assert.equal(layer.innerHTML,'','no red guides or measurements in a preset');
+  assert.equal(saves,0);
+  pointer('pointerup',a.node);
+  assert.equal(home.fingerprint(home.snapshot()),before,'no target means no change');
+  assert.equal(saves,0);
+  click(a.node); pointer('pointerdown',a.node); pointer('pointermove',a.node,{clientX:160,clientY:200});
+  home.drag.target={kind:'parent',parentId:'b',index:0};
+  pointer('pointerup',a.node); await new Promise(setImmediate);
+  assert.equal(saves,1);
+  assert.equal(home.active.nodes.find(n=>n.id==='a').parent_id,'b');
+  assert.equal(home.active.nodes.find(n=>n.id==='child').parent_id,'a');
+  assert.ok(home.active.nodes.filter(n=>n.id!=='root').every(n=>n.x===null && n.y===null));
+  click(node); pointer('pointerdown',node);
+  assert.equal(home.drag,null,'preset main root stays anchored');
+});
+
+test('sibling reordering is saved and undoable while parent-child storage interleaving is irrelevant', async () => {
+  const {home}=savedEditor();
+  home.nodes=[{id:'root',parent_id:null,text:home.name},
+    ...['a','b','c','d'].map(id=>({id,parent_id:'root',text:id})), {id:'child',parent_id:'a',text:'Child'}];
+  home.active.nodes=JSON.parse(JSON.stringify(home.nodes));
+  home.history.reconcile();
+  home.makeRequest=async(action,data)=>({...data,version:data.version+1});
+  const [root,a,b,c,d,child]=home.nodes;
+  assert.equal(home.fingerprint(home.nodes),home.fingerprint([child,root,a,b,c,d]));
+  assert.equal(home.moveBranch('d',{parentId:'root',index:2}),true);
+  assert.equal(home.hasChanges(),true);
+  await home.save();
+  assert.equal(home.active.nodes.filter(n=>n.parent_id==='root').map(n=>n.id).join(','),'a,b,d,c');
+  await home.history.undo();
+  assert.equal(home.active.nodes.filter(n=>n.parent_id==='root').map(n=>n.id).join(','),'a,b,c,d');
+});
+
+test('all preset layouts suppress red guides during resizing as well as dragging', () => {
+  for (const mode of ['horizontal','vertical','list','topdown','linear','radial','matrix']) {
+    const {home,addAlignmentLayer}=savedEditor();
+    const layer=addAlignmentLayer();
+    home.nodes[0].layout={mode}; home.positionTree();
+    home.resizeGuideKey='root'; home.renderAlignmentGuides();
+    assert.equal(layer.innerHTML,'',mode);
+  }
+});
+
 test('a node must be selected before dragging, and a click without movement never saves', () => {
   const { home, node, root, pointer, click } = savedEditor();
   home.makeRequest = () => { throw new Error('Selection and clicks must not save'); };

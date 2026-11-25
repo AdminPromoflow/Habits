@@ -641,6 +641,7 @@ button.diagram-handle-arrows { cursor: ew-resize; touch-action: none; }
 .diagram-node.is-drop-parent { outline: 3px solid #2185f5; outline-offset: 4px; }
 .mindmap-stage.is-reordering .diagram-connections { opacity: .3; }
 .mindmap-stage.is-reordering .diagram-root.is-dragging { opacity: .65; }
+.mindmap-stage.is-reordering .diagram-root.is-dragging .diagram-controls { visibility: hidden; }
 .diagram-alignment-guides .diagram-reorder-guide.is-active line { stroke-width: 3; stroke-dasharray: none; }
 .diagram-connections { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
 .diagram-connections path { fill: none; stroke: var(--diagram-line-color, var(--lavender)); stroke-width: 2; }
