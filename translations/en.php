@@ -755,7 +755,7 @@ return [
     'planner_on_date' => 'Date',
     'planner_optional_description' => 'Add a description (optional)',
     'planner_month_spacing' => 'How often, in months?',
-    'planner_every_months' => 'Every {count} month(s)',
+    'planner_every_months' => 'Every {count} months',
     'planner_choose_months' => 'Choose months',
     'planner_months' => 'Months of the year',
     'planner_month_pattern' => 'Which days?',

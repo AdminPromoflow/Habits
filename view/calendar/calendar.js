@@ -11,6 +11,10 @@ function plannerChoices(name, label, options, selected, cls = '') {
   return `<fieldset class="planner-choices ${cls}"><legend>${esc(t(label))}</legend><div>${options.map(([value,text]) => `<label><input type="checkbox" name="${name}" value="${value}" ${selected.includes(value) ? 'checked' : ''}><span>${esc(text)}</span></label>`).join('')}</div></fieldset>`;
 }
 
+function plannerMonthInterval(count) {
+  return count === 1 ? t('planner_monthly') : t('planner_every_months',{count});
+}
+
 function plannerScheduleFields(entry = {}, kind = null) {
   const recurrence = entry.recurrence || (kind === 'habit' ? 'weekly' : 'once');
   const start = entry.start_date || S.date || today(), rule = plannerRule(entry);
@@ -23,10 +27,10 @@ function plannerScheduleFields(entry = {}, kind = null) {
       <fieldset class="planner-frequency"><legend>${t('planner_frequency')}</legend><div>${['yearly','monthly','weekly','daily'].map(v => `<label><input type="radio" name="repeat_frequency" value="${v}" ${frequency === v ? 'checked' : ''}><span>${t('planner_'+v)}</span></label>`).join('')}</div></fieldset>
       <div data-week-fields>${daysField(days)}<button class="text-btn planner-weekdays" type="button" data-select-weekdays>${t('planner_weekdays')}</button></div>
       <div data-year-fields>
-        ${selectField('month_preset','planner_month_spacing',[[0,t('planner_choose_months')],...[1,2,3,4,6,12].map(n=>[n,t('planner_every_months',{count:n})])],0)}
+        ${selectField('month_preset','planner_month_spacing',[[0,t('planner_choose_months')],...[1,2,3,4,6,12].map(n=>[n,plannerMonthInterval(n)])],0)}
         ${plannerChoices('rule_months','planner_months',Array.from({length:12},(_,i)=>[i+1,fmt(`2026-${String(i+1).padStart(2,'0')}-01`,{month:'short'})]),rule.months || [Number(start.slice(5,7))],'planner-month-choices')}
       </div>
-      <div data-month-interval>${selectField('rule_interval','planner_month_spacing',Array.from({length:12},(_,i)=>[i+1,t('planner_every_months',{count:i+1})]),rule.interval || 1)}</div>
+      <div data-month-interval>${selectField('rule_interval','planner_month_spacing',Array.from({length:12},(_,i)=>[i+1,plannerMonthInterval(i+1)]),rule.interval || 1)}</div>
       <div data-month-fields>
         <fieldset class="planner-month-mode"><legend>${t('planner_month_pattern')}</legend><div>${['dates','weekdays'].map(v => `<label><input type="radio" name="month_mode" value="${v}" ${(rule.month_mode || 'dates') === v ? 'checked' : ''}><span>${t('planner_month_'+v)}</span></label>`).join('')}</div></fieldset>
         <div data-month-dates>${plannerChoices('rule_month_days','planner_month_days',Array.from({length:31},(_,i)=>[i+1,String(i+1)]),rule.month_days || [Number(start.slice(8))],'planner-number-choices')}<p class="field-help">${t('planner_short_month')}</p></div>
@@ -99,7 +103,8 @@ function plannerForm(entry = null, defaults = {}) {
     data.schedule_days=fields.getAll('schedule_days').map(Number);
     data.recurrence_rule=JSON.parse(data.recurrence_rule);
     if (entry?.kind === 'habit') for (const key of ['category_id','routine_id','goal','unit','section']) data[key]=entry[key];
-    const source=defaults.source_diagram_id ? defaults : entry;
+    // Existing activities keep their link even if the original node was removed.
+    const source=!entry && defaults.source_diagram_id ? defaults : null;
     if (source?.source_diagram_id) { data.source_diagram_id=source.source_diagram_id; data.source_node_key=source.source_node_key; }
     try {
       if (data.recurrence === 'weekly' && !data.schedule_days.length) throw new Error(t('error_schedule'));

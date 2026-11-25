@@ -755,7 +755,7 @@ return [
     'planner_on_date' => 'Fecha',
     'planner_optional_description' => 'Añadir descripción (opcional)',
     'planner_month_spacing' => '¿Cada cuántos meses?',
-    'planner_every_months' => 'Cada {count} mes(es)',
+    'planner_every_months' => 'Cada {count} meses',
     'planner_choose_months' => 'Elegir meses',
     'planner_months' => 'Meses del año',
     'planner_month_pattern' => '¿Qué días?',

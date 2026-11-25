@@ -85,6 +85,14 @@ El modelo documentado desde las migraciones está en [database-model](database-m
 
 Para esta instalación, verificar siempre la base publicada desde Hostinger/phpMyAdmin en Chrome al revisar cambios o incidencias; las pruebas locales no sustituyen esa comprobación. Utilizar consultas de solo lectura para revisar migraciones, columnas y datos, y comprobar también la carga real del sitio.
 
+### Planificador — 24 de noviembre de 2026
+
+El error «The database is unavailable» del formulario correspondía a la ausencia de la migración 018 en producción. Se aplicaron mediante phpMyAdmin `018_daily_planner.sql` (SHA-256 `a7b90378878401bdce41d8338f0e1f5ae512a9fb43122e9a47722c7e0bb6ff47`) y `019_planner_recurrence.sql` (SHA-256 `ae33f9f20f6e2065ab2841624c23a4516b9a009e81e23ea0aaaf6bae26233b25`), y se registraron en `schema_migrations`.
+
+La verificación confirmó los campos de recurrencia y vínculo al diagrama en `habits` y `calendar_tasks`. Se conservaron los 42 hábitos y 14 diagramas existentes. Se publicaron los archivos del formulario, modelos, controlador y traducciones mediante el administrador de archivos de Hostinger, conservando la configuración del servidor y las sesiones. El paquete de despliegue quedó en `.builds`, fuera de `public_html`.
+
+La página publicada cargó **My day to day**, el selector **Habit / Task**, las opciones de repetición y **Delete habit** al abrir un hábito existente. No se eliminaron hábitos reales ni se crearon actividades de prueba en producción. En una base aislada pasaron 285 comprobaciones HTTP y las tres pruebas JavaScript del calendario; la revisión visual comprobó el guardado mensual y que el icono del diagrama reabre la misma actividad con su nombre inicial.
+
 El 24 de noviembre de 2026 se revisó un aviso `error_server` que desapareció al reintentar; la usuaria confirmó su recuperación. En Chrome, la petición publicada `controller/dashboard/index.php?action=bootstrap` respondió **200** y el diagrama abrió correctamente. La causa del aviso puntual no quedó identificada. En Hostinger se verificaron la migración 017 y su checksum, los tres campos de colores mediante `SHOW COLUMNS`, un diagrama con diez nodos, cero nodos huérfanos y cero documentos con JSON inválido. No se modificaron datos durante esta comprobación.
 
 ### Colores del diagrama — 24 de noviembre de 2026
