@@ -86,7 +86,30 @@ const markup = (kind, key=kind) => template('view/layout/layout.php','layout', {
     assert.equal(await page.locator('.topbar').isVisible(),true);
     assert.equal(await page.locator('.mobile-document-toggle').isVisible(),false);
     await page.setViewportSize({width:1280,height:800});
-    await open('notes');
+    for (const kind of ['diagram','spreadsheet','notes','scrum','habits']) {
+      await open(kind,`desktop-${kind}`);
+      assert.deepEqual(await frame(),{x:0,y:0,width:1280,height:800},`${kind} fills the desktop viewport`);
+      assert.equal(await page.locator('.topbar').isVisible(),false);
+      assert.equal(await page.locator('.sidebar').isVisible(),false);
+      const close=page.getByRole('button',{name:'Salir de pantalla completa'});
+      const box=await close.boundingBox();assert.ok(box.x>=1220 && box.y<=12);
+      await close.click();
+      assert.equal(await page.locator('.topbar').isVisible(),true);
+      assert.equal(await page.locator('.sidebar').isVisible(),true);
+      await page.evaluate(()=>mobileDocumentView.sync());
+      assert.equal(await page.locator('.topbar').isVisible(),true,'desktop exit survives a refresh');
+      await page.getByRole('button',{name:'Ver documento en pantalla completa'}).click();
+      assert.deepEqual(await frame(),{x:0,y:0,width:1280,height:800});
+      if(kind==='spreadsheet' || kind==='notes') {
+        const input=page.locator('#mindspace-panel input, #mindspace-panel textarea').first();
+        await input.fill('Edición pendiente en computador');
+        await input.evaluate(el=>window.originalInput=el);
+        await close.click();
+        assert.equal(await input.inputValue(),'Edición pendiente en computador');
+        assert.equal(await input.evaluate(el=>el===window.originalInput),true);
+      }
+    }
+    await open('folder');
     assert.equal(await page.locator('.topbar').isVisible(),true);
     assert.equal(await page.locator('.mobile-document-toggle').isVisible(),false);
     await page.setViewportSize({width:390,height:844});

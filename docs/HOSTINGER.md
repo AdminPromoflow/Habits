@@ -83,6 +83,12 @@ El modelo documentado desde las migraciones está en [database-model](database-m
 
 ## Verificación en producción
 
+### Colores del diagrama — 24 de noviembre de 2026
+
+Se verificó la instalación publicada en Chrome. La base tenía las migraciones 001–016, pero faltaban los campos de colores. Se aplicó `017_diagram_colors.sql` mediante phpMyAdmin y se registró el SHA-256 `a980129b25bcad7cb3ba598808673ebf3cf883daf1aa5268412c1d7fa6e9e7c5`. La comprobación posterior confirmó `color_theme VARCHAR(32)`, `diagram_color CHAR(7)` y `canvas_color CHAR(7)`, todos anulables, y el checksum correcto. Se conservaron un diagrama y diez nodos; no había documentos MindSpace con JSON inválido.
+
+El sitio HTTPS cargó el acceso, el espacio y el diagrama después del inicio de sesión. El selector publicado mostró las siete combinaciones y los controles de color del diagrama y del fondo. La aplicación confirmó «Diagram saved» y recuperó los colores al recargar. Una consulta posterior confirmó el tema y un fondo personalizado guardados en MySQL. Durante la comprobación, la usuaria también probó combinaciones; esos cambios explicaron las diferencias entre recargas. No se desplegaron archivos de aplicación durante esta revisión.
+
 La migración 007 se aplicó mediante Chrome/phpMyAdmin el 23 de noviembre de 2026 tras comprobar que faltaba `node_width`. Se registró su checksum, se conservaron un diagrama y ocho nodos, y la usuaria confirmó que el guardado funciona al reintentar. Si una pestaña conserva cambios pendientes tras un error, usar «Try again» antes de recargar para recuperarlos.
 
 1. Abre `/MyRemarkableMind/` y comprueba que aparece el formulario de acceso.

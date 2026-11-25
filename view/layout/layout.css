@@ -221,3 +221,23 @@
 .sidebar-backdrop {
   display: none;
 }
+
+/* Only the light theme's top bar uses the purple navigation palette. */
+body:not([data-theme='dark']) .topbar {
+  --ink: #f4effa;
+  --muted: #cbbdd9;
+  --surface: #342640;
+  --canvas: #3e2e4c;
+  --line: #5c486d;
+  --lavender-wash: #503c65;
+  --purple-dark: #dfc3f6;
+  color: var(--ink);
+}
+body:not([data-theme='dark']) .topbar .breadcrumb {
+  color: var(--muted);
+}
+body:not([data-theme='dark']) .topbar .avatar {
+  background: var(--lavender-wash);
+  border-color: var(--line);
+  color: var(--purple-dark);
+}

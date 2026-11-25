@@ -47,6 +47,8 @@
 .mobile-document-surface .diagram-title { width: min(300px, calc(100% - 84px)); }
 .mobile-document-surface .ms-notes { padding: 8px 12px; min-height: 0; }
 .mobile-document-surface .ms-notes textarea { min-height: 180px; resize: none; }
-.mobile-document-surface input,
-.mobile-document-surface select,
-.mobile-document-surface textarea { font-size: max(16px, 1em); }
+@media (max-width: 760px), (max-height: 500px) and (pointer: coarse) {
+  .mobile-document-surface input,
+  .mobile-document-surface select,
+  .mobile-document-surface textarea { font-size: max(16px, 1em); }
+}

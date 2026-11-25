@@ -1,9 +1,9 @@
 'use strict';
 
-// Expand the existing editor in place, preserving its draft, selection and camera.
+// Expand documents on every screen, preserving their draft, selection and camera.
+// Keep the existing asset/class names so mobile and desktop share the same view.
 class MobileDocumentView {
   constructor() {
-    this.media = window.matchMedia('(max-width: 760px), (max-height: 500px) and (pointer: coarse)');
     this.ancestors = [];
     this.dismissedKey = null;
     window.addEventListener('resize', () => this.sync());
@@ -16,7 +16,7 @@ class MobileDocumentView {
     const key = surface?.dataset.mobileDocument || null;
     if (key !== this.key) this.dismissedKey = null;
     this.key = key;
-    const active = !!surface && this.media.matches && this.dismissedKey !== key;
+    const active = !!surface && this.dismissedKey !== key;
     const wasActive = this.active;
     this.surface?.classList.remove('mobile-document-surface');
     this.ancestors.forEach(element => element.classList.remove('mobile-document-ancestor'));
@@ -41,7 +41,7 @@ class MobileDocumentView {
       document.body.append(this.button);
     }
     if (this.button) {
-      this.button.hidden = !surface || !this.media.matches;
+      this.button.hidden = !surface;
       const label = t(active ? 'ms_exit_fullscreen' : 'ms_enter_fullscreen');
       this.button.setAttribute('aria-label', label);
       this.button.title = label;
