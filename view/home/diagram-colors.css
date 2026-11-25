@@ -2,6 +2,10 @@
 .diagram-root .diagram-node-labels-inside { color: var(--diagram-node-text, var(--ink)); }
 .diagram-colors-dialog { width: min(720px, calc(100% - 24px)); }
 .diagram-colors-dialog .diagram-layout-header { align-items: flex-start; }
+.diagram-colors-dialog :is(.diagram-layout-header, .diagram-layout-footer) { background: var(--surface); border-color: var(--line); color: var(--ink); }
+.diagram-colors-dialog .diagram-layout-close { color: var(--muted); }
+.diagram-colors-dialog .diagram-layout-close:hover { background: var(--lavender-wash); }
+.diagram-colors-dialog .diagram-layout-footer .btn.secondary { background: var(--surface); border-color: var(--line); color: var(--ink); }
 .diagram-colors-dialog .diagram-layout-header p { margin: 7px 0 0; color: var(--muted); font-size: .875rem; line-height: 1.5; }
 .diagram-colors-body { padding: 20px 24px; }
 .diagram-color-themes { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; }

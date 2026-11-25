@@ -2,11 +2,21 @@
 .mindspace-page .home-heading h1 { margin-bottom: 5px; }
 .mindspace-page .home-heading p { margin: 0; font-size: .9rem; }
 .mindspace-shell { display: flex; flex-direction: column; flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: 0 10px 35px #70579508; }
-.mindspace-tabbar { display: flex; align-items: stretch; min-width: 0; border-bottom: 1px solid var(--line); background: var(--lavender-wash); border-radius: 16px 16px 0 0; padding: 8px 8px 0; gap: 5px; }
+.mindspace-tabbar {
+  --ink: #f4effa;
+  --purple: #dfc3f6;
+  --purple-dark: #dfc3f6;
+  --surface: #503c65;
+  --line: #5c486d;
+  display: flex; align-items: stretch; min-width: 0;
+  border-bottom: 1px solid var(--line); background: #3e2e4c;
+  border-radius: 16px 16px 0 0; padding: 8px 8px 0; gap: 5px;
+  color: var(--ink);
+}
 .mindspace-tabs { display: flex; gap: 3px; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
 .mindspace-tabs [role="tab"] { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; max-width: 220px; min-height: 42px; border: 1px solid transparent; border-bottom: 0; padding: 9px 13px; border-radius: 9px 9px 0 0; background: transparent; color: var(--purple-dark); font: inherit; font-size: .875rem; cursor: pointer; }
 .mindspace-tabs [role="tab"] span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mindspace-tabs [aria-selected="true"] { background: var(--surface); border-color: var(--line); color: var(--ink); font-weight: 600; }
+.mindspace-tabs [aria-selected="true"] { background: var(--surface); border-color: var(--line); color: var(--ink); font-weight: 600; box-shadow: inset 0 2px 0 var(--lavender); }
 .mindspace-tabs svg, .mindspace-add svg, .mindspace-explorer svg { width: 17px; height: 17px; flex-shrink: 0; }
 .mindspace-add { display: grid; place-items: center; flex: 0 0 36px; width: 36px; height: 36px; margin-top: 3px; border: 0; border-radius: 8px; color: var(--purple-dark); background: transparent; cursor: pointer; }
 .mindspace-add:hover, .mindspace-tabs [role="tab"]:hover { background: var(--surface); }

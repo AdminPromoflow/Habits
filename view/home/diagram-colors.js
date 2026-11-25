@@ -2,13 +2,15 @@
 
 class DiagramColors {
   static themes = [
-    {id:'default', background:'#ffffff', root:'#f1ecf7', colors:['#f1ecf7']},
-    {id:'pastel', background:'#fff9e9', root:'#efd2b8', colors:['#e8dc69','#f6bdca','#e5b5e7','#acd1c0','#f2ca60','#cfc0e4','#9fc9d9']},
-    {id:'vivid', background:'#fffafa', root:'#29364b', colors:['#f6ca48','#f17e9c','#a995e8','#52bfa5','#ef9a52','#68b3e3']},
-    {id:'ocean', background:'#f1f8fc', root:'#194b66', colors:['#a9d6e5','#86c5d8','#b8e3dc','#8eb8de','#bed5f0']},
-    {id:'forest', background:'#f5f8ef', root:'#315a43', colors:['#b7d4a0','#d3df9b','#9bc7b3','#dce5bf','#9dbb98']},
-    {id:'sunset', background:'#fff5ed', root:'#7e4357', colors:['#f5be91','#f0a6ab','#e8b6d0','#f3d28a','#d6b5dd']},
-    {id:'mono', background:'#f5f6f8', root:'#354052', colors:['#dce1e9','#c7d0df','#e9ecf2','#b9c3d4']},
+    // Warm paper backgrounds and muted accents share the app's purple palette.
+    // Stable IDs preserve the combinations already saved in existing diagrams.
+    {id:'default', background:'#fbf7ef', root:'#e8dff1', colors:['#e8dff1']},
+    {id:'pastel', background:'#fcf7ef', root:'#d7c6e8', colors:['#eadcc0','#ead0d9','#ddd0ea','#d2dfd2','#ebd4bf','#cedbe2','#e2d8ce']},
+    {id:'vivid', background:'#faf5ed', root:'#745886', colors:['#c4abd8','#d7b3bf','#e1c697','#aebfc0','#c1caa7','#d6b99f']},
+    {id:'ocean', background:'#f7f5ee', root:'#736a8e', colors:['#c3d5db','#b7cbd0','#d6d9e6','#c9dcd6','#d9cfe3','#dcd7cb']},
+    {id:'forest', background:'#f7f5e9', root:'#766880', colors:['#ced8bd','#dcdcc2','#bdcfc3','#e3d8c4','#d2c9dc','#c4d2ce']},
+    {id:'sunset', background:'#fcf3e9', root:'#815c75', colors:['#e8cbb4','#e4c2c9','#ddcae2','#e9d7b5','#d0bfd9','#e2d1c6']},
+    {id:'mono', background:'#f7f4ef', root:'#7a6c87', colors:['#d6cedd','#e4dce6','#c5bbcf','#e8e0d8','#d2cbd6']},
   ];
   static valid(color) { return typeof color === 'string' && /^#[\da-f]{6}$/i.test(color); }
   static theme(id) { return this.themes.find(theme => theme.id === id) || this.themes[0]; }
@@ -16,12 +18,12 @@ class DiagramColors {
     const rgb = fill.match(/[\da-f]{2}/gi).map(value => parseInt(value,16));
     const luminance = rgb.map(value => { const n=value/255; return n<=.04045 ? n/12.92 : ((n+.055)/1.055)**2.4; })
       .reduce((sum,value,index)=>sum+value*[.2126,.7152,.0722][index],0);
-    return {fill, text:luminance>.179 ? '#000000' : '#ffffff',
+    return {fill, text:luminance>.33 ? '#343044' : luminance>.179 ? '#000000' : '#ffffff',
       border:'#'+rgb.map(value=>Math.round(luminance>.179 ? value*.58 : value+(255-value)*.4).toString(16).padStart(2,'0')).join('')};
   }
   static color(nodes, node, themeId, diagramColor = null) {
     if (this.valid(diagramColor)) return this.paint(diagramColor);
-    if (!themeId || themeId === 'default' || !node) return null;
+    if (!node) return null;
     const theme = this.theme(themeId), byId = new Map(nodes.map(item=>[item.id,item]));
     if (node.parent_id === null) return this.paint(theme.root);
     let branch = node;
@@ -45,7 +47,7 @@ class DiagramColors {
     const child=from?.parent_id===to?.id ? from : to;
     return this.node(child)?.border || '';
   }
-  background() { return this.home.canvasColor || (this.home.colorTheme ? DiagramColors.theme(this.home.colorTheme).background : ''); }
+  background() { return this.home.canvasColor || DiagramColors.theme(this.home.colorTheme).background; }
   preview(theme) {
     const nodes = [[104,54,theme.root],[13,17,theme.colors[0]],[195,17,theme.colors[1%theme.colors.length]],
       [13,91,theme.colors[2%theme.colors.length]],[195,91,theme.colors[3%theme.colors.length]]];

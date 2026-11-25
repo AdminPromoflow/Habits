@@ -17,7 +17,7 @@ test('diagram palettes and background save without changing structure, reload, a
   restored.home.render();restored.home.drawStage();
   assert.equal(restored.home.colorTheme,'pastel');
   assert.equal(restored.stage.style.backgroundColor,'#fff4dd');
-  assert.match(JSON.parse(restored.home.nodeContent(restored.home.nodes[0])).colorStyle,/--diagram-node-bg:#efd2b8/);
+  assert.match(JSON.parse(restored.home.nodeContent(restored.home.nodes[0])).colorStyle,/--diagram-node-bg:#d7c6e8/);
   await home.colors.apply({theme:'pastel',diagramColor:'#354052',canvasColor:'#e6f4ee'});
   assert.equal(home.colors.node(home.nodes[0]).text,'#ffffff');
   await home.history.undo();
@@ -56,7 +56,7 @@ test('color changes reject invalid values and read-only access, and reset return
   assert.equal(home.diagramColor,'#abcdef');
   await home.colors.apply({theme:'default'});
   assert.equal(home.colorTheme,null);assert.equal(home.diagramColor,null);assert.equal(home.canvasColor,null);
-  assert.equal(home.colors.css(home.nodes[0]),'');assert.equal(home.colors.background(),'');
+  assert.match(home.colors.css(home.nodes[0]),/--diagram-node-bg:#e8dff1/);assert.equal(home.colors.background(),'#fbf7ef');
 });
 
 test('topic links are included in dirty detection, saved snapshots and their visible open button', async () => {
