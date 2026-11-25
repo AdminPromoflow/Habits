@@ -228,7 +228,7 @@ final class MindSpacesModel extends BaseModel
         $content = match ($kind) {
             'folder' => new stdClass(),
             'notes' => ['text' => ''],
-            'spreadsheet' => ['rows' => 30, 'columns' => 10, 'cells' => new stdClass()],
+            'spreadsheet' => self::newSheet($data),
             'habits' => ['habit_ids' => []],
             default => ['cards' => [], 'columns' => self::defaultColumns(), 'sprint' => ['name' => '', 'goal' => '', 'start' => null, 'end' => null]],
         };
@@ -260,6 +260,43 @@ final class MindSpacesModel extends BaseModel
         return $value;
     }
 
+    private static function newSheet(array $data): array
+    {
+        $template = Validate::choice($data['template'] ?? 'blank', ['blank', 'ledger', 'budget', 'inventory', 'projects']);
+        if ($template === 'blank') return ['rows' => 30, 'columns' => 10, 'cells' => new stdClass()];
+        $language = Validate::choice($data['language'] ?? 'en', ['en', 'es']);
+        $sheet = ['rows' => 31, 'columns' => match ($template) { 'budget' => 4, 'inventory' => 5, default => 6 },
+            'template' => $template, 'template_language' => $language, 'cells' => []];
+        if ($template === 'budget') {
+            $categories = $language === 'es' ? ['Vivienda', 'Alimentación', 'Transporte', 'Servicios', 'Salud', 'Ocio', 'Otros']
+                : ['Housing', 'Groceries', 'Transport', 'Utilities', 'Health', 'Leisure', 'Other'];
+            foreach ($categories as $i => $category) $sheet['cells']['A' . ($i + 2)] = $category;
+        }
+        return self::sheetTemplate($sheet);
+    }
+
+    private static function sheetTemplate(array $sheet): array
+    {
+        $template = $sheet['template']; $spanish = $sheet['template_language'] === 'es';
+        $headers = match ($template) {
+            'ledger' => $spanish ? ['Fecha', 'Descripción', 'Categoría', 'Entrada', 'Salida', 'Saldo'] : ['Date', 'Description', 'Category', 'Income', 'Expense', 'Balance'],
+            'budget' => $spanish ? ['Categoría', 'Presupuesto', 'Gasto real', 'Disponible'] : ['Category', 'Budget', 'Actual spending', 'Remaining'],
+            'inventory' => $spanish ? ['Producto', 'Código', 'Cantidad', 'Costo unitario', 'Valor total'] : ['Item', 'SKU', 'Quantity', 'Unit cost', 'Stock value'],
+            'projects' => $spanish ? ['Tarea', 'Responsable', 'Estado', 'Inicio', 'Vencimiento', 'Notas'] : ['Task', 'Owner', 'Status', 'Start date', 'Due date', 'Notes'],
+        };
+        if ($sheet['rows'] < 2 || $sheet['columns'] < count($headers)) fail('error_validation');
+        $cells = (array) $sheet['cells'];
+        foreach ($headers as $i => $header) $cells[chr(65 + $i) . '1'] = $header;
+        // Keep calculated columns intact, including rows added by older clients.
+        for ($row = 2; $row <= $sheet['rows']; $row++) {
+            if ($template === 'ledger') $cells["F$row"] = "=SUM(D2:D$row)-SUM(E2:E$row)";
+            if ($template === 'budget') $cells["D$row"] = "=B$row-C$row";
+            if ($template === 'inventory') $cells["E$row"] = "=C$row*D$row";
+        }
+        $sheet['cells'] = (object) $cells;
+        return $sheet;
+    }
+
     private function content(string $kind, mixed $data, array $existing = []): array
     {
         if (!is_array($data)) fail('error_validation');
@@ -276,7 +313,13 @@ final class MindSpacesModel extends BaseModel
                 $value = self::text($value, 2000);
                 if ($value !== '') $clean[$key] = $value;
             }
-            return ['rows' => $rows, 'columns' => $columns, 'cells' => (object) $clean];
+            $sheet = ['rows' => $rows, 'columns' => $columns, 'cells' => (object) $clean];
+            $template = $existing['template'] ?? 'blank';
+            if (array_key_exists('template', $data) && $data['template'] !== $template) fail('error_validation');
+            if ($template === 'blank') return $sheet;
+            $sheet['template'] = $template;
+            $sheet['template_language'] = $existing['template_language'];
+            return self::sheetTemplate($sheet);
         }
         if ($kind === 'habits') {
             $ids = $data['habit_ids'] ?? null;

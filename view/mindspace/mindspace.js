@@ -450,7 +450,24 @@ class MindSpace extends PageController {
       <label class="field"><span>${esc(t('ms_location'))}</span><select name="parent">${this.folderOptions(parent, null, spaceId)}</select></label>${formFooter('create')}</form>`);
     const form = document.getElementById('ms-create-form'), key = crypto.randomUUID();
     form.addEventListener('submit', event => { event.preventDefault(); void this.submit(form, async values => {
-      const item = await this.home.makeRequest('createMindSpaceItem', { kind, name:values.get('name'), mindspace_id:spaceId, parent_id:Number(values.get('parent')) || null, client_key:key });
+      const payload = { kind, name:values.get('name'), mindspace_id:spaceId, parent_id:Number(values.get('parent')) || null, client_key:key };
+      if (kind === 'spreadsheet') { this.sheetTemplates(payload); return; }
+      const item = await this.home.makeRequest('createMindSpaceItem', payload);
+      this.upsert(item); closeModal(); await this.go(item);
+    }); });
+  }
+  sheetTemplates(payload) {
+    openModal('ms_sheet_templates', `<form id="ms-sheet-template-form"><p class="ms-add-context">${esc(t('ms_sheet_templates_hint'))}</p>
+      <div class="ms-template-grid">${MindSpaceSheet.templates.map((template, index) => `<label class="ms-template-card">
+        <input type="radio" name="template" value="${template}" ${index === 0 ? 'checked' : ''}>
+        <span><strong>${esc(t(`ms_template_${template}`))}</strong><small>${esc(t(`ms_template_${template}_hint`))}</small></span>
+        <span class="ms-template-preview ms-template-preview-${template}" aria-hidden="true">${Array.from({length:15}, () => '<i></i>').join('')}</span>
+      </label>`).join('')}</div>${formFooter('ms_use_template')}</form>`);
+    const form = document.getElementById('ms-sheet-template-form');
+    form.addEventListener('submit', event => { event.preventDefault(); void this.submit(form, async values => {
+      const template = values.get('template');
+      const name = payload.name.trim() === t('ms_default_spreadsheet') && template !== 'blank' ? t(`ms_template_${template}`) : payload.name;
+      const item = await this.home.makeRequest('createMindSpaceItem', {...payload, name, template, language:S.language});
       this.upsert(item); closeModal(); await this.go(item);
     }); });
   }

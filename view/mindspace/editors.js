@@ -148,19 +148,62 @@ class MindSpaceEditors {
 
   sheet() {
     const sheet = this.space.draft, evaluator = new MindSpaceSheet(sheet);
-    const returns = this.space.targetReturnLinks();
-    return `<div class="ms-sheet">
-      <div class="ms-formula-bar"><span id="ms-cell-address">${this.cell}</span><span aria-hidden="true">ƒx</span><input data-ms-formula aria-label="${esc(t('ms_formula'))}" maxlength="2000" value="${esc(sheet.cells?.[this.cell] || '')}"></div>
+    const returns = this.space.targetReturnLinks(), ledger = sheet.template === 'ledger', bands = this.sheetBands();
+    return `<div class="ms-sheet${ledger ? ' ms-ledger' : ''}">
+      <div class="ms-sheet-layout"><div class="ms-sheet-main"><div class="ms-formula-bar"><span id="ms-cell-address">${this.cell}</span><span aria-hidden="true">ƒx</span><input data-ms-formula aria-label="${esc(t('ms_formula'))}" maxlength="2000" ${MindSpaceSheet.locked(sheet, this.cell) ? 'readonly' : ''} value="${esc(sheet.cells?.[this.cell] || '')}"></div>
       <div class="ms-sheet-scroll"><table aria-label="${esc(this.space.active.name)}"><thead><tr><th></th>${Array.from({ length:sheet.columns }, (_,col) => `<th scope="col">${MindSpaceSheet.column(col)}</th>`).join('')}</tr></thead><tbody>
-      ${Array.from({ length:sheet.rows }, (_,row) => `<tr><th scope="row">${row + 1}</th>${Array.from({ length:sheet.columns }, (_,col) => {
+      ${Array.from({ length:sheet.rows }, (_,row) => `<tr data-ms-sheet-row="${row + 1}" class="${row === 0 && sheet.template ? 'ms-template-header' : bands[row + 1]?.className || ''}" ${bands[row + 1]?.style || ''}><th scope="row">${row + 1}</th>${Array.from({ length:sheet.columns }, (_,col) => {
         const key = `${MindSpaceSheet.column(col)}${row + 1}`;
-        const back = returns.get(key) || '';
-        return `<td><div class="ms-sheet-cell${back ? ' has-return' : ''}"><input data-ms-cell="${key}" aria-label="${key}" autocomplete="off" spellcheck="false" maxlength="2000" value="${esc(evaluator.display(key))}">${back}</div></td>`;
-      }).join('')}</tr>`).join('')}</tbody></table></div><p class="ms-sheet-hint">${esc(t('ms_sheet_hint'))}</p></div>`;
+        const back = returns.get(key) || '', locked = MindSpaceSheet.locked(sheet, key);
+        const error = this.sheetCellError(key, evaluator);
+        return `<td><div class="ms-sheet-cell${back ? ' has-return' : ''}"><input data-ms-cell="${key}" aria-label="${key}${sheet.template && row > 0 ? ` · ${esc(sheet.cells[`${MindSpaceSheet.column(col)}1`] || '')}` : ''}" autocomplete="off" spellcheck="false" maxlength="2000" ${locked ? 'readonly' : ''} ${ledger && row > 0 && [3,4].includes(col) ? 'inputmode="decimal"' : ''} ${error ? `aria-invalid="true" title="${esc(error)}"` : ''} value="${esc(evaluator.display(key))}">${back}</div></td>`;
+      }).join('')}</tr>`).join('')}</tbody></table></div><p class="ms-sheet-hint">${esc(t(ledger ? 'ms_ledger_hint' : 'ms_sheet_hint'))}</p>${sheet.template ? `<p class="ms-sheet-hint">${esc(t('ms_template_calculated_hint'))}</p>` : ''}</div>
+      ${ledger ? `<aside class="ms-ledger-summary" aria-label="${esc(t('ms_ledger_totals'))}"><h3>${esc(t('ms_ledger_totals'))}</h3><p>${esc(t('ms_ledger_totals_hint'))}</p><dl aria-live="polite" aria-atomic="true" data-ms-ledger-totals>${this.ledgerTotals(evaluator)}</dl><p class="ms-ledger-error" data-ms-ledger-error ${Object.values(evaluator.ledgerSummary()).every(value => typeof value === 'number') ? 'hidden' : ''}>${esc(t('ms_ledger_amount_error'))}</p><span class="ms-ledger-live">${esc(t('ms_ledger_live'))}</span></aside>` : ''}</div></div>`;
+  }
+  sheetBands() {
+    const sheet = this.space.draft, bands = {};
+    if (sheet.template !== 'ledger') return bands;
+    let previous = '';
+    for (let row = 2; row <= sheet.rows; row++) {
+      const month = MindSpaceSheet.month(sheet.cells[`A${row}`]);
+      if (!month) continue;
+      bands[row] = {className:`ms-month-row${previous !== month.key ? ' ms-month-start' : ''}`, style:`style="--ms-month-hue:${(month.month - 1) * 30 + 15}"`};
+      previous = month.key;
+    }
+    return bands;
+  }
+  sheetCellError(key, evaluator) {
+    if (this.space.draft.template !== 'ledger') return '';
+    const [row, col] = MindSpaceSheet.address(key), raw = this.space.draft.cells[key] || '';
+    if (!row || !raw.trim()) return '';
+    if (col === 0 && !MindSpaceSheet.month(raw)) return t('ms_ledger_date_error');
+    if ([3,4].includes(col)) {
+      try { if (typeof evaluator.value(key) !== 'number') return t('ms_ledger_amount_error'); }
+      catch { return t('ms_ledger_amount_error'); }
+    }
+    return '';
+  }
+  ledgerTotals(evaluator) {
+    return Object.entries(evaluator.ledgerSummary()).map(([name, value]) => `<div class="ms-ledger-total-${name}"><dt>${esc(t(`ms_ledger_${name}`))}</dt><dd>${esc(typeof value === 'number' ? new Intl.NumberFormat(S.language === 'es' ? 'es-CO' : 'en-US', {minimumFractionDigits:2, maximumFractionDigits:2}).format(value / 100) : value)}</dd></div>`).join('');
   }
   recalculate() {
-    const evaluator = new MindSpaceSheet(this.space.draft);
-    document.querySelectorAll('[data-ms-cell]').forEach(input => { if (input !== document.activeElement) input.value = evaluator.display(input.dataset.msCell); });
+    const evaluator = new MindSpaceSheet(this.space.draft), bands = this.sheetBands();
+    document.querySelectorAll('[data-ms-cell]').forEach(input => {
+      if (input !== document.activeElement) input.value = evaluator.display(input.dataset.msCell);
+      const error = this.sheetCellError(input.dataset.msCell, evaluator);
+      input.toggleAttribute('aria-invalid', Boolean(error));
+      if (error) input.setAttribute('aria-invalid', 'true');
+      input.title = error;
+    });
+    document.querySelectorAll('[data-ms-sheet-row]').forEach(row => {
+      if (Number(row.dataset.msSheetRow) === 1) return;
+      const band = bands[row.dataset.msSheetRow]; row.className = band?.className || '';
+      row.style.setProperty('--ms-month-hue', band ? /hue:(\d+)/.exec(band.style)[1] : '0');
+    });
+    const totals = document.querySelector('[data-ms-ledger-totals]');
+    if (totals) totals.innerHTML = this.ledgerTotals(evaluator);
+    const error = document.querySelector('[data-ms-ledger-error]');
+    if (error) error.hidden = Object.values(evaluator.ledgerSummary()).every(value => typeof value === 'number');
   }
   event(type, event) {
     const input = event.target, space = this.space;
@@ -169,12 +212,16 @@ class MindSpaceEditors {
     if (type === 'change' && input.matches?.('[data-ms-habit-date]')) { S.date = input.value || today(); this.refresh(); }
     const key = input.dataset.msCell;
     if (type === 'focusin' && key) {
-      this.cell = key; input.value = space.draft.cells?.[key] || '';
+      this.cell = key;
+      if (!MindSpaceSheet.locked(space.draft, key)) input.value = space.draft.cells?.[key] || '';
       document.getElementById('ms-cell-address').textContent = key;
-      document.querySelector('[data-ms-formula]').value = input.value;
+      const formula = document.querySelector('[data-ms-formula]');
+      formula.value = space.draft.cells?.[key] || '';
+      formula.readOnly = MindSpaceSheet.locked(space.draft, key);
     }
     if (type === 'input' && (key || input.matches?.('[data-ms-formula]'))) {
       const address = key || this.cell;
+      if (MindSpaceSheet.locked(space.draft, address)) return;
       space.draft.cells = { ...space.draft.cells, [address]:input.value };
       if (!input.value) delete space.draft.cells[address];
       if (key) document.querySelector('[data-ms-formula]').value = input.value;
@@ -187,6 +234,7 @@ class MindSpaceEditors {
       document.querySelector(`[data-ms-cell="${next}"]`)?.focus();
     }
     if (type === 'paste' && key) {
+      if (MindSpaceSheet.locked(space.draft, key)) { event.preventDefault(); return; }
       const text = event.clipboardData.getData('text/plain');
       if (!text.includes('\t') && !text.includes('\n')) return;
       event.preventDefault();
@@ -194,7 +242,11 @@ class MindSpaceEditors {
       const [startRow,startCol] = MindSpaceSheet.address(key), rows = startRow + values.length, columns = startCol + Math.max(...values.map(row => row.length));
       if (rows > 200 || columns > 52 || values.some(row => row.some(value => value.length > 2000))) { toast(t('ms_sheet_limit'), true); return; }
       space.draft.rows = Math.max(space.draft.rows, rows); space.draft.columns = Math.max(space.draft.columns, columns);
-      values.forEach((row,r) => row.forEach((value,c) => { space.draft.cells[`${MindSpaceSheet.column(startCol + c)}${startRow + r + 1}`] = value; }));
+      values.forEach((row,r) => row.forEach((value,c) => {
+        const address = `${MindSpaceSheet.column(startCol + c)}${startRow + r + 1}`;
+        if (!MindSpaceSheet.locked(space.draft, address)) space.draft.cells[address] = value;
+      }));
+      MindSpaceSheet.prepare(space.draft);
       space.changed(); this.refresh(); document.querySelector(`[data-ms-cell="${key}"]`)?.focus();
     }
   }
@@ -220,6 +272,7 @@ class MindSpaceEditors {
     if (action === 'ms-sheet-row' && this.space.draft.rows < 200) this.space.draft.rows++;
     else if (action === 'ms-sheet-column' && this.space.draft.columns < 52) this.space.draft.columns++;
     else return;
+    MindSpaceSheet.prepare(this.space.draft);
     this.space.changed(); this.refresh();
   }
 }
