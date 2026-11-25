@@ -72,7 +72,7 @@ Notas, celdas y tableros se guardan automáticamente y antes de navegar. **Kanba
 
 Al pulsar **Crear** en una nueva hoja de cálculo aparece el selector de **Libro de contabilidad, Presupuesto mensual, Inventario, Seguimiento de proyectos** y **Hoja en blanco**. La hoja se crea al confirmar la plantilla. El libro incluye Fecha, Descripción, Categoría, Entrada, Salida y Saldo acumulado, con totales de entradas, salidas y saldo a la derecha. Los colores siguen el mes de cada fecha y se adaptan al tema claro u oscuro. Fechas admitidas: `AAAA-MM-DD` y `DD/MM/AAAA`; los importes usan punto decimal sin separador de miles y se redondean a centavos por movimiento. Los datos inválidos se señalan y los importes inválidos bloquean el total, sin tratarse como cero. Los encabezados y columnas calculadas están protegidos, incluso al pegar; las filas nuevas reciben sus fórmulas automáticamente. Las plantillas funcionan también en espacios compartidos con permiso Edit y no requieren SQL adicional.
 
-Selecciona una celda y usa **Ajustes**, al pie de la hoja, para elegir un estilo predefinido o personalizar fondo, color y tamaño del texto, negrita, cursiva, alineación y bordes. El panel ofrece vista previa y **Restablecer estilo**; **Cancelar** descarta los cambios del panel. Los estilos se guardan por celda junto al documento, incluso en celdas vacías o calculadas, sin cambiar sus valores ni fórmulas. Se requiere permiso de edición y no hace falta una migración de base de datos.
+Selecciona una o varias celdas y usa **Ajustes**, al pie de la hoja, para elegir un estilo predefinido o personalizar fondo, color y tamaño del texto, negrita, cursiva, alineación y bordes. Arrastrar o **Shift + clic** selecciona un rango; **Ctrl/Cmd + clic** añade o quita celdas separadas. **Shift + flechas** amplía el rango y **Ctrl/Cmd + A**, desde una celda, selecciona toda la hoja. El resaltado y el contador indican qué celdas recibirán el formato. Un ajuste individual conserva los demás estilos de cada celda; elegir un estilo predefinido sustituye el formato completo de la selección. El panel ofrece vista previa y **Restablecer estilo**; **Cancelar** descarta los cambios del panel. Los estilos se guardan por celda junto al documento, incluso en celdas vacías o calculadas, sin cambiar sus valores ni fórmulas. Se requiere permiso de edición y no hace falta una migración de base de datos.
 
 Aplica **013_mindspaces.sql** y **014_mindspace_folders.sql** mediante `php bin/migrate.php` después de subir los archivos. Si faltan estas migraciones, se mantiene el editor anterior: las carpetas no aparecen todavía. Véase [la actualización de MindSpace](docs/MINDSPACE-MIGRATION.md).
 
@@ -189,7 +189,7 @@ El importador utiliza identificadores de origen para no duplicar rutinas ni ejer
 ```sh
 PHP_BIN=/opt/homebrew/bin/php python3 tests/functional.py
 node --test tests/diagrams.cjs tests/diagram-layout.cjs tests/diagram-viewport.cjs tests/diagram-routing.cjs tests/diagram-link-navigation.cjs
-node --test tests/mindspace.cjs
+node --test tests/mindspace.cjs tests/mindspace-selection.cjs tests/mindspace-dates.cjs
 node --test tests/mindspace-pdf.cjs
 ```
 
