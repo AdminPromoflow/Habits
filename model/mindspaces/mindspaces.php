@@ -198,7 +198,10 @@ final class MindSpacesModel extends BaseModel
         $item['content'] = json_decode($item['content_json'], true, 32, JSON_THROW_ON_ERROR);
         $item['kind'] = self::boardKind($item['kind']);
         if ($item['kind'] === 'kanban') $item['content']['columns'] ??= self::defaultColumns();
-        if ($item['kind'] === 'spreadsheet') $item['content']['cells'] = (object) $item['content']['cells'];
+        if ($item['kind'] === 'spreadsheet') {
+            $item['content']['cells'] = (object) $item['content']['cells'];
+            if (isset($item['content']['cell_styles'])) $item['content']['cell_styles'] = (object) $item['content']['cell_styles'];
+        }
         unset($item['content_json'], $item['client_key']);
         return $item;
     }
@@ -297,6 +300,32 @@ final class MindSpacesModel extends BaseModel
         return $sheet;
     }
 
+    private static function cellStyles(mixed $styles, int $rows, int $columns): array
+    {
+        if (!is_array($styles) || count($styles) > 10400) fail('error_validation');
+        $clean = [];
+        foreach ($styles as $key => $style) {
+            if (!is_string($key) || !preg_match('/^([A-Z]{1,2})([1-9][0-9]{0,2})$/D', $key, $match) || !is_array($style)) fail('error_validation');
+            $column = 0; foreach (str_split($match[1]) as $letter) $column = $column * 26 + ord($letter) - 64;
+            if ($column > $columns || (int) $match[2] > $rows) fail('error_validation');
+            $entry = [];
+            foreach ($style as $property => $value) {
+                $valid = match ($property) {
+                    'background', 'color', 'border_color' => is_string($value) && preg_match('/^#[a-f0-9]{6}$/iD', $value),
+                    'bold', 'italic' => is_bool($value),
+                    'font_size' => in_array($value, [12,13,14,16,18,20,24], true),
+                    'align' => in_array($value, ['left','center','right'], true),
+                    'borders' => in_array($value, ['grid','none','all','bottom'], true),
+                    default => false,
+                };
+                if (!$valid) fail('error_validation');
+                $entry[$property] = $value;
+            }
+            if ($entry) $clean[$key] = $entry;
+        }
+        return $clean;
+    }
+
     private function content(string $kind, mixed $data, array $existing = []): array
     {
         if (!is_array($data)) fail('error_validation');
@@ -314,6 +343,8 @@ final class MindSpacesModel extends BaseModel
                 if ($value !== '') $clean[$key] = $value;
             }
             $sheet = ['rows' => $rows, 'columns' => $columns, 'cells' => (object) $clean];
+            $styles = self::cellStyles(array_key_exists('cell_styles', $data) ? $data['cell_styles'] : ($existing['cell_styles'] ?? []), $rows, $columns);
+            if ($styles) $sheet['cell_styles'] = (object) $styles;
             $template = $existing['template'] ?? 'blank';
             if (array_key_exists('template', $data) && $data['template'] !== $template) fail('error_validation');
             if ($template === 'blank') return $sheet;

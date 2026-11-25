@@ -179,10 +179,7 @@ class MindSpaceEditors {
     if (!row || !raw.trim()) return '';
     if (col === 0 && !MindSpaceSheet.month(raw)) return t('ms_ledger_date_error');
     if ([3,4].includes(col)) {
-      try {
-        const value = evaluator.value(key);
-        if (typeof value !== 'number' || !Number.isSafeInteger(Math.round(value * 100))) return t('ms_ledger_amount_error');
-      }
+      try { MindSpaceSheet.cents(evaluator.value(key)); }
       catch { return t('ms_ledger_amount_error'); }
     }
     return '';

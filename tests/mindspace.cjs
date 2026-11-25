@@ -14,7 +14,7 @@ test('ledger balances, live totals and formulas use cents and recalculate after 
   assert.deepEqual(JSON.parse(JSON.stringify(sheet.ledgerSummary())),{income:100040,expense:25020,balance:75020});
   assert.equal(sheet.display('F1'),'Balance');assert.equal(data.cells.F200,'=SUM(D2:D200)-SUM(E2:E200)');
   data.cells.E3='100';sheet=new Sheet(data);assert.equal(sheet.display('F200'),'850.40');
-  data.cells.D4='1.005';assert.equal(new Sheet(data).display('F4'),'901.11');
+  data.cells.D4='1.005';assert.equal(new Sheet(data).display('F4'),'901.11');assert.equal(new Sheet(data).display('D4'),'1.01');
 });
 test('ledger rejects invalid amounts and unsafe totals instead of silently treating them as zero',()=>{
   const data={template:'ledger',rows:5,columns:6,cells:{D2:'100',E3:'oops',D4:'=1/0'}};Sheet.prepare(data);

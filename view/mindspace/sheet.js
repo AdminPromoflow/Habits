@@ -2,6 +2,27 @@
 
 // A small spreadsheet evaluator. Cell contents are data; no JavaScript is executed.
 class MindSpaceSheet {
+  static stylePresets = {
+    default: {},
+    heading: {background:'#5b427a',color:'#ffffff',bold:true,borders:'all',border_color:'#5b427a'},
+    soft: {background:'#eee8f6',color:'#493663',borders:'bottom',border_color:'#b39bce'},
+    success: {background:'#e1f3e9',color:'#24543c',borders:'bottom',border_color:'#63a580'},
+    warning: {background:'#fff0ce',color:'#704b13',bold:true,borders:'all',border_color:'#d8ad54'}
+  };
+  static format(style = {}) {
+    const text = [], border = [], color = value => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
+    if (color(style.background)) text.push(`background-color:${style.background}`);
+    if (color(style.color)) text.push(`color:${style.color}`);
+    if (typeof style.bold === 'boolean') text.push(`font-weight:${style.bold ? 700 : 400}`);
+    if (typeof style.italic === 'boolean') text.push(`font-style:${style.italic ? 'italic' : 'normal'}`);
+    if (['left','center','right'].includes(style.align)) text.push(`text-align:${style.align}`);
+    if ([12,13,14,16,18,20,24].includes(style.font_size)) text.push(`font-size:${style.font_size / 16}rem`, `height:${Math.max(32, style.font_size + 16)}px`);
+    const ink = color(style.border_color) ? style.border_color : 'var(--line)';
+    if (style.borders === 'all') border.push(`border:1px solid ${ink}`);
+    if (style.borders === 'bottom') border.push(`border-bottom:2px solid ${ink}`);
+    if (style.borders === 'none') border.push('border-color:transparent');
+    return {text:text.join(';'), border:border.join(';')};
+  }
   static templates = ['ledger', 'budget', 'inventory', 'projects', 'blank'];
   static calculated(sheet) { return ({ledger:'F', budget:'D', inventory:'E'})[sheet.template] || null; }
   static locked(sheet, key) {
@@ -24,6 +45,12 @@ class MindSpaceSheet {
     const date = new Date(Date.UTC(year, month - 1, day));
     if (year < 1000 || date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
     return { key:`${year}-${String(month).padStart(2, '0')}`, month, year };
+  }
+  static cents(value) {
+    if (typeof value !== 'number') throw new Error('#VALUE!');
+    const amount = Math.sign(value) * Math.round((Math.abs(value) + Number.EPSILON) * 100);
+    if (!Number.isSafeInteger(amount)) throw new Error('#NUM!');
+    return amount;
   }
   static column(index) {
     let name = '';
@@ -65,7 +92,9 @@ class MindSpaceSheet {
         const value = this.value(key);
         return this.sheet.template === 'ledger' ? value.toFixed(2) : String(Number(value.toPrecision(12)));
       }
-      const value = this.value(key); return typeof value === 'number' ? String(Number(value.toPrecision(12))) : value;
+      const value = this.value(key);
+      if (this.sheet.template === 'ledger' && row > 0 && [3,4].includes(col) && typeof value === 'number') return (MindSpaceSheet.cents(value) / 100).toFixed(2);
+      return typeof value === 'number' ? String(Number(value.toPrecision(12))) : value;
     }
     catch (error) { return error.message.startsWith('#') ? error.message : '#ERROR!'; }
   }
@@ -75,9 +104,8 @@ class MindSpaceSheet {
     for (let row = 2; row <= end; row++) {
       const value = this.value(`${column}${row}`);
       if (value === '' || (typeof value === 'string' && !value.trim())) continue;
-      if (typeof value !== 'number') throw new Error('#VALUE!');
-      const amount = Math.sign(value) * Math.round((Math.abs(value) + Number.EPSILON) * 100);
-      if (!Number.isSafeInteger(amount) || !Number.isSafeInteger(cents + amount)) throw new Error('#NUM!');
+      const amount = MindSpaceSheet.cents(value);
+      if (!Number.isSafeInteger(cents + amount)) throw new Error('#NUM!');
       cents += amount;
     }
     return cents;
