@@ -73,6 +73,7 @@ const base = 'http://127.0.0.1:8785';
     await toggle('root').focus(); await page.keyboard.press('Enter');
     assert.equal(await visible(),6);
     await page.locator('#mindmap-stage').screenshot({path:'tests/.runtime/diagram-branch-expanded.png'});
+    await page.evaluate(id=>pageControllers.home.viewport.focusElement(document.getElementById(`diagram-node-${id}`)),a);
     await toggle(a).click();
     await page.locator(`#diagram-root-${a} [data-action="add-diagram-child"]`).click();
     assert.equal(await toggle(a).getAttribute('aria-expanded'),'true','adding a child expands its parent');
