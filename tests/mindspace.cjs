@@ -411,12 +411,14 @@ function modalFixture(url='http://localhost/?item=6') {
   return fixture;
 }
 
-test('All main spaces includes documents in every space, nested folders and contextual Add buttons',()=>{
-  const {space}=multiple(); const html=space.directory();
-  for (const name of ['Note','Map','Work note','Parent','Child','Work folder']) assert.ok(html.includes(`>${name}</span>`), name);
-  assert.ok(html.includes('data-space="100" data-parent="2"'));
-  assert.ok(html.includes('data-space="200" data-parent="5"'));
-  assert.equal((html.match(/data-action="ms-entry-menu"/g)||[]).length,8);
+test('All main spaces includes the full tree in both the directory and sidebar',()=>{
+  const {space}=multiple();
+  for (const html of [space.directory(),space.sidebar()]) {
+    for (const name of ['Note','Map','Work note','Parent','Child','Work folder']) assert.ok(html.includes(`>${name}</span>`), name);
+    assert.ok(html.includes('data-space="100" data-parent="2"'));
+    assert.ok(html.includes('data-space="200" data-parent="5"'));
+    assert.equal((html.match(/data-action="ms-entry-menu"/g)||[]).length,8);
+  }
 });
 
 test('creation from a different space retains the requested destination through form submission',async()=>{

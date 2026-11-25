@@ -60,6 +60,7 @@ return [
     'home' => 'Inicio',
     'mindspaces' => 'Todos los espacios principales',
     'ms_main_spaces' => 'Espacios principales',
+    'ms_toggle_spaces' => 'Mostrar u ocultar espacios principales',
     'ms_no_spaces' => 'Todavía no hay espacios principales.',
     'habits' => 'Mis hábitos',
     'calendar' => 'Calendario',

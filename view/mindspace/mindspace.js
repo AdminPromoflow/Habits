@@ -3,7 +3,7 @@
 class MindSpace extends PageController {
   constructor(home) {
     super(['ms-new','ms-new-kind','ms-open','ms-folder','ms-rename','ms-move','ms-retry',
-      'ms-link-return','ms-link-returns','ms-sidebar-add','ms-space-open','ms-space-new','ms-entry-menu','ms-space-rename','ms-share','ms-delete','ms-space-delete',
+      'ms-link-return','ms-link-returns','ms-sidebar-open','ms-sidebar-toggle','ms-sidebar-add','ms-space-open','ms-space-new','ms-entry-menu','ms-space-rename','ms-share','ms-delete','ms-space-delete',
       'ms-card-new','ms-card-edit','ms-column-new','ms-sprint','ms-habits-select','ms-habit-new','ms-sheet-row','ms-sheet-column','ms-sheet-export','ms-download-pdf','ms-sheet-settings']);
     this.home = home;
     this.editor = new MindSpaceEditors(this);
@@ -69,7 +69,7 @@ class MindSpace extends PageController {
     this.active = null; this.draft = null; this.baseline = ''; this.busy = false;
     this.error = ''; this.savePromise = null; this.draggingId = null;
     this.titleEdit = null; this.titleSave = null;
-    this.treeExpanded = undefined; this.linkArrival = null;
+    this.sidebarExpanded = undefined; this.treeExpanded = undefined; this.linkArrival = null;
   }
   enabled() { return !!S.data?.mindspace; }
   can(right, item = this.active) { return !S.sharedWorkspace || !!(item?.permissions || S.sharedWorkspace.permissions)[right]; }
@@ -124,6 +124,32 @@ class MindSpace extends PageController {
   }
 
   sidebarKey() { return `mindspace-sidebar:${new URL(location.href).pathname}:${S.user?.id || 'guest'}`; }
+  sidebarOpen() {
+    if (this.sidebarExpanded === undefined) {
+      try { this.sidebarExpanded = localStorage.getItem(this.sidebarKey()) === 'open'; }
+      catch { this.sidebarExpanded = false; }
+    }
+    return this.sidebarExpanded;
+  }
+  setSidebarOpen(open) {
+    this.sidebarExpanded = open;
+    try { localStorage.setItem(this.sidebarKey(), open ? 'open' : 'closed'); } catch {}
+    document.getElementById('mindspace-sidebar-toggle')?.setAttribute('aria-expanded', String(open));
+    const list = document.getElementById('mindspace-sidebar-list');
+    if (list) list.hidden = !open;
+  }
+  sidebar() {
+    const open = !S.sharedWorkspace && this.sidebarOpen(), current = S.view === 'mindspaces';
+    return `<section class="mindspace-sidebar">
+      <div class="nav-item ms-sidebar-heading ${current ? 'active' : ''}">
+        <button type="button" class="ms-sidebar-link" data-action="ms-sidebar-open" ${current ? 'aria-current="page"' : ''}>${icon('overview')}<span>${esc(t('mindspaces'))}</span></button>
+        <button type="button" id="mindspace-sidebar-toggle" class="ms-sidebar-toggle" data-action="ms-sidebar-toggle" aria-label="${esc(t('ms_toggle_spaces'))}" aria-expanded="${open}" aria-controls="mindspace-sidebar-list"><span class="ms-sidebar-chevron" aria-hidden="true">›</span></button>
+      </div>
+      <div id="mindspace-sidebar-list" class="mindspace-explorer" ${open ? '' : 'hidden'}>${S.sharedWorkspace ? '' : this.explorer()}
+        <button type="button" class="ms-sidebar-add" data-action="ms-space-new">${icon('plus')}<span>${esc(t('ms_new_space'))}</span></button>
+      </div>
+    </section>`;
+  }
   treeState() {
     if (this.treeExpanded === undefined) {
       try { this.treeExpanded = JSON.parse(localStorage.getItem(`${this.sidebarKey()}:tree`) || '{}') || {}; }
@@ -660,6 +686,16 @@ class MindSpace extends PageController {
     document.querySelectorAll('.ms-drop-target').forEach(el => el.classList.remove('ms-drop-target'));
   }
   async handleAction(action, button) {
+    if (action === 'ms-sidebar-open' || (action === 'ms-sidebar-toggle' && S.sharedWorkspace)) {
+      await navigate('mindspaces');
+      if (!S.sharedWorkspace && S.view === 'mindspaces' && !hasMindSpaceTarget()) this.setSidebarOpen(true);
+      return;
+    }
+    if (action === 'ms-sidebar-toggle') {
+      this.closeMenu();
+      this.setSidebarOpen(!this.sidebarOpen());
+      return;
+    }
     if (action === 'ms-download-pdf') return MindSpacePDF.download(this, button);
     const right = ['ms-delete','ms-space-delete'].includes(action) ? 'delete' : action === 'ms-share' ? 'share' : action === 'ms-move' ? 'move'
       : ['ms-new','ms-new-kind','ms-rename','ms-space-rename','ms-card-new','ms-card-edit','ms-column-new','ms-sprint','ms-habits-select','ms-habit-new','ms-sheet-row','ms-sheet-column','ms-sheet-settings'].includes(action) ? 'edit' : null;

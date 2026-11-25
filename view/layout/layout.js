@@ -56,6 +56,7 @@ function shell() {
       .map(
         (v) =>
           !admin && v === 'sharing' ? sharingSidebar(pending) :
+          !admin && v === 'mindspaces' ? pageControllers.home.mindspace.sidebar() :
           `<button data-view="${v}" class="nav-item ${S.view === v || (v === 'habits' && ['routine', 'categoryWeek'].includes(S.view)) ? 'active' : ''}" ${S.view === v ? 'aria-current="page"' : ''}>${icon({ mindspaces: 'overview', users: 'sharing', requests: 'book', templates: 'habits', statistics: 'progress' }[v] || v)}<span>${t(v)}</span>${v === 'sharing' && pending ? `<span class="nav-count">${pending}</span>` : ''}</button>`
       )
       .join(''),

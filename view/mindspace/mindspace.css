@@ -24,6 +24,14 @@
 .mindspace-body { display: flex; min-height: 520px; flex: 1; min-width: 0; }
 .mindspace-explorer { margin: 2px 0 8px 20px; padding: 3px 0 3px 10px; border-left: 1px solid var(--line); font-size: .8125rem; min-width: 0; }
 .mindspace-explorer[hidden] { display: none; }
+.ms-sidebar-heading { padding: 0; gap: 0; }
+.ms-sidebar-link { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 13px 0 13px 13px; color: inherit; font: inherit; text-align: left; border-radius: 10px 0 0 10px; }
+.ms-sidebar-link > .icon { width: 20px; height: 20px; flex-shrink: 0; }
+.ms-sidebar-link > span { min-width: 0; overflow-wrap: anywhere; }
+.ms-sidebar-toggle { display: grid; place-items: center; flex: 0 0 34px; align-self: stretch; color: inherit; border-radius: 0 10px 10px 0; }
+.ms-sidebar-toggle:hover { background: var(--lavender-wash); }
+.ms-sidebar-chevron { font-size: 20px; line-height: 1; transition: transform .15s; }
+.ms-sidebar-toggle[aria-expanded="true"] .ms-sidebar-chevron { transform: rotate(90deg); }
 .ms-directory-explorer { margin: 0; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); font-size: .875rem; }
 .ms-directory-explorer .ms-sidebar-space { margin-bottom: 8px; }
 .ms-directory-explorer .ms-entry-label { min-height: 42px; }

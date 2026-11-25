@@ -60,6 +60,7 @@ return [
     'home' => 'Home',
     'mindspaces' => 'All main spaces',
     'ms_main_spaces' => 'Main spaces',
+    'ms_toggle_spaces' => 'Show or hide main spaces',
     'ms_no_spaces' => 'No main spaces yet.',
     'habits' => 'My habits',
     'calendar' => 'Calendar',
