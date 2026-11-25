@@ -148,6 +148,7 @@ class MindSpaceEditors {
 
   sheet() {
     const sheet = this.space.draft, evaluator = new MindSpaceSheet(sheet);
+    if (this.sheetItemId !== this.space.active.id) { this.cell = 'A1'; this.sheetItemId = this.space.active.id; }
     const returns = this.space.targetReturnLinks(), ledger = sheet.template === 'ledger', bands = this.sheetBands();
     return `<div class="ms-sheet${ledger ? ' ms-ledger' : ''}">
       <div class="ms-sheet-layout"><div class="ms-sheet-main"><div class="ms-formula-bar"><span id="ms-cell-address">${this.cell}</span><span aria-hidden="true">ƒx</span><input data-ms-formula aria-label="${esc(t('ms_formula'))}" maxlength="2000" ${MindSpaceSheet.locked(sheet, this.cell) ? 'readonly' : ''} value="${esc(sheet.cells?.[this.cell] || '')}"></div>
@@ -156,9 +157,70 @@ class MindSpaceEditors {
         const key = `${MindSpaceSheet.column(col)}${row + 1}`;
         const back = returns.get(key) || '', locked = MindSpaceSheet.locked(sheet, key);
         const error = this.sheetCellError(key, evaluator);
-        return `<td><div class="ms-sheet-cell${back ? ' has-return' : ''}"><input data-ms-cell="${key}" aria-label="${key}${sheet.template && row > 0 ? ` · ${esc(sheet.cells[`${MindSpaceSheet.column(col)}1`] || '')}` : ''}" autocomplete="off" spellcheck="false" maxlength="2000" ${locked ? 'readonly' : ''} ${ledger && row > 0 && [3,4].includes(col) ? 'inputmode="decimal"' : ''} ${error ? `aria-invalid="true" title="${esc(error)}"` : ''} value="${esc(evaluator.display(key))}">${back}</div></td>`;
-      }).join('')}</tr>`).join('')}</tbody></table></div><div class="ms-editor-toolbar ms-sheet-toolbar"><button type="button" class="btn secondary" data-action="ms-sheet-row" ${sheet.rows >= 200 ? 'disabled' : ''}>${esc(t('ms_add_row'))}</button><button type="button" class="btn secondary" data-action="ms-sheet-column" ${sheet.columns >= 52 ? 'disabled' : ''}>${esc(t('ms_add_column'))}</button><button type="button" class="btn secondary" data-action="ms-sheet-export">${esc(t('ms_export_csv'))}</button></div><p class="ms-sheet-hint">${esc(t(ledger ? 'ms_ledger_hint' : 'ms_sheet_hint'))}</p>${sheet.template ? `<p class="ms-sheet-hint">${esc(t('ms_template_calculated_hint'))}</p>` : ''}</div>
+        const format = MindSpaceSheet.format(sheet.cell_styles?.[key]);
+        return `<td${format.border ? ` style="${esc(format.border)}"` : ''}><div class="ms-sheet-cell${back ? ' has-return' : ''}"><input data-ms-cell="${key}" aria-label="${key}${sheet.template && row > 0 ? ` · ${esc(sheet.cells[`${MindSpaceSheet.column(col)}1`] || '')}` : ''}" autocomplete="off" spellcheck="false" maxlength="2000" ${locked ? 'readonly' : ''} ${ledger && row > 0 && [3,4].includes(col) ? 'inputmode="decimal"' : ''} ${error ? `aria-invalid="true" title="${esc(error)}"` : ''} ${format.text ? `style="${esc(format.text)}"` : ''} value="${esc(evaluator.display(key))}">${back}</div></td>`;
+      }).join('')}</tr>`).join('')}</tbody></table></div>${this.space.can('edit') ? `<div class="ms-sheet-settings"><span>${esc(t('ms_selected_cell'))} <strong data-ms-style-address>${this.cell}</strong></span><button type="button" class="btn secondary" data-action="ms-sheet-settings" aria-haspopup="dialog">${icon('settings')}${esc(t('settings'))}</button></div>` : ''}<p class="ms-sheet-hint">${esc(t(ledger ? 'ms_ledger_hint' : 'ms_sheet_hint'))}</p>${sheet.template ? `<p class="ms-sheet-hint">${esc(t('ms_template_calculated_hint'))}</p>` : ''}</div>
       ${ledger ? `<aside class="ms-ledger-summary" aria-label="${esc(t('ms_ledger_totals'))}"><h3>${esc(t('ms_ledger_totals'))}</h3><p>${esc(t('ms_ledger_totals_hint'))}</p><dl aria-live="polite" aria-atomic="true" data-ms-ledger-totals>${this.ledgerTotals(evaluator)}</dl><p class="ms-ledger-error" data-ms-ledger-error ${Object.values(evaluator.ledgerSummary()).every(value => typeof value === 'number') ? 'hidden' : ''}>${esc(t('ms_ledger_amount_error'))}</p><span class="ms-ledger-live">${esc(t('ms_ledger_live'))}</span></aside>` : ''}</div></div>`;
+  }
+  async cellSettings() {
+    const space = this.space, id = space.active?.id, generation = space.generation, key = this.cell;
+    if (space.active?.kind !== 'spreadsheet' || !space.can('edit')) return;
+    if (!await space.flush() || space.active?.id !== id || space.generation !== generation) return;
+    const style = space.draft.cell_styles?.[key] || {};
+    const choices = (values, prefix) => values.map(value => `<option value="${value}">${esc(t(`${prefix}${value}`))}</option>`).join('');
+    const colors = ['background','color','border_color'];
+    openModal('ms_cell_style', `<form id="ms-cell-style-form"><p class="ms-style-context">${esc(t('ms_selected_cell'))} <strong>${key}</strong></p>
+      <label class="field"><span>${esc(t('ms_style_preset'))}</span><select name="preset"><option value="custom">${esc(t('ms_style_custom'))}</option>${choices(Object.keys(MindSpaceSheet.stylePresets), 'ms_style_')}</select></label>
+      <div class="ms-style-colors">${colors.map(name => `<div class="ms-style-color"><label for="ms-style-${name}">${esc(t(`ms_style_${name}`))}</label><input type="color" id="ms-style-${name}" name="${name}" value="#ffffff"><label class="ms-style-auto"><input type="checkbox" name="${name}_auto">${esc(t('ms_style_auto'))}</label></div>`).join('')}</div>
+      <div class="form-grid"><label class="field"><span>${esc(t('ms_style_size'))}</span><select name="font_size"><option value="">${esc(t('ms_style_auto'))}</option>${[12,13,14,16,18,20,24].map(size => `<option value="${size}">${size}</option>`).join('')}</select></label>
+      <label class="field"><span>${esc(t('ms_style_align'))}</span><select name="align"><option value="">${esc(t('ms_style_auto'))}</option>${choices(['left','center','right'], 'ms_style_')}</select></label></div>
+      <div class="ms-style-emphasis"><label><input type="checkbox" name="bold">${esc(t('ms_style_bold'))}</label><label><input type="checkbox" name="italic">${esc(t('ms_style_italic'))}</label></div>
+      <label class="field"><span>${esc(t('ms_style_borders'))}</span><select name="borders">${choices(['grid','all','bottom','none'], 'ms_style_border_')}</select></label>
+      <div class="ms-style-preview" aria-label="${esc(t('ms_style_preview'))}"><span data-ms-style-preview>${esc(new MindSpaceSheet(space.draft).display(key) || 'Aa · 123')}</span></div>
+      ${formFooter('save', `<button type="button" class="btn ghost" data-ms-style-reset>${esc(t('ms_style_reset'))}</button>`)}</form>`);
+    const form = document.getElementById('ms-cell-style-form'), field = name => form.elements.namedItem(name);
+    let emphasis = {bold:style.bold, italic:style.italic};
+    const read = () => {
+      const value = {};
+      for (const name of colors) if (!field(`${name}_auto`).checked) value[name] = field(name).value;
+      for (const name of ['bold','italic']) if (emphasis[name] !== undefined) value[name] = field(name).checked;
+      if (field('font_size').value) value.font_size = Number(field('font_size').value);
+      if (field('align').value) value.align = field('align').value;
+      if (field('borders').value !== 'grid') value.borders = field('borders').value;
+      return value;
+    };
+    const preview = () => {
+      for (const name of colors) field(name).disabled = field(`${name}_auto`).checked;
+      const formatted = MindSpaceSheet.format(read());
+      form.querySelector('[data-ms-style-preview]').style.cssText = `${formatted.text};${formatted.border}`;
+    };
+    const fill = value => {
+      emphasis = {bold:value.bold, italic:value.italic};
+      for (const name of colors) { field(name).value = value[name] || ({background:'#ffffff',color:'#292534',border_color:'#9f93b6'}[name]); field(`${name}_auto`).checked = !value[name]; }
+      for (const name of ['bold','italic']) field(name).checked = value[name] === true;
+      field('font_size').value = value.font_size || ''; field('align').value = value.align || ''; field('borders').value = value.borders || 'grid';
+      preview();
+    };
+    fill(style);
+    form.addEventListener('input', event => {
+      if (event.target.name === 'preset') {
+        if (Object.hasOwn(MindSpaceSheet.stylePresets, field('preset').value)) fill(MindSpaceSheet.stylePresets[field('preset').value]);
+        return;
+      }
+      if (['bold','italic'].includes(event.target.name)) emphasis[event.target.name] = event.target.checked;
+      field('preset').value = 'custom'; preview();
+    });
+    form.querySelector('[data-ms-style-reset]').addEventListener('click', () => { field('preset').value = 'default'; fill({}); });
+    form.addEventListener('submit', event => { event.preventDefault(); void space.submit(form, async () => {
+      if (space.active?.id !== id || space.generation !== generation || !space.can('edit')) throw new Error(t('error_forbidden'));
+      const value = read();
+      space.draft.cell_styles = {...space.draft.cell_styles};
+      if (Object.keys(value).length) space.draft.cell_styles[key] = value; else delete space.draft.cell_styles[key];
+      space.changed();
+      if (!await space.save()) throw new Error(space.error);
+      if (space.active?.id !== id || space.generation !== generation) return;
+      closeModal(); this.refresh(); document.querySelector(`[data-ms-cell="${key}"]`)?.focus();
+    }); });
   }
   sheetBands() {
     const sheet = this.space.draft, bands = {};
@@ -216,6 +278,8 @@ class MindSpaceEditors {
       this.cell = key;
       if (!MindSpaceSheet.locked(space.draft, key)) input.value = space.draft.cells?.[key] || '';
       document.getElementById('ms-cell-address').textContent = key;
+      const selected = document.querySelector('[data-ms-style-address]');
+      if (selected) selected.textContent = key;
       const formula = document.querySelector('[data-ms-formula]');
       formula.value = space.draft.cells?.[key] || '';
       formula.readOnly = MindSpaceSheet.locked(space.draft, key);
@@ -263,6 +327,7 @@ class MindSpaceEditors {
     anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   async action(action, button) {
+    if (action === 'ms-sheet-settings') return this.cellSettings();
     if (action === 'ms-column-new') return this.newColumn();
     if (action === 'ms-card-new') return this.cardForm(null, button.dataset.status);
     if (action === 'ms-card-edit') return this.cardForm(button.dataset.id);
