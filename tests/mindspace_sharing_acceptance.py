@@ -68,6 +68,10 @@ def run(owner, recipient, outsider, guest, check):
  call('shareMindSpace',dict(payload,email=other_email,source_share_id=share['id']),403,client=recipient)
  action(share,'saveMindSpaceItem',{'id':private['id'],'version':private['version'],'content':{'text':'Private'}},expected=404)
  child=action(share,'createMindSpaceItem',{'kind':'notes','name':'Created together','mindspace_id':space['id'],'parent_id':folder['id'],'client_key':str(uuid.uuid4())})
+ ledger=action(share,'createMindSpaceItem',{'kind':'spreadsheet','name':'Shared ledger','mindspace_id':space['id'],'parent_id':folder['id'],'client_key':str(uuid.uuid4()),'template':'ledger','language':'es'})
+ ledger=action(share,'saveMindSpaceItem',{'id':ledger['id'],'version':ledger['version'],'content':dict(ledger['content'],cells={'D2':'800','E3':'125'})})
+ assert item(share,ledger['id'],owner)['content']['cells']['D2']=='800' and ledger['content']['cells']['F3']=='=SUM(D2:D3)-SUM(E2:E3)'
+ check(True,'Collaborators with Edit create ledger templates and save transactions in the original shared workspace')
  action(share,'createMindSpaceItem',{'kind':'notes','name':'Outside','mindspace_id':space['id'],'parent_id':None,'client_key':str(uuid.uuid4())},expected=403)
  check(True,'Edit creates and updates shared content with version conflicts, while move, delete, sharing and outside destinations remain forbidden')
 

@@ -157,7 +157,7 @@ class MindSpaceEditors {
         const back = returns.get(key) || '', locked = MindSpaceSheet.locked(sheet, key);
         const error = this.sheetCellError(key, evaluator);
         return `<td><div class="ms-sheet-cell${back ? ' has-return' : ''}"><input data-ms-cell="${key}" aria-label="${key}${sheet.template && row > 0 ? ` · ${esc(sheet.cells[`${MindSpaceSheet.column(col)}1`] || '')}` : ''}" autocomplete="off" spellcheck="false" maxlength="2000" ${locked ? 'readonly' : ''} ${ledger && row > 0 && [3,4].includes(col) ? 'inputmode="decimal"' : ''} ${error ? `aria-invalid="true" title="${esc(error)}"` : ''} value="${esc(evaluator.display(key))}">${back}</div></td>`;
-      }).join('')}</tr>`).join('')}</tbody></table></div><p class="ms-sheet-hint">${esc(t(ledger ? 'ms_ledger_hint' : 'ms_sheet_hint'))}</p>${sheet.template ? `<p class="ms-sheet-hint">${esc(t('ms_template_calculated_hint'))}</p>` : ''}</div>
+      }).join('')}</tr>`).join('')}</tbody></table></div><div class="ms-editor-toolbar ms-sheet-toolbar"><button type="button" class="btn secondary" data-action="ms-sheet-row" ${sheet.rows >= 200 ? 'disabled' : ''}>${esc(t('ms_add_row'))}</button><button type="button" class="btn secondary" data-action="ms-sheet-column" ${sheet.columns >= 52 ? 'disabled' : ''}>${esc(t('ms_add_column'))}</button><button type="button" class="btn secondary" data-action="ms-sheet-export">${esc(t('ms_export_csv'))}</button></div><p class="ms-sheet-hint">${esc(t(ledger ? 'ms_ledger_hint' : 'ms_sheet_hint'))}</p>${sheet.template ? `<p class="ms-sheet-hint">${esc(t('ms_template_calculated_hint'))}</p>` : ''}</div>
       ${ledger ? `<aside class="ms-ledger-summary" aria-label="${esc(t('ms_ledger_totals'))}"><h3>${esc(t('ms_ledger_totals'))}</h3><p>${esc(t('ms_ledger_totals_hint'))}</p><dl aria-live="polite" aria-atomic="true" data-ms-ledger-totals>${this.ledgerTotals(evaluator)}</dl><p class="ms-ledger-error" data-ms-ledger-error ${Object.values(evaluator.ledgerSummary()).every(value => typeof value === 'number') ? 'hidden' : ''}>${esc(t('ms_ledger_amount_error'))}</p><span class="ms-ledger-live">${esc(t('ms_ledger_live'))}</span></aside>` : ''}</div></div>`;
   }
   sheetBands() {
@@ -167,7 +167,8 @@ class MindSpaceEditors {
     for (let row = 2; row <= sheet.rows; row++) {
       const month = MindSpaceSheet.month(sheet.cells[`A${row}`]);
       if (!month) continue;
-      bands[row] = {className:`ms-month-row${previous !== month.key ? ' ms-month-start' : ''}`, style:`style="--ms-month-hue:${(month.month - 1) * 30 + 15}"`};
+      const hue = [210,35,155,275,350,185,55,235,15,305,125,65][month.month - 1];
+      bands[row] = {className:`ms-month-row${previous !== month.key ? ' ms-month-start' : ''}`, hue, style:`style="--ms-month-hue:${hue}"`};
       previous = month.key;
     }
     return bands;
@@ -178,7 +179,10 @@ class MindSpaceEditors {
     if (!row || !raw.trim()) return '';
     if (col === 0 && !MindSpaceSheet.month(raw)) return t('ms_ledger_date_error');
     if ([3,4].includes(col)) {
-      try { if (typeof evaluator.value(key) !== 'number') return t('ms_ledger_amount_error'); }
+      try {
+        const value = evaluator.value(key);
+        if (typeof value !== 'number' || !Number.isSafeInteger(Math.round(value * 100))) return t('ms_ledger_amount_error');
+      }
       catch { return t('ms_ledger_amount_error'); }
     }
     return '';
@@ -198,7 +202,7 @@ class MindSpaceEditors {
     document.querySelectorAll('[data-ms-sheet-row]').forEach(row => {
       if (Number(row.dataset.msSheetRow) === 1) return;
       const band = bands[row.dataset.msSheetRow]; row.className = band?.className || '';
-      row.style.setProperty('--ms-month-hue', band ? /hue:(\d+)/.exec(band.style)[1] : '0');
+      row.style.setProperty('--ms-month-hue', String(band?.hue || 0));
     });
     const totals = document.querySelector('[data-ms-ledger-totals]');
     if (totals) totals.innerHTML = this.ledgerTotals(evaluator);

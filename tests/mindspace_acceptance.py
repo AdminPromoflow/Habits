@@ -56,6 +56,22 @@ def run(owner, stranger, guest, check):
  for bad in [{'rows':201,'columns':10,'cells':{}},{'rows':2,'columns':2,'cells':{'C1':'x'}},{'rows':2,'columns':2,'cells':{'A1':'x'*2001}}]:
   call('saveMindSpaceItem',{'id':sheet['id'],'version':sheet['version'],'content':bad},422)
  check(current(sheet['id'])['version']==sheet['version'], 'Spreadsheet size and cell limits reject invalid writes atomically')
+ for template,columns in [('ledger',6),('budget',4),('inventory',5),('projects',6),('blank',10)]:
+  payload={'kind':'spreadsheet','name':template,'parent_id':root['id'],'client_key':str(uuid.uuid4()),'template':template,'language':'es'}
+  created=call('createMindSpaceItem',payload)
+  check(call('createMindSpaceItem',payload)['id']==created['id'] and created['content']['columns']==columns, template+' template is created atomically in its folder and retries are idempotent')
+  if template=='ledger':
+   check([created['content']['cells'][c+'1'] for c in 'ABCDEF']==['Fecha','Descripción','Categoría','Entrada','Salida','Saldo'], 'Ledger contains all six requested column headers')
+   ledger=save(created,{'rows':32,'columns':6,'cells':{'A1':'Overwrite','A2':'2026-01-31','D2':'1000','E3':'150','F2':'wrong'}})
+   restored=current(ledger['id'])['content']
+   check(restored['template']=='ledger' and restored['template_language']=='es' and restored['cells']['A1']=='Fecha' and restored['cells']['F2']=='=SUM(D2:D2)-SUM(E2:E2)' and restored['cells']['F32']=='=SUM(D2:D32)-SUM(E2:E32)' and restored['cells']['D2']=='1000', 'Ledger metadata survives older clients; headers and balances are protected and extended, while transactions persist')
+   for bad in [dict(restored,template='blank'),dict(restored,rows=1,cells={}),dict(restored,columns=5,cells={})]:
+    call('saveMindSpaceItem',{'id':ledger['id'],'version':ledger['version'],'content':bad},422)
+   call('saveMindSpaceItem',{'id':ledger['id'],'version':ledger['version'],'content':restored},404,client=stranger)
+   check(current(ledger['id'])==ledger, 'Invalid dimensions, template changes and foreign writes cannot corrupt a ledger')
+ for template,language in [('unknown','es'),('ledger','invalid')]:
+  call('createMindSpaceItem',{'kind':'spreadsheet','name':'Invalid template','client_key':str(uuid.uuid4()),'template':template,'language':language},422)
+ check(True, 'Template selection and language are validated by the API')
  for kind in ['kanban','scrum']:
   board=create(kind,kind,root['id'])
   assert board['kind']=='kanban' and [c['name'] for c in board['content']['columns']]==['Pending','To Do','In Progress','Done']

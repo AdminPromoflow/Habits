@@ -5,6 +5,42 @@ const vm = require('node:vm');
 const Sheet = vm.runInNewContext(fs.readFileSync('view/mindspace/sheet.js','utf8')+'\nMindSpaceSheet;');
 const evaluate = cells => new Sheet({rows:30,columns:10,cells});
 
+test('ledger balances, live totals and formulas use cents and recalculate after edits', () => {
+  const data={template:'ledger',rows:200,columns:6,cells:{A1:'Date',F1:'Balance',A2:'2026-01-31',D2:'1000.10',A3:'01/02/2026',E3:'200.20',D4:'0.10',D5:'0.20',B200:'Last row',E200:'50'}};
+  Sheet.prepare(data);
+  let sheet=new Sheet(data);
+  assert.equal(sheet.display('F2'),'1000.10');assert.equal(sheet.display('F3'),'799.90');assert.equal(sheet.display('F5'),'800.20');
+  assert.equal(sheet.display('F6'),'');assert.equal(sheet.display('F200'),'750.20');
+  assert.deepEqual(JSON.parse(JSON.stringify(sheet.ledgerSummary())),{income:100040,expense:25020,balance:75020});
+  assert.equal(sheet.display('F1'),'Balance');assert.equal(data.cells.F200,'=SUM(D2:D200)-SUM(E2:E200)');
+  data.cells.E3='100';sheet=new Sheet(data);assert.equal(sheet.display('F200'),'850.40');
+  data.cells.D4='1.005';assert.equal(new Sheet(data).display('F4'),'901.11');
+});
+test('ledger rejects invalid amounts and unsafe totals instead of silently treating them as zero',()=>{
+  const data={template:'ledger',rows:5,columns:6,cells:{D2:'100',E3:'oops',D4:'=1/0'}};Sheet.prepare(data);
+  let sheet=new Sheet(data);
+  assert.equal(sheet.display('F2'),'100.00');assert.equal(sheet.display('F3'),'#VALUE!');
+  assert.equal(sheet.ledgerSummary().expense,'#VALUE!');assert.equal(sheet.ledgerSummary().income,'#DIV/0!');
+  data.cells={D2:'90071992547410'};Sheet.prepare(data);sheet=new Sheet(data);assert.equal(sheet.display('F2'),'#NUM!');
+  data.cells={D2:'=F2'};Sheet.prepare(data);sheet=new Sheet(data);assert.equal(sheet.display('F2'),'#CYCLE!');
+});
+test('month colors use validated dates across month and year changes',()=>{
+  assert.equal(Sheet.month('2026-01-31').key,'2026-01');assert.equal(Sheet.month('1/2/2026').key,'2026-02');
+  assert.equal(Sheet.month('2026-12-31').month,12);assert.equal(Sheet.month('2027-01-01').month,1);
+  assert.equal(Sheet.month('2028-02-29').key,'2028-02');
+  for(const value of ['2026-02-29','31/04/2026','2026-00-10','2026-13-10','','=A3','text']) assert.equal(Sheet.month(value),null);
+});
+test('templates protect headers and calculated columns, extend formulas and keep blank sheets editable',()=>{
+  for(const [template,col,formula] of [['ledger','F','=SUM(D2:D32)-SUM(E2:E32)'],['budget','D','=B32-C32'],['inventory','E','=C32*D32']]) {
+    const data={template,rows:32,columns:6,cells:{B32:'10',C32:'3',D32:'2'}};Sheet.prepare(data);
+    assert.equal(data.cells[`${col}32`],formula);assert.equal(Sheet.locked(data,`${col}32`),true);
+    assert.equal(Sheet.locked(data,'A1'),true);assert.equal(Sheet.locked(data,'A2'),false);
+  }
+  assert.equal(new Sheet({template:'budget',rows:3,columns:4,cells:{B2:'300',C2:'125',D2:'=B2-C2'}}).display('D2'),'175');
+  assert.equal(new Sheet({template:'inventory',rows:3,columns:5,cells:{C2:'3',D2:'12.50',E2:'=C2*D2'}}).display('E2'),'37.5');
+  assert.equal(Sheet.locked({rows:2,columns:6,cells:{}},'F2'),false);
+});
+
 test('spreadsheet evaluates dependencies, precedence, bilingual functions and ranges', () => {
   const sheet = evaluate({A1:'10',A2:'20',A3:'text',B1:'=SUMA(A1:A3)',B2:'=AVERAGE(A1:A2)',B3:'=B1+B2*2',C1:'=CONTAR(A1:A3)',C2:'=MAX(A1:A2)-MIN(A1:A2)',C3:'=-(2+3)*.5'});
   assert.equal(sheet.display('B1'),'30'); assert.equal(sheet.display('B2'),'15'); assert.equal(sheet.display('B3'),'60');
@@ -160,6 +196,17 @@ function cellReturnFixture() {
   state.data.diagrams=[{id:10,name:'Source map',nodes:[{id:'root',text:'Budget topic',link:{item_id:3,target:{type:'cell',id:'B3'}}}]}];
   return fixture;
 }
+test('ledger renders editable entries, protected balances, month bands and right-side totals',()=>{
+  const {space}=cellReturnFixture();
+  space.draft={template:'ledger',rows:4,columns:6,cells:{A1:'Date',B1:'Description',C1:'Category',D1:'Income',E1:'Expense',F1:'Balance',A2:'2026-01-31',D2:'1000',A3:'2026-02-01',E3:'250'}};
+  Sheet.prepare(space.draft);
+  const html=space.editor.sheet();
+  assert.match(html,/data-ms-cell="F3"[^>]*readonly[^>]*value="750.00"/);
+  assert.match(html,/data-ms-cell="D2"[^>]*inputmode="decimal"/);
+  assert.match(html,/--ms-month-hue:210/);assert.match(html,/--ms-month-hue:35/);
+  assert.match(html,/class="ms-ledger-summary"/);assert.match(html,/ms_ledger_balance<\/dt><dd>750.00/);
+  assert.doesNotMatch(html,/data-ms-cell="D2"[^>]*readonly/);
+});
 test('only the linked cell receives a return arrow, with the source tooltip and no duplicate header link',()=>{
   const {space,state}=cellReturnFixture();
   const html=space.editor.sheet();
@@ -355,6 +402,19 @@ test('creation from a different space retains the requested destination through 
   assert.equal(new URL(f.location.assigned).searchParams.get('space'),'100');
 });
 
+test('Create opens the template chooser before any request, preserving name and destination',async()=>{
+  const f=modalFixture(), create=f.form('ms-create-form'), select=f.form('ms-sheet-template-form');let request;
+  f.context.MindSpaceSheet=Sheet;f.state.language='es';
+  f.home.makeRequest=async(action,data)=>{request={action,...data};return {id:7,...data,content:{rows:31,columns:6,cells:{},template:data.template}};};
+  await f.space.newForm('spreadsheet',{spaceId:100,parent:2});
+  f.values={name:'My ledger',parent:'2'};create.submit({preventDefault(){}});await f.pending;
+  assert.equal(request,undefined);assert.equal(f.modal.title,'ms_sheet_templates');
+  for(const template of Sheet.templates) assert.match(f.modal.html,new RegExp(`value="${template}"`));
+  f.values={template:'ledger'};select.submit({preventDefault(){}});await f.pending;
+  assert.equal(request.name,'My ledger');assert.equal(request.mindspace_id,100);assert.equal(request.parent_id,2);
+  assert.equal(request.template,'ledger');assert.equal(request.language,'es');
+});
+
 test('renaming an inactive diagram preserves the active editor and updates only that diagram',async()=>{
   const f=modalFixture(), form=f.form('ms-rename-form');
   f.home.active={id:20,name:'Other map',version:9};f.home.diagramTitle='Other map';
@@ -372,6 +432,53 @@ test('renaming a space updates its catalog without selecting it',async()=>{
   await f.space.rename(100,true);f.values={name:'Personal'};form.submit({preventDefault(){}});await f.pending;
   assert.equal(f.space.spaceName(100),'Personal');assert.equal(f.state.data.mindspace.name,'Personal');
   assert.equal(f.space.active.id,6);assert.equal(f.space.spaceId(),200);
+});
+
+function inlineTitleFixture(url) {
+  const f=modalFixture(url), input={value:'',setAttribute(){},addEventListener(type,fn){this[type]=fn;},focus(){this.focused=true;},select(){this.selection=[0,this.value.length];}};
+  f.context.document.createElement=()=>input;
+  f.context.document.querySelector=()=>null;
+  f.context.toast=message=>{f.error=message;};
+  f.heading={dataset:{msTitle:'item'},isConnected:true,replaceChildren(child){this.input=child;}};
+  f.input=input;return f;
+}
+test('inline names select all, save pending content first and preserve the editor draft',async()=>{
+  const f=inlineTitleFixture(),calls=[];
+  f.home.makeRequest=async(action,data)=>{calls.push(data);return {...f.space.active,...data,content:data.content||f.space.active.content,version:data.version+1};};
+  await f.space.beginTitleEditing(f.heading);
+  assert.deepEqual(f.input.selection,[0,'Work note'.length]);assert.equal(f.input.focused,true);
+  assert.equal(f.space.isEditing(),true);
+  f.space.draft.text='unsaved content';f.input.value='Renamed inline';
+  assert.equal(await f.space.finishTitleEditing(),true);
+  assert.equal(calls.length,2);assert.equal(calls[0].content.text,'unsaved content');
+  assert.equal(calls[1].version,calls[0].version+1);assert.equal(calls[1].name,'Renamed inline');
+  assert.equal(f.space.draft.text,'unsaved content');assert.equal(f.space.dirty(),false);
+  assert.equal(f.heading.textContent,'Renamed inline');assert.equal(f.space.titleEdit,null);
+});
+test('Escape, empty names and read-only access cannot rename a workspace heading',async()=>{
+  const f=inlineTitleFixture();let calls=0;f.home.makeRequest=async()=>{calls++;};
+  await f.space.beginTitleEditing(f.heading);f.input.value='Discard this';await f.space.finishTitleEditing(false);
+  assert.equal(f.heading.textContent,'Work note');assert.equal(calls,0);
+  await f.space.beginTitleEditing(f.heading);f.input.value='   ';await f.space.finishTitleEditing();
+  assert.equal(f.heading.textContent,'Work note');assert.equal(calls,0);
+  f.state.sharedWorkspace={permissions:{edit:false}};
+  await f.space.beginTitleEditing(f.heading);assert.equal(f.space.titleEdit,null);
+});
+test('failed inline renames retain their text and block navigation until saved or cancelled',async()=>{
+  const f=inlineTitleFixture();await f.space.beginTitleEditing(f.heading);
+  f.input.value='Keep this name';f.home.makeRequest=async()=>{throw new Error('offline');};
+  await f.space.go(null);assert.equal(f.location.assigned,undefined);
+  assert.equal(f.error,'offline');assert.equal(f.input.value,'Keep this name');assert.equal(f.input.readOnly,false);
+  f.home.makeRequest=async(action,data)=>({...f.space.active,name:data.name,version:2});
+  await f.space.go(null);assert.equal(f.space.active.name,'Keep this name');assert.ok(f.location.assigned);
+});
+test('inline diagram titles use the latest diagram version and synchronize its catalog',async()=>{
+  const f=inlineTitleFixture('http://localhost/?diagram=10');let request;
+  f.home.active={id:10,name:'Map',version:7};
+  f.home.makeRequest=async(action,data)=>{request=data;return {...f.space.active,name:data.name,version:2,diagram_version:8};};
+  await f.space.beginTitleEditing(f.heading);f.input.value='Mind map';await f.space.finishTitleEditing();
+  assert.equal(request.diagram_version,7);assert.equal(f.home.diagramTitle,'Mind map');
+  assert.equal(f.home.active.version,8);assert.equal(f.state.data.diagrams[0].name,'Mind map');
 });
 
 test('deleting the current nondefault space at its root navigates to a surviving space',async()=>{

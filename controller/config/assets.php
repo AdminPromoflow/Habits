@@ -40,6 +40,7 @@ return [
         'view/mindspace/sheet.js',
         'view/mindspace/link-targets.js',
         'view/mindspace/editors.js',
+        'view/mindspace/pdf.js',
         'view/mindspace/mindspace.js',
         'view/home/home.js',
         'view/habits/habits.js',

@@ -4,7 +4,7 @@ class MindSpace extends PageController {
   constructor(home) {
     super(['ms-new','ms-new-kind','ms-open','ms-folder','ms-rename','ms-move','ms-retry',
       'ms-link-return','ms-link-returns','ms-sidebar-toggle','ms-sidebar-add','ms-space-open','ms-space-new','ms-entry-menu','ms-space-rename','ms-share','ms-delete','ms-space-delete',
-      'ms-card-new','ms-card-edit','ms-column-new','ms-sprint','ms-habits-select','ms-habit-new','ms-sheet-row','ms-sheet-column','ms-sheet-export']);
+      'ms-card-new','ms-card-edit','ms-column-new','ms-sprint','ms-habits-select','ms-habit-new','ms-sheet-row','ms-sheet-column','ms-sheet-export','ms-download-pdf']);
     this.home = home;
     this.editor = new MindSpaceEditors(this);
     this.reset();
@@ -24,6 +24,12 @@ class MindSpace extends PageController {
     }, true);
     document.addEventListener('click', event => {
       if (!event.target.closest?.('#ms-context-menu,[data-action="ms-entry-menu"]')) this.closeMenu();
+    });
+    document.addEventListener('dblclick', event => {
+      const heading = event.target.closest?.('[data-ms-title]');
+      if (!heading || !this.enabled()) return;
+      event.preventDefault();
+      void this.beginTitleEditing(heading);
     });
     document.addEventListener('keydown', event => this.menuKeydown(event));
     document.defaultView?.addEventListener('resize', () => this.closeMenu());
@@ -62,6 +68,7 @@ class MindSpace extends PageController {
     this.generation = (this.generation || 0) + 1;
     this.active = null; this.draft = null; this.baseline = ''; this.busy = false;
     this.error = ''; this.savePromise = null; this.draggingId = null;
+    this.titleEdit = null; this.titleSave = null;
     this.sidebarExpanded = undefined; this.treeExpanded = undefined; this.linkArrival = null;
   }
   enabled() { return !!S.data?.mindspace; }
@@ -82,7 +89,7 @@ class MindSpace extends PageController {
   folderId() { return this.active?.kind === 'folder' ? this.active.id : this.active?.parent_id || null; }
   isDiagram() { return this.enabled() && this.active?.kind === 'diagram'; }
   dirty() { return !!this.active && !['diagram','folder'].includes(this.active.kind) && JSON.stringify(this.draft) !== this.baseline; }
-  isEditing() { return this.busy || !!this.savePromise || this.dirty() || !!this.error; }
+  isEditing() { return this.busy || !!this.titleEdit || !!this.titleSave || !!this.savePromise || this.dirty() || !!this.error; }
 
   resolve() {
     const url = new URL(location.href), items = this.items();
@@ -284,7 +291,10 @@ class MindSpace extends PageController {
       spaceName:esc(this.spaceName()), intro:t('ms_intro'), tabsLabel:t('ms_tabs'), tabs:this.tabs(), plus:icon('plus'), addLabel:t('ms_add'),
       pathLabel:t('ms_folder_path'), path, linkedFrom:this.linkedFrom(),
       name:esc(this.active?.name || t('ms_files')),
+      spaceHeading:`<h1 ${this.spaces().some(space => space.id === this.spaceId() && this.can('edit', space)) ? `data-ms-title="space" title="${esc(t('ms_title_edit_hint'))}"` : ''}>${esc(this.spaceName())}</h1>`,
+      itemHeading:`<h2 id="mindspace-item-name" ${this.active && this.can('edit') ? `data-ms-title="item" title="${esc(t('ms_title_edit_hint'))}"` : ''}>${esc(this.active?.name || t('ms_files'))}</h2>`,
       actions:this.active ? `${this.can('edit') ? `<button type="button" class="text-btn" data-action="ms-rename">${esc(t('ms_rename'))}</button>` : ''}${this.can('move') ? `<button type="button" class="text-btn" data-action="ms-move">${esc(t('ms_move'))}</button>` : ''}` : '', content,
+      download:this.active && this.active.kind !== 'folder' ? `<footer class="mindspace-item-footer"><button type="button" class="btn secondary" data-action="ms-download-pdf">${esc(t('ms_download_pdf'))}</button></footer>` : '',
     });
   }
 
@@ -349,7 +359,7 @@ class MindSpace extends PageController {
     const tabs = document.getElementById('mindspace-tabs');
     if (tabs) tabs.innerHTML = this.tabs();
     const name = document.getElementById('mindspace-item-name');
-    if (name && this.isDiagram()) name.textContent = this.home.titleName();
+    if (name && this.isDiagram() && this.titleEdit?.heading !== name) name.textContent = this.home.titleName();
   }
 
   adoptDiagram(diagram) {
@@ -396,7 +406,11 @@ class MindSpace extends PageController {
     return pending;
   }
 
-  async flush() { return this.isDiagram() ? this.home.finishBeforeSwitch() : await this.save(); }
+  async flushContent() { return this.isDiagram() ? this.home.finishBeforeSwitch() : await this.save(); }
+  async flush() {
+    if ((this.titleEdit || this.titleSave) && !await this.finishTitleEditing()) return false;
+    return this.flushContent();
+  }
   async go(item, spaceId = this.spaceId(), target = null) {
     if (!await this.flush()) return;
     const url = new URL(location.href);
@@ -483,6 +497,99 @@ class MindSpace extends PageController {
     }); });
   }
   diagramVersion(item) { return item.kind === 'diagram' && this.home.active?.id === item.diagram_id ? this.home.active.version : item.diagram_version; }
+  async beginTitleEditing(heading) {
+    if (this.titleEdit?.heading === heading) return;
+    const generation = this.generation, isSpace = heading.dataset.msTitle === 'space';
+    const id = isSpace ? this.spaceId() : this.active?.id;
+    if (!id || !await this.flush() || generation !== this.generation || !heading.isConnected) return;
+    const item = (isSpace ? this.spaces() : this.allItems()).find(entry => entry.id === id);
+    if (!item || !this.can('edit', item)) return;
+    const input = document.createElement('input');
+    input.type = 'text'; input.className = 'ms-title-editor'; input.maxLength = 120;
+    input.value = item.name; input.setAttribute('aria-label', t('name'));
+    input.setAttribute('title', t('ms_title_edit_keys'));
+    this.titleEdit = {id, isSpace, heading, input, original:item.name};
+    heading.replaceChildren(input);
+    input.addEventListener('keydown', event => {
+      if (event.isComposing || !['Enter','Escape'].includes(event.key)) return;
+      event.preventDefault(); event.stopPropagation();
+      void this.finishTitleEditing(event.key !== 'Escape');
+    });
+    input.addEventListener('blur', () => { void this.finishTitleEditing(); });
+    input.focus({preventScroll:true}); input.select();
+  }
+  finishTitleEditing(commit = true) {
+    if (this.titleSave) return this.titleSave;
+    const edit = this.titleEdit;
+    if (!edit) return Promise.resolve(true);
+    const name = edit.input.value.trim();
+    if (!commit || !name || name === edit.original) {
+      this.titleEdit = null; edit.heading.textContent = edit.original;
+      return Promise.resolve(true);
+    }
+    const generation = this.generation;
+    edit.input.readOnly = true;
+    const run = async () => {
+      try {
+        if (!await this.flushContent() || generation !== this.generation) throw new Error(this.error || t('ms_unsaved'));
+        const saved = await this.saveName(edit.id, name, edit.isSpace);
+        if (generation !== this.generation || !saved) return false;
+        this.titleEdit = null; edit.heading.textContent = saved.name;
+        this.syncRenamedTitle(saved, edit.isSpace);
+        return true;
+      } catch (error) {
+        if (generation === this.generation) {
+          toast(error.message, true);
+          edit.input.readOnly = false;
+          edit.input.focus({preventScroll:true});
+        }
+        return false;
+      }
+    };
+    const pending = this.titleSave = run();
+    void pending.finally(() => { if (this.titleSave === pending) this.titleSave = null; });
+    return pending;
+  }
+  syncRenamedTitle(item, isSpace) {
+    const selector = isSpace ? `[data-action="ms-space-open"][data-space="${item.id}"]`
+      : `[data-action="ms-open"][data-id="${item.id}"],[data-action="ms-folder"][data-id="${item.id}"]`;
+    for (const button of document.querySelectorAll(selector)) {
+      const label = button.querySelector('strong,span');
+      (label || button).textContent = item.name;
+      button.setAttribute('title', item.name);
+    }
+    for (const button of document.querySelectorAll(`[data-action="ms-entry-menu"][data-target="${isSpace ? 'space' : 'item'}"][data-id="${item.id}"]`)) {
+      button.setAttribute('aria-label', t('ms_options_for', {name:item.name}));
+    }
+    if (isSpace) {
+      const root = document.querySelector('.mindspace-folder-path [data-id="0"]');
+      if (root) root.textContent = item.name;
+      document.querySelector('.mindspace-shell')?.setAttribute('aria-label', item.name);
+    } else document.getElementById('mindspace-panel')?.setAttribute('aria-label', item.name);
+  }
+  async saveName(id, name, isSpace = false) {
+    const generation = this.generation;
+    const item = (isSpace ? this.spaces() : this.allItems()).find(entry => entry.id === id);
+    if (!item || !this.can('edit', item)) throw new Error(t('error_validation'));
+    const saved = await this.home.makeRequest(isSpace ? 'renameMindSpace' : 'saveMindSpaceItem', {id, version:item.version, name, diagram_version:this.diagramVersion(item)});
+    if (generation !== this.generation) return null;
+    if (isSpace) {
+      Object.assign(item, saved);
+      if (S.data.mindspace.id === id) S.data.mindspace.name = saved.name;
+    } else {
+      if (this.active?.id === id) this.active = saved;
+      this.upsert(saved);
+      if (saved.kind === 'diagram') {
+        if (this.home.active?.id === saved.diagram_id) {
+          this.home.diagramTitle = saved.name;
+          Object.assign(this.home.active, {name:saved.name, version:saved.diagram_version});
+        }
+        const diagram = S.data.diagrams.find(entry => entry.id === saved.diagram_id);
+        if (diagram) Object.assign(diagram, {name:saved.name, version:saved.diagram_version});
+      }
+    }
+    return saved;
+  }
   async rename(id = this.active?.id, isSpace = false) {
     if (!id || !await this.flush()) return;
     this.closeMenu();
@@ -491,23 +598,7 @@ class MindSpace extends PageController {
     openModal('ms_rename', `<form id="ms-rename-form"><label class="field"><span>${esc(t('name'))}</span><input name="name" maxlength="120" required value="${esc(item.name)}"></label>${formFooter()}</form>`);
     const form = document.getElementById('ms-rename-form');
     form.addEventListener('submit', event => { event.preventDefault(); void this.submit(form, async values => {
-      const saved = await this.home.makeRequest(isSpace ? 'renameMindSpace' : 'saveMindSpaceItem', { id:item.id, version:item.version, name:values.get('name'), diagram_version:this.diagramVersion(item) });
-      if (isSpace) {
-        Object.assign(item, saved);
-        if (S.data.mindspace.id === id) S.data.mindspace.name = saved.name;
-      } else {
-        if (this.active?.id === id) this.active = saved;
-        this.upsert(saved);
-        if (saved.kind === 'diagram') {
-          if (this.home.active?.id === saved.diagram_id) {
-            this.home.diagramTitle = saved.name;
-            Object.assign(this.home.active, { name:saved.name, version:saved.diagram_version });
-          }
-          const diagram = S.data.diagrams.find(entry => entry.id === saved.diagram_id);
-          if (diagram) Object.assign(diagram, { name:saved.name, version:saved.diagram_version });
-        }
-      }
-      closeModal(); render();
+      if (await this.saveName(id, values.get('name'), isSpace)) { closeModal(); render(); }
     }); });
   }
   async deleteForm(id, isSpace = false) {
@@ -574,6 +665,7 @@ class MindSpace extends PageController {
     document.querySelectorAll('.ms-drop-target').forEach(el => el.classList.remove('ms-drop-target'));
   }
   async handleAction(action, button) {
+    if (action === 'ms-download-pdf') return MindSpacePDF.download(this, button);
     const right = ['ms-delete','ms-space-delete'].includes(action) ? 'delete' : action === 'ms-share' ? 'share' : action === 'ms-move' ? 'move'
       : ['ms-new','ms-new-kind','ms-rename','ms-space-rename','ms-card-new','ms-card-edit','ms-column-new','ms-sprint','ms-habits-select','ms-habit-new','ms-sheet-row','ms-sheet-column'].includes(action) ? 'edit' : null;
     if (right && !this.can(right)) throw new Error(t('error_forbidden'));
