@@ -65,6 +65,53 @@ test('color changes reject invalid values and read-only access, and reset return
   assert.match(home.colors.css(home.nodes[0]),/--diagram-node-bg:#e8dff1/);assert.equal(home.colors.background(),'#fcfaf7');
 });
 
+test('branch toggles hide all descendants and their connections without editing the saved tree', () => {
+  const {home,state} = savedEditor();
+  home.nodes = [
+    {id:'root',parent_id:null,text:'Root'}, {id:'a',parent_id:'root',text:'A'},
+    {id:'child',parent_id:'a',text:'Child'}, {id:'grandchild',parent_id:'child',text:'Grandchild'},
+    {id:'b',parent_id:'root',text:'B'}, {id:'other',parent_id:null,text:'Other'},
+  ];
+  home.name = 'Root';
+  home.connections = [{from:'grandchild',to:'b'}];
+  home.active.nodes = JSON.parse(JSON.stringify(home.nodes));
+  home.active.connections = JSON.parse(JSON.stringify(home.connections));
+  const before = home.fingerprint(home.snapshot());
+  let requests = 0;
+  home.makeRequest = async () => { requests++; };
+  assert.equal(home.branchToggleContent(home.nodes[3]),'','leaves have no toggle');
+  assert.match(home.branchToggleContent(home.nodes[1]),/aria-expanded="true"/);
+  home.toggleBranch('child');
+  home.toggleBranch('a');
+  assert.equal(home.visibleNodes().map(node=>node.id).join(','),'root,a,b,other');
+  assert.equal(home.connectionTool.visibleEdges().length,2);
+  assert.match(home.branchToggleContent(home.nodes[1]),/aria-expanded="false"/);
+  assert.equal(home.fingerprint(home.snapshot()),before);
+  assert.equal(home.hasChanges(),false);
+  assert.equal(requests,0);
+  home.toggleBranch('a');
+  assert.equal(home.visibleNodes().length,6,'expanding reveals previously folded grandchildren too');
+  assert.equal(home.connectionTool.visibleEdges().length,5);
+  state.sharedWorkspace = {permissions:{edit:false}};
+  home.toggleBranch('root');
+  assert.equal(home.visibleNodes().map(node=>node.id).join(','),'root,other','view-only access can fold its own view');
+  assert.equal(requests,0);
+});
+
+test('selecting a folded descendant reveals its ancestors and leaves unrelated branches folded', () => {
+  const {home} = savedEditor();
+  home.nodes = [{id:'root',parent_id:null,text:'Root'}, {id:'a',parent_id:'root',text:'A'},
+    {id:'child',parent_id:'a',text:'Child'}, {id:'b',parent_id:'root',text:'B'},
+    {id:'other',parent_id:'b',text:'Other'}];
+  home.name = 'Root';
+  home.toggleBranch('a'); home.toggleBranch('b');
+  home.selectNode('child');
+  assert.equal(home.visibleNodes().map(node=>node.id).join(','),'root,a,child,b');
+  assert.equal(home.selectedKey,'child');
+  assert.equal(home.collapsedNodes.has('a'),false);
+  assert.equal(home.collapsedNodes.has('b'),true);
+});
+
 test('topic links are included in dirty detection, saved snapshots and their visible open button', async () => {
   const { home } = savedEditor();
   home.nodes[0].link = { diagram_id: 52, node_id: 'root' };

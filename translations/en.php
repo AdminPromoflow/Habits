@@ -502,6 +502,8 @@ return [
     'diagram_saved' => 'Diagram saved',
     'diagram_retry' => 'Try again',
     'diagram_add_child' => 'Add child idea',
+    'diagram_collapse_children' => 'Hide children of {name}',
+    'diagram_expand_children' => 'Show children of {name}',
     'diagram_add_child_hint' => 'Click to add a child. Press and drag onto another node to connect them.',
     'diagram_connection_limit' => 'You have reached the limit of 1000 additional connections.',
     'diagram_connection_label' => 'Connection from {from} to {to}. Delete or Backspace removes only the line.',

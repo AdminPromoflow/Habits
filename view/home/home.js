@@ -2,7 +2,7 @@
 
 class HomePage extends PageController {
   constructor() {
-    super(['create-diagram', 'retry-diagram', 'toggle-diagram-menu', 'diagram-layout', 'diagram-colors', 'add-diagram-child', 'add-diagram-sibling',
+    super(['create-diagram', 'retry-diagram', 'toggle-diagram-menu', 'toggle-diagram-branch', 'diagram-layout', 'diagram-colors', 'add-diagram-child', 'add-diagram-sibling',
       'diagram-checkbox-menu', 'diagram-checkbox-state', 'toggle-diagram-picker', 'select-diagram',
       'copy-diagram-node', 'cut-diagram-node', 'paste-diagram-node', 'delete-diagram-node', 'image-diagram-node', 'labels-diagram-node',
       'link-diagram-node', 'open-diagram-link', 'open-diagram-return', 'choose-diagram-return', 'diagram-link-ancestor', 'diagram-link-child',
@@ -224,6 +224,8 @@ class HomePage extends PageController {
     this.layoutPanel = null;
     this.layoutOpen = false;
     this.nodes = null;
+    this.collapsedNodes = new Set();
+    this.branchViewKey = null;
     this.connections = [];
     this.hiddenConnections = [];
     this.connectionStyles = [];
@@ -303,7 +305,7 @@ class HomePage extends PageController {
     this.commitName();
     const nodes = this.ensureTree();
     if (nodes.length > 1) return renderTemplate('diagram-tree', {
-      nodes: nodes.map((node) => this.nodeContent(node)).join(''),
+      nodes: this.visibleNodes().map((node) => this.nodeContent(node)).join(''),
     });
     return this.nodeContent(nodes[0]);
   }
@@ -491,6 +493,7 @@ class HomePage extends PageController {
       ...this.nodeTools.content(node),
       topicLink: this.links.badge(node),
       colorStyle: this.colors.css(node),
+      branchToggle: this.branchToggleContent(node),
       colorsLabel: esc(t('diagram_colors')),
       pasteDisabled: this.nodeTools.clipboard() ? '' : 'disabled',
       checkboxNoneLabel: esc(t('diagram_checkbox_none')),
@@ -571,6 +574,90 @@ class HomePage extends PageController {
     return this.nodes;
   }
 
+  syncBranchView() {
+    // Like the camera, folded branches are a personal view, not a document edit.
+    const identity = this.active?.id || this.draft?.client_key;
+    const key = identity ? `diagram-branches:v1:${JSON.stringify([
+      new URL(location.href).pathname, String(S.user?.id || ''), String(identity),
+    ])}` : null;
+    if (key === this.branchViewKey) return;
+    this.branchViewKey = key;
+    this.collapsedNodes = new Set();
+    try {
+      const saved = key ? JSON.parse(localStorage.getItem(key) || '[]') : [];
+      if (Array.isArray(saved)) this.collapsedNodes = new Set(saved.filter(id => typeof id === 'string').slice(0, 200));
+    } catch { /* Storage restrictions must not prevent folding a branch. */ }
+  }
+
+  saveBranchView() {
+    try {
+      if (this.branchViewKey) localStorage.setItem(this.branchViewKey, JSON.stringify([...this.collapsedNodes]));
+    } catch { /* Keep the current view in memory when storage is unavailable. */ }
+  }
+
+  visibleNodes() {
+    this.syncBranchView();
+    const nodes = this.ensureTree(), byId = new Map(nodes.map(node => [node.id, node]));
+    return nodes.filter(node => {
+      let parent = byId.get(node.parent_id);
+      const visited = new Set();
+      while (parent && !visited.has(parent.id)) {
+        if (this.collapsedNodes.has(parent.id)) return false;
+        visited.add(parent.id); parent = byId.get(parent.parent_id);
+      }
+      return true;
+    });
+  }
+
+  branchToggleContent(node) {
+    if (!this.ensureTree().some(child => child.parent_id === node.id)) return '';
+    this.syncBranchView();
+    const expanded = !this.collapsedNodes.has(node.id);
+    const label = esc(t(expanded ? 'diagram_collapse_children' : 'diagram_expand_children', { name: node.text }));
+    const suffix = node.id === 'root' ? '' : `-${esc(node.id)}`;
+    return `<button type="button" class="diagram-handle diagram-branch-toggle" id="diagram-branch${suffix}"
+      data-action="toggle-diagram-branch" aria-expanded="${expanded}" aria-label="${label}" title="${label}">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 3 21 12 7 21Z"/></svg></button>`;
+  }
+
+  revealBranchTo(key) {
+    this.syncBranchView();
+    const byId = new Map(this.ensureTree().map(node => [node.id, node]));
+    let parent = byId.get(byId.get(key)?.parent_id), changed = false;
+    const visited = new Set();
+    while (parent && !visited.has(parent.id)) {
+      changed = this.collapsedNodes.delete(parent.id) || changed;
+      visited.add(parent.id); parent = byId.get(parent.parent_id);
+    }
+    if (changed) this.saveBranchView();
+    return changed;
+  }
+
+  toggleBranch(key) {
+    if ((!this.active && !this.draft) || this.layoutOpen || this.drag || this.resizing ||
+        this.nodeTools.busy || this.viewport.isInteracting() ||
+        !this.ensureTree().some(node => node.parent_id === key)) return;
+    this.element('name')?.blur();
+    this.selectNode(key);
+    this.commitName();
+    const before = this.element('node', key)?.getBoundingClientRect?.();
+    this.syncBranchView();
+    if (this.collapsedNodes.has(key)) {
+      // Expanding shows the entire branch, including previously folded grandchildren.
+      for (const node of this.branchNodes(key)) this.collapsedNodes.delete(node.id);
+    } else this.collapsedNodes.add(key);
+    this.saveBranchView();
+    this.editing = this.menuOpen = false;
+    this.drawStage();
+    const after = this.element('node', key)?.getBoundingClientRect?.();
+    if (before && after) {
+      this.viewport.x += before.left - after.left;
+      this.viewport.y += before.top - after.top;
+      this.viewport.render();
+    }
+    this.element('branch', key)?.focus({ preventScroll: true });
+  }
+
   commitName() {
     const node = this.ensureTree().find((item) => item.id === this.selectedKey);
     if (node) node.text = this.name;
@@ -646,7 +733,8 @@ class HomePage extends PageController {
       this.menuOpen = false;
     }
     this.selected = true;
-    this.syncNodeState();
+    if (this.revealBranchTo(key)) this.drawStage();
+    else this.syncNodeState();
     return true;
   }
 
@@ -770,6 +858,7 @@ class HomePage extends PageController {
 
   drawStage() {
     this.links.hideTooltip();
+    if (this.selected) this.revealBranchTo(this.selectedKey);
     const stage = document.getElementById('mindmap-stage');
     if (stage) stage.innerHTML = this.stageContent();
     this.mount();
@@ -783,7 +872,8 @@ class HomePage extends PageController {
     const enabled = !!(this.active || this.draft);
     stage?.classList.toggle('has-diagram', enabled);
     stage?.classList.toggle('has-tree', this.ensureTree().length > 1);
-    const sizes = Object.fromEntries(this.ensureTree().map((node) => {
+    const visible = this.visibleNodes();
+    const sizes = Object.fromEntries(visible.map((node) => {
       const box = this.element('node', node.id);
       const input = this.element('name', node.id);
       const width = this.nodeWidth(node);
@@ -804,7 +894,7 @@ class HomePage extends PageController {
       return;
     }
     this.commitName();
-    this.plan = DiagramLayout.arrange(this.nodes, sizes, this.connections);
+    this.plan = DiagramLayout.arrange(visible, sizes, this.connections);
     scene.style.width = `${this.plan.width}px`;
     scene.style.height = `${this.plan.height}px`;
     const connections = document.getElementById('diagram-connections');
@@ -1174,6 +1264,7 @@ class HomePage extends PageController {
     if (action === 'toggle-diagram-picker') return this.pickerOpen ? this.closeDiagramPicker(true) : this.openDiagramPicker();
     if (action === 'select-diagram') return this.openDiagram(button.dataset.id);
     if (action === 'retry-diagram') return this.save();
+    if (action === 'toggle-diagram-branch') return this.toggleBranch(this.keyFor(button));
     if (button?.closest?.('.diagram-root') && this.selectNode(this.keyFor(button)) === false) return;
     if (this.nodeTools.busy) return;
     if (action === 'copy-diagram-node') return this.nodeTools.copy();

@@ -470,6 +470,25 @@ button.diagram-handle {
   height: 16px;
 }
 
+.diagram-branch-toggle {
+  left: -40px;
+  top: calc(50% - 16px);
+  width: 32px;
+  height: 32px;
+  z-index: 2;
+  touch-action: manipulation;
+}
+.diagram-branch-toggle::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+}
+.diagram-branch-toggle svg { width: 22px; height: 22px; pointer-events: none; }
+.diagram-branch-toggle[aria-expanded="true"] svg { transform: rotate(90deg); }
+.diagram-branch-toggle:hover { background: linear-gradient(#aaa6b3, #77727f); }
+.diagram-branch-toggle:focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; }
+
 .diagram-handle-more { top: -38px; left: 20px; }
 .diagram-handle-text { top: -38px; right: 20px; }
 .diagram-handle-add { top: calc(50% - 14px); right: -38px; }

@@ -73,6 +73,7 @@
 {{name}}</textarea>
       {{insideLabels}}
     </div>
+    {{branchToggle}}
     {{topicLink}}
     <span id="diagram-interaction-hint{{suffix}}" class="sr-only">{{hint}}</span>
     <div class="diagram-controls" id="diagram-controls{{suffix}}" hidden>

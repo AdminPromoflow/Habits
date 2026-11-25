@@ -37,9 +37,11 @@ class DiagramConnections {
 
   visibleEdges() {
     const home = this.home;
+    const visible = new Set(home.visibleNodes().map(node => node.id));
     return [...home.ensureTree().filter(node => node.parent_id !== null)
       .map(node => ({ from: node.parent_id, to: node.id })), ...home.connections]
-      .filter(edge => !home.hiddenConnections.some(hidden => this.same(edge, hidden)));
+      .filter(edge => visible.has(edge.from) && visible.has(edge.to) &&
+        !home.hiddenConnections.some(hidden => this.same(edge, hidden)));
   }
 
   elements() {

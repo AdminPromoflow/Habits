@@ -161,7 +161,7 @@ class MindSpacePDF {
     host.style.cssText = `position:absolute;left:-100000px;top:0;width:${width}px;height:${height}px;background:white;padding:20px;--ink:#343044;--surface:#fff;--purple-dark:#705795;--lavender:#b8a4d4;--lavender-wash:#f1ecf7;`;
     host.style.backgroundColor = home.colors.background() || '#ffffff';
     clone.style.position = 'relative'; clone.style.left = '0'; clone.style.top = '0'; clone.style.transform = 'none'; clone.style.margin = '0';
-    clone.querySelectorAll('.diagram-controls,.diagram-menu,.diagram-status,.sr-only,.diagram-alignment-guides,.diagram-connection-tools,.diagram-topic-link,.diagram-topic-return').forEach(el => el.remove());
+    clone.querySelectorAll('.diagram-controls,.diagram-branch-toggle,.diagram-menu,.diagram-status,.sr-only,.diagram-alignment-guides,.diagram-connection-tools,.diagram-topic-link,.diagram-topic-return').forEach(el => el.remove());
     clone.querySelectorAll('.is-selected,.is-editing').forEach(el => el.classList.remove('is-selected','is-editing'));
     clone.classList.remove('is-selected','is-editing');
     // Textareas otherwise paint only their scroll viewport, losing wrapped text.

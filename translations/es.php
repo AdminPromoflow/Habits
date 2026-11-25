@@ -502,6 +502,8 @@ return [
     'diagram_saved' => 'Diagrama guardado',
     'diagram_retry' => 'Reintentar',
     'diagram_add_child' => 'Añadir idea hija',
+    'diagram_collapse_children' => 'Ocultar hijos de {name}',
+    'diagram_expand_children' => 'Mostrar hijos de {name}',
     'diagram_add_child_hint' => 'Clic para crear un hijo. Mantén presionado y arrastra a otro cuadro para conectarlos.',
     'diagram_connection_limit' => 'Has alcanzado el límite de 1000 conexiones adicionales.',
     'diagram_connection_label' => 'Conexión de {from} a {to}. Delete o Retroceso elimina solo la línea.',
