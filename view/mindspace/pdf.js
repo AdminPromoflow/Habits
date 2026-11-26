@@ -45,7 +45,7 @@ class MindSpacePDF {
       const pdf = new MindSpacePDF(item, space.spaceName());
       if (item.kind === 'diagram') await pdf.diagram(space.home);
       else if (item.kind === 'spreadsheet') pdf.sheet();
-      else if (item.kind === 'notes') pdf.text(item.content.text || t('ms_pdf_empty'));
+      else if (item.kind === 'notes') pdf.notes();
       else if (item.kind === 'habits') pdf.habits();
       else pdf.board();
       if (!current()) return;
@@ -89,6 +89,19 @@ class MindSpacePDF {
       this.y += lineHeight;
     }
     this.y += gap;
+  }
+
+  notes() {
+    const pages = this.item.content.pages;
+    if (!pages?.length) { this.text(this.item.content.text || t('ms_pdf_empty')); return; }
+    pages.forEach((page,index) => {
+      if (index) this.newPage();
+      if (page.date) {
+        this.doc.setFontSize(10);
+        this.doc.text(page.date,this.width-this.margin,this.y,{align:'right'}); this.y += 8;
+      }
+      if (page.text) this.text(page.text);
+    });
   }
 
   table(head, body, columnStyles = {}) {

@@ -22,6 +22,7 @@ return [
         'view/mindspace/mindspace.css',
         'view/home/diagram-layout-panel.css',
         'view/layout/mobile-document.css',
+        'view/mindspace/notes.css',
         'view/home/diagram-colors.css',
     ],
     'scripts' => [
@@ -43,6 +44,7 @@ return [
         'view/home/diagram-colors.js',
         'view/mindspace/sheet.js',
         'view/mindspace/link-targets.js',
+        'view/mindspace/notes.js',
         'view/mindspace/editors.js',
         'view/mindspace/pdf.js',
         'view/mindspace/mindspace.js',

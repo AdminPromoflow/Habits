@@ -8,8 +8,11 @@ class MindSpace extends PageController {
     this.home = home;
     this.editor = new MindSpaceEditors(this);
     this.reset();
-    for (const type of ['click','dblclick','input','change','focusin','focusout','keydown','copy','paste']) document.addEventListener(type, event => {
-      if (this.enabled() && this.can('edit') && event.target.closest?.('#mindspace-panel')) this.editor.event(type, event);
+    for (const type of ['click','dblclick','beforeinput','input','change','focusin','focusout','keydown','copy','paste','compositionstart','compositionend']) document.addEventListener(type, event => {
+      if (this.enabled() && event.target.closest?.('#mindspace-panel')) {
+        if (this.active?.kind === 'notes') this.editor.notes?.event(type,event);
+        else if (this.can('edit')) this.editor.event(type, event);
+      }
       if (type === 'keydown' && event.target.closest?.('[role="tablist"]') && ['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) {
         const tabs = [...document.querySelectorAll('#mindspace-tabs [role="tab"]')];
         const index = tabs.indexOf(event.target);
@@ -372,6 +375,8 @@ class MindSpace extends PageController {
   renderDiagram(values) { return this.frame(renderTemplate('mindspace-diagram', values)); }
   mount() {
     this.status();
+    if (this.active?.kind === 'notes') this.editor.notes?.mount();
+    else this.editor.notes?.observer?.disconnect();
     MindSpaceLinkTargets.arrive(this);
     document.querySelector('#mindspace-tabs [aria-selected="true"]')?.scrollIntoView({ block:'nearest', inline:'nearest' });
   }

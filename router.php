@@ -20,7 +20,7 @@ if (
 }
 if (
     preg_match(
-        '~^/(?:assets|view)/(?:[a-zA-Z0-9_-]+/)*[a-zA-Z0-9_.-]+\.(css|js|svg|png|woff2)$~D',
+        '~^/(?:assets|view)/(?:[a-zA-Z0-9_-]+/)*[a-zA-Z0-9_.-]+\.(css|js|svg|png|woff2|ttf)$~D',
         $path,
     ) &&
     is_file(__DIR__ . $path)

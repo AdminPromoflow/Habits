@@ -28,7 +28,7 @@ class MindSpaceEditors {
   }
   render() {
     const space = this.space, kind = space.active.kind;
-    if (kind === 'notes') return `<div class="ms-notes"><textarea data-ms-notes aria-label="${esc(t('ms_note_body'))}" placeholder="${esc(t('ms_note_placeholder'))}" maxlength="200000">${esc(space.draft.text || '')}</textarea></div>`;
+    if (kind === 'notes') { this.notes ||= new MindSpaceNotes(space); return this.notes.render(); }
     if (kind === 'spreadsheet') return this.sheet();
     if (kind === 'habits') return this.habits();
     return this.board();
@@ -36,6 +36,7 @@ class MindSpaceEditors {
   refresh() {
     const panel = document.getElementById('mindspace-panel');
     if (panel) panel.innerHTML = this.render();
+    if (this.space.active?.kind === 'notes') this.notes?.mount();
     this.space.status();
     if (S.sharedWorkspace) mountSharedWorkspace();
   }
@@ -530,7 +531,6 @@ class MindSpaceEditors {
   }
   event(type, event) {
     const input = event.target, space = this.space;
-    if (type === 'input' && input.matches?.('[data-ms-notes]')) { space.draft.text = input.value; space.changed(); }
     if (type === 'change' && input.dataset.msCardStatus) this.moveCard(input.dataset.msCardStatus, input.value);
     if (type === 'change' && input.matches?.('[data-ms-habit-date]')) { S.date = input.value || today(); this.refresh(); }
     const key = input.dataset.msCell;

@@ -59,6 +59,10 @@ Los enlaces duran 30 minutos y solo pueden usarse una vez. Pedir un enlace no ca
 
 ## Git y despliegues
 
+Desde el 25 de noviembre de 2026, la usuaria publica los cambios desde su terminal mediante Git. Dejar las modificaciones en el proyecto local, sin crear paquetes ZIP, carpetas de builds ni subir archivos de aplicación a Hostinger. Revisar e indicar si cada cambio requiere migraciones de base de datos. El ajuste de posición y centrado de las flechas de desplazamiento solo modifica CSS y no requiere cambios de base de datos.
+
+Se retiraron a la papelera de Hostinger los siete ZIP históricos de `.builds` (planner, categories, week, note, note-fullscreen, flags-scroll y scroll-center), conservando `logs`. También se eliminaron sus copias temporales locales; las referencias posteriores a esos paquetes son un registro histórico.
+
 Para los enlaces entre diagramas/cuadros, aplicar `012_diagram_node_links.sql` antes de habilitar el modelo actualizado. Se aplicó en esta instalación el 24 de noviembre de 2026, conservando dos diagramas y quince nodos. El guardado pendiente del enlace en Safari pasó de `error_database` a «Diagram saved» al reintentar después de añadir `link_json`.
 
 Para la selección voluntaria de categorías, aplica `004_category_choices.sql` antes de desplegar esa versión. Conserva inscripciones de categorías globales que ya tengan hábitos/rutinas; las categorías privadas propias permanecen disponibles. El catálogo global se conserva en Hostinger, mientras que cada usuario elige en Ajustes cuáles añadir. En Mis hábitos se muestran las categorías con hábitos, y cada una abre su tablero semanal.
@@ -86,6 +90,8 @@ El modelo documentado desde las migraciones está en [database-model](database-m
 Para esta instalación, verificar siempre la base publicada desde Hostinger/phpMyAdmin en Chrome al revisar cambios o incidencias; las pruebas locales no sustituyen esa comprobación. Utilizar consultas de solo lectura para revisar migraciones, columnas y datos, y comprobar también la carga real del sitio.
 
 ### Hoja diaria de tareas — 25 de noviembre de 2026
+
+Las flechas globales se centraron horizontalmente en `main` (o en el documento ampliado) mediante `.builds/mrm-scroll-center-20261125.zip`, con dos archivos y SHA-256 `329ec41f171f55e70f88aaed14c3795303fddc999ce204b4ec8930dbeadf0322`. Se comprobó localmente que ambas coinciden con el centro del contenido en vista normal y pantalla completa. Chrome confirmó la posición centrada tras publicar y recargar en Hostinger. Evidencia: `tests/.runtime/scroll-centered-hostinger.png`.
 
 Se publicaron las banderitas de categoría y las flechas globales de desplazamiento mediante `.builds/mrm-flags-scroll-20261125.zip` (ocho archivos; SHA-256 `c3a3901d1ebca6014e552d89e30f1b089001c1f5e813d167f54c375f86c6145e`). Cada banderita aparece entre checkbox y tarea, usa el color de la categoría y muestra su nombre hacia la derecha al pasar el mouse, enfocar o tocar. Las flechas globales van al inicio/final de `main`, o del documento ampliado, y se ocultan en cada extremo o cuando no hay contenido que desplazar; el pie de página por sí solo no las activa.
 

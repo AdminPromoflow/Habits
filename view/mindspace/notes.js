@@ -4,14 +4,14 @@
 // and dated pages start a new passage, so editing earlier text cannot erase them.
 class MindSpaceNotes {
   static LIMIT = 200000;
-  static MAX_PAGES = 2000;
+  static MAX_PAGES = 20000;
   constructor(space) { this.space = space; this.index = 0; this.pages = []; }
   static pages(content) {
     return content.pages?.length ? content.pages.map(page => ({...page}))
       : [{text:content.text || '', date:null, manual:true}];
   }
   static text(pages) {
-    return pages.reduce((text,page,index) => text + (index && page.manual && !text.endsWith('\n') && !page.text.startsWith('\n') ? '\n' : '') + page.text, '');
+    return pages.reduce((text,page,index) => text + (index && page.manual && (!text.endsWith('\n') || !pages[index-1].text) && !page.text.startsWith('\n') ? '\n' : '') + page.text, '');
   }
   static paginate(text, fits) {
     if (!text) return [''];
@@ -70,8 +70,9 @@ class MindSpaceNotes {
     this.input = this.root.querySelector('[data-ms-notes]');
     this.measure = this.root.querySelector('.ms-note-measure');
     this.reflow(); this.show();
+    if (this.historyItem !== this.itemId) { this.historyItem = this.itemId; this.history = [this.snapshot()]; this.historyIndex = 0; }
     const root = this.root;
-    document.fonts?.ready.then(() => { if (root.isConnected && this.root === root) { this.reflow(this.anchor()); this.show(); } });
+    this.afterFonts();
     if (typeof ResizeObserver !== 'undefined') {
       let width = this.input.clientWidth;
       this.observer = new ResizeObserver(() => {
@@ -82,8 +83,18 @@ class MindSpaceNotes {
     }
   }
   anchor() {
-    return {page:this.index, start:this.input?.selectionStart || 0, end:this.input?.selectionEnd || 0,
-      direction:this.input?.selectionDirection || 'none', focus:document.activeElement === this.input};
+    const focus = document.activeElement === this.input;
+    return {page:this.index, start:focus ? this.input.selectionStart : 0, end:focus ? this.input.selectionEnd : 0,
+      direction:this.input?.selectionDirection || 'none', focus};
+  }
+  afterFonts(save = false) {
+    const root = this.root;
+    document.fonts?.ready.then(() => {
+      if (root.isConnected && this.root === root && !this.composing) {
+        this.reflow(this.anchor()); this.show();
+        if (save && this.space.can('edit')) this.commit();
+      }
+    });
   }
   reflow(anchor = {page:this.index, start:0, end:0}) {
     if (!this.input.clientWidth) return;
@@ -134,6 +145,25 @@ class MindSpaceNotes {
   }
   commit() {
     this.space.draft = {...this.space.draft, font:this.space.draft.font || 'edwardian', pages:this.pages.map(page => ({...page})), text:MindSpaceNotes.text(this.pages)};
+    const snapshot = this.snapshot();
+    if (snapshot !== this.history?.[this.historyIndex]) {
+      this.history = (this.history || []).slice(0,(this.historyIndex || 0)+1);
+      this.history.push(snapshot); if (this.history.length > 40) this.history.shift();
+      this.historyIndex = this.history.length-1;
+    }
+    this.space.changed();
+  }
+  snapshot() { return JSON.stringify({pages:this.pages, font:this.space.draft.font || 'edwardian', index:this.index}); }
+  undo(direction) {
+    const index = this.historyIndex + direction;
+    if (!this.history?.[index]) return;
+    this.historyIndex = index;
+    const saved = JSON.parse(this.history[index]); this.pages = saved.pages; this.index = saved.index;
+    this.space.draft.font = saved.font; this.root.dataset.noteFont = saved.font;
+    this.root.querySelector('[data-note-font-choice]').value = saved.font;
+    const end = this.pages[this.index].text.length;
+    this.reflow({page:this.index,start:end,end,focus:true}); this.show();
+    this.space.draft = {...this.space.draft, pages:this.pages.map(page => ({...page})), text:MindSpaceNotes.text(this.pages)};
     this.space.changed();
   }
   edit() {
@@ -169,6 +199,9 @@ class MindSpaceNotes {
       }
     }
     if (!editable) return;
+    if (type === 'beforeinput' && ['historyUndo','historyRedo'].includes(event.inputType)) {
+      event.preventDefault(); this.undo(event.inputType === 'historyUndo' ? -1 : 1); return;
+    }
     if (type === 'compositionstart') this.composing = true;
     if (type === 'compositionend') { this.composing = false; this.edit(); }
     if (type === 'input' && target === this.input) {
@@ -178,11 +211,15 @@ class MindSpaceNotes {
     if (type === 'change' && target.matches('[data-note-font-choice]')) {
       const anchor = this.anchor(); this.space.draft.font = target.value;
       this.root.dataset.noteFont = target.value; this.reflow(anchor); this.show(); this.commit();
+      this.afterFonts(true);
     }
     if (type === 'change' && target.matches('[data-note-date]') && target.validity.valid) {
       this.pages[this.index].date = target.value || null; this.pages[this.index].manual = true; this.show(); this.commit();
     }
     if (type === 'keydown' && target === this.input && !event.isComposing && !this.composing) {
+      if ((event.metaKey || event.ctrlKey) && ['z','y'].includes(event.key.toLowerCase())) {
+        event.preventDefault(); this.undo(event.shiftKey || event.key.toLowerCase() === 'y' ? 1 : -1); return;
+      }
       const start = target.selectionStart, end = target.selectionEnd;
       if (start !== end) return;
       if (event.key === 'ArrowLeft' && start === 0 && this.index) { event.preventDefault(); this.turn(this.index-1,this.pages[this.index-1].text.length); }

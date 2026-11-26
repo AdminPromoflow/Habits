@@ -231,7 +231,7 @@ final class MindSpacesModel extends BaseModel
         }
         $content = match ($kind) {
             'folder' => new stdClass(),
-            'notes' => ['text' => ''],
+            'notes' => ['text' => '', 'font' => 'edwardian', 'pages' => [['text' => '', 'date' => null, 'manual' => true]]],
             'spreadsheet' => self::newSheet($data),
             'habits' => ['habit_ids' => []],
             default => ['cards' => [], 'columns' => self::defaultColumns(), 'sprint' => ['name' => '', 'goal' => '', 'start' => null, 'end' => null]],
@@ -328,11 +328,38 @@ final class MindSpacesModel extends BaseModel
         return $clean;
     }
 
+    private static function noteContent(array $data): array
+    {
+        $font = Validate::choice($data['font'] ?? 'edwardian', ['edwardian', 'roboto']);
+        // Old clients and existing notes may still send a single text field.
+        if (!array_key_exists('pages', $data)) return ['text' => self::text($data['text'] ?? '', 200000), 'font' => $font];
+        if (!is_array($data['pages']) || !array_is_list($data['pages']) || !count($data['pages']) || count($data['pages']) > 20000) fail('error_validation');
+        $pages = []; $text = ''; $length = 0;
+        foreach ($data['pages'] as $index => $page) {
+            if (!is_array($page)) fail('error_validation');
+            $body = self::text($page['text'] ?? '', 200000);
+            $date = $page['date'] ?? null;
+            if ($date !== null) {
+                $date = Validate::date($date);
+                if ($date < '1000-01-01' || $date > '9998-12-31') fail('error_date');
+            }
+            $manual = $page['manual'] ?? false;
+            if (!is_bool($manual)) fail('error_validation');
+            if ($index === 0 || $date !== null) $manual = true;
+            $separator = $index && $manual && (!str_ends_with($text, "\n") || $pages[$index-1]['text'] === '') && !str_starts_with($body, "\n") ? "\n" : '';
+            $length += mb_strlen($body) + strlen($separator);
+            if ($length > 200000) fail('error_validation');
+            $text .= $separator . $body;
+            $pages[] = ['text' => $body, 'date' => $date, 'manual' => $manual];
+        }
+        return ['text' => $text, 'font' => $font, 'pages' => $pages];
+    }
+
     private function content(string $kind, mixed $data, array $existing = []): array
     {
         if (!is_array($data)) fail('error_validation');
         if ($kind === 'folder') return [];
-        if ($kind === 'notes') return ['text' => self::text($data['text'] ?? '', 200000)];
+        if ($kind === 'notes') return self::noteContent($data);
         if ($kind === 'spreadsheet') {
             $rows = $data['rows'] ?? null; $columns = $data['columns'] ?? null; $cells = $data['cells'] ?? null;
             if (!is_int($rows) || $rows < 1 || $rows > 200 || !is_int($columns) || $columns < 1 || $columns > 52 || !is_array($cells) || count($cells) > 10400) fail('error_validation');

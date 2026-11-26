@@ -49,6 +49,15 @@ test('wide spreadsheets include the last column and calculated values across pag
   artifact(pdf, 'wide-sheet');
 });
 
+test('notebook exports preserve optional dates, manual blank pages and all text', () => {
+  const {PDF} = setup(), pdf = new PDF({name:'Cuaderno',kind:'notes',content:{pages:[
+    {text:'Primera idea',date:'2026-11-25'}, {text:'',date:null}, {text:'Última idea',date:'2026-12-01'},
+  ]}},'Mi espacio');
+  const text = capture(pdf); pdf.notes();
+  assert.equal(pdf.doc.getNumberOfPages(),3);
+  for (const phrase of ['Primera idea','Última idea','2026-11-25','2026-12-01']) assert.ok(text.includes(phrase));
+});
+
 test('long table cells split without dropping subsequent rows', () => {
   const {PDF} = setup(), pdf = new PDF({name:'Filas largas',kind:'spreadsheet',content:{rows:3,columns:6,cells:{A1:'Descripción',A2:'Información '.repeat(160),A3:'FILA FINAL',F1:'Total',F3:'=2+3'}}}, 'Mi MindSpace');
   const text = capture(pdf); pdf.sheet();

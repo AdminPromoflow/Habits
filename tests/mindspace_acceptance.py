@@ -36,6 +36,15 @@ def run(owner, stranger, guest, check):
  check(current(note['id'])['content']['text']==literal and saved['version']==2, 'Notes preserve text and whitespace across reloads')
  call('saveMindSpaceItem',{'id':note['id'],'version':1,'content':{'text':'stale'}},409)
  check(current(note['id'])['content']['text']==literal, 'Concurrent stale edits cannot overwrite newer content')
+ notebook=create('notes','Cuaderno de prueba')
+ check(notebook['content']['font']=='edwardian' and notebook['content']['pages']==[{'text':'','date':None,'manual':True}], 'New notes start with Edwardian and a blank undated page')
+ pages=[{'text':'Primera hoja\n\n  acción 👩🏽‍💻','date':'2026-11-25','manual':True},{'text':' continuación','date':None,'manual':False},{'text':'','date':None,'manual':True},{'text':'Otra idea','date':'2026-12-01','manual':True}]
+ notebook=save(notebook,{'text':'stale preview','font':'roboto','pages':pages})
+ persisted=current(notebook['id'])['content']
+ check(persisted['pages']==pages and persisted['font']=='roboto' and persisted['text']=='Primera hoja\n\n  acción 👩🏽‍💻 continuación\n\nOtra idea', 'Notes preserve dates, Unicode, blank manual pages and font across API reloads')
+ for invalid in [{'font':'script'},{'pages':[]},{'pages':[{'text':'x','date':'2026-02-30'}]},{'pages':[{'text':'x','manual':'yes'}]},{'pages':[{'text':'x'*100001},{'text':'x'*100000}]}]:
+  call('saveMindSpaceItem',{'id':notebook['id'],'version':notebook['version'],'content':invalid},422)
+ check(current(notebook['id'])['content']==persisted, 'Invalid notebook fonts, dates, pages and excessive total text are rejected without changing the saved note')
  for dest in [root['id'],child['id'],deep['id']]: move(root,dest,422)
  move(child,note['id'],422)
  check(current(root['id'])['parent_id'] is None, 'Moving a folder into itself, descendants or a document is rejected without changing the tree')
