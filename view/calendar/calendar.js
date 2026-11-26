@@ -179,6 +179,35 @@ function plannerEntryColor(entry) {
   return plannerEntryCategory(entry).color;
 }
 
+function plannerCategoryKey(entry) {
+  return entry.category_id ? String(Number(entry.category_id)) : 'none';
+}
+
+function plannerFilterCategories() {
+  const categories = new Map((S.data.categories || []).map(category => [String(Number(category.id)),plannerEntryCategory({category_id:category.id})]));
+  const entries = [...(S.data.calendar?.tasks || []),...(S.data.habits || []).filter(habit => habit.status === 'active' && habit.permission !== 'viewer')];
+  for (const entry of entries) {
+    const key = plannerCategoryKey(entry);
+    if (!categories.has(key)) categories.set(key,plannerEntryCategory(entry));
+  }
+  return [...categories].map(([key,category]) => ({key,...category})).sort((a,b) => a.name.localeCompare(b.name,S.language));
+}
+
+function plannerNoteEntries(date) {
+  return plannerEntries(date).filter(entry => !S.plannerCategory || plannerCategoryKey(entry) === S.plannerCategory);
+}
+
+function plannerFlagIcon() {
+  return '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="flag-cloth" d="M5 4c5-3 9 3 14 0v10c-5 3-9-3-14 0Z"/><path class="flag-pole" d="M5 3v18"/></svg>';
+}
+
+function plannerCategoryFilters() {
+  const categories = plannerFilterCategories();
+  if (S.plannerCategory && !categories.some(category => category.key === S.plannerCategory)) { S.plannerCategory = ''; S.plannerPage = 0; }
+  const options = [{key:'',name:t('planner_all_tasks'),color:'#87947A'},...categories];
+  return `<div class="planner-category-filters" role="group" aria-label="${esc(t('planner_filter_category'))}">${options.map(category => `<button type="button" class="planner-category-filter" data-action="planner-filter-category" data-category="${category.key}" style="--planner-color:${category.color}" aria-pressed="${(S.plannerCategory || '') === category.key}" aria-controls="planner-note-entries" title="${esc(category.name)}">${plannerFlagIcon()}<span>${esc(category.name)}</span></button>`).join('')}</div>`;
+}
+
 function plannerEntry(entry, date, compact = false) {
   const isHabit = entry.kind === 'habit', color = plannerEntryColor(entry);
   return `<article class="planner-entry ${entry.completed ? 'is-done' : ''} ${isHabit ? 'is-habit' : 'is-task'} ${compact ? 'compact' : ''}" style="--planner-color:${color}">
@@ -215,18 +244,19 @@ function plannerNoteRow(entry, date, lines = 1, measure = false) {
   const disabled = date > today() || (isHabit && entry.permission === 'viewer');
   return `<div class="planner-note-row ${entry.completed ? 'is-done' : ''}" style="--planner-color:${category.color};--note-lines:${lines}" ${measure ? 'data-note-measure' : `data-note-entry="${key}"`}>
     ${measure ? '<span class="planner-note-check"></span>' : `<button class="planner-note-check" data-action="${isHabit ? 'toggle-habit' : 'planner-complete'}" data-id="${entry.id}" data-date="${date}" aria-label="${esc(t('record_progress')+': '+entry.name)}" aria-pressed="${entry.completed}" ${disabled ? 'disabled' : ''}>${entry.completed ? icon('check') : ''}</button>`}
-    <span class="planner-note-category">${measure ? '' : `<button type="button" class="planner-note-flag" aria-label="${esc(t('category'))}" aria-describedby="${tooltipId}"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="flag-cloth" d="M5 4c5-3 9 3 14 0v10c-5 3-9-3-14 0Z"/><path class="flag-pole" d="M5 3v18"/></svg></button><span class="planner-note-category-tooltip" role="tooltip" id="${tooltipId}">${esc(category.name)}</span>`}</span>
+    <span class="planner-note-category">${measure ? '' : `<button type="button" class="planner-note-flag" aria-label="${esc(t('category'))}" aria-describedby="${tooltipId}">${plannerFlagIcon()}</button><span class="planner-note-category-tooltip" role="tooltip" id="${tooltipId}">${esc(category.name)}</span>`}</span>
     ${measure ? `<span class="planner-note-name">${esc(entry.name)}</span>` : `<button class="planner-note-name" data-action="${edit}" data-id="${entry.id}" data-date="${date}">${esc(entry.name)}</button>`}
     <time class="planner-note-time">${entry.scheduled_time?.slice(0,5) || ''}</time>
   </div>`;
 }
 
 function plannerNoteSheet() {
-  const entries = plannerEntries(S.date);
+  const filters = plannerCategoryFilters(), entries = plannerNoteEntries(S.date);
   return `<button class="planner-note-back" data-action="planner-calendar-toggle" aria-label="${esc(t('planner_open_month'))}" title="${esc(t('planner_open_month'))}">${icon('chevron','flip')}</button>
     <time class="planner-note-date" datetime="${S.date}">${esc(fmt(S.date,{day:'numeric',month:'short',year:'numeric'}))}</time>
     <h2 class="planner-note-title" id="planner-note-title" tabindex="-1">Tareas</h2>
-    <div class="planner-note-lines" aria-label="${esc(fmt(S.date,{dateStyle:'full'}))}"></div>
+    ${filters}
+    <div class="planner-note-lines" id="planner-note-entries" aria-live="polite" aria-label="${esc(fmt(S.date,{dateStyle:'full'}))}"></div>
     <div class="planner-note-measure" aria-hidden="true">${entries.map(entry => plannerNoteRow(entry,S.date,1,true)).join('')}</div>
     <button class="planner-note-arrow previous" data-action="planner-note-prev" aria-label="${esc(t('planner_previous_sheet'))}">${icon('chevron','flip')}</button>
     <button class="planner-note-arrow next" data-action="planner-note-next" aria-label="${esc(t('planner_next_sheet'))}">${icon('chevron')}</button>
@@ -261,7 +291,7 @@ function calendarPage() {
 
 class CalendarPage extends PageController {
   constructor() {
-    super(['date-prev','date-next','today','pick-date','calendar-date','planner-calendar-toggle','planner-month-prev','planner-month-next','planner-note-date','planner-note-prev','planner-note-next','planner-add','planner-edit','planner-delete','planner-delete-habit','planner-edit-habit','planner-complete']);
+    super(['date-prev','date-next','today','pick-date','calendar-date','planner-calendar-toggle','planner-month-prev','planner-month-next','planner-note-date','planner-note-prev','planner-note-next','planner-filter-category','planner-add','planner-edit','planner-delete','planner-delete-habit','planner-edit-habit','planner-complete']);
     document.addEventListener('change',event => {
       if (event.target.id !== 'planner-note-month' || !/^\d{4}-\d{2}$/.test(event.target.value) || !event.target.validity.valid) return;
       S.plannerMonth = event.target.value; render(); $('#planner-note-month')?.focus({preventScroll:true});
@@ -284,7 +314,7 @@ class CalendarPage extends PageController {
     this.unmount();
     const note = $('.planner-note[data-mode="note"]');
     if (!note) return;
-    const entries = plannerEntries(S.date);
+    const entries = plannerNoteEntries(S.date);
     const layout = () => {
       if (!note.isConnected) return;
       const lineHeight = $('.planner-note-lines',note).getBoundingClientRect().height / PLANNER_NOTE_LINES;
@@ -292,7 +322,7 @@ class CalendarPage extends PageController {
       this.notePages = plannerNotePages(entries,counts);
       const last = this.notePages.length-1;
       S.plannerPage = S.plannerPage === -1 ? last : Math.min(last,Math.max(0,S.plannerPage || 0));
-      const content = this.notePages[S.plannerPage].map(({entry,lines})=>plannerNoteRow(entry,S.date,lines)).join('');
+      const content = this.notePages[S.plannerPage].map(({entry,lines})=>plannerNoteRow(entry,S.date,lines)).join('') || (S.plannerCategory ? `<p class="planner-note-empty">${esc(t('planner_category_empty'))}</p>` : '');
       const list = $('.planner-note-lines',note);
       if (list.innerHTML !== content) list.innerHTML = content;
       const pageLabel = t('planner_sheet_count',{page:S.plannerPage+1,count:this.notePages.length});
@@ -308,6 +338,17 @@ class CalendarPage extends PageController {
   }
 
   async handleAction(action, el, id) {
+    if (action === 'planner-filter-category') {
+      const category = el.dataset.category || '';
+      if (category && !plannerFilterCategories().some(item => item.key === category)) return;
+      const scroll = $('.planner-category-filters')?.scrollLeft || 0;
+      S.plannerCategory = category; S.plannerPage = 0;
+      render();
+      const filters = $('.planner-category-filters');
+      if (filters) filters.scrollLeft = scroll;
+      $('.planner-category-filter[aria-pressed="true"]')?.focus({preventScroll:true});
+      return;
+    }
     if (action === 'planner-add') return plannerForm(null,{start_date:el.dataset.date || S.date,scheduled_time:el.dataset.time || '',category_id:el.dataset.category || null});
     if (action === 'planner-edit-habit') {
       const habit = S.data.habits.find(h => Number(h.id) === id);

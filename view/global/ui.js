@@ -14,6 +14,7 @@ const S = {
   plannerMode: 'note',
   plannerPage: 0,
   plannerMonth: '',
+  plannerCategory: '',
   filter: { category: '', routine: '', status: 'active', search: '' },
   sharingTab: 'all',
   sharePerson: null,

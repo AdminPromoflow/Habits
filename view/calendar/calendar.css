@@ -10,6 +10,15 @@
 .mobile-document-surface.planner-notebook .planner-note { width:min(100%,820px); }
 .planner-note-title { position:absolute; top:6.5%; left:28%; width:44%; height:14.5%; display:flex; align-items:center; justify-content:center; background:#fffffe; color:#242722; font:400 clamp(38px,10cqw,72px)/1 'Snell Roundhand','Segoe Script','URW Chancery L',cursive; letter-spacing:0; text-align:center; margin:0; }
 .planner-note-title:focus { outline:none; }
+.planner-note[data-mode="note"] .planner-note-title { height:9%; }
+.planner-category-filters { position:absolute; top:15.6%; left:10.4%; right:10.2%; height:5.8%; display:flex; align-items:center; gap:5px; overflow-x:auto; overscroll-behavior-x:contain; scrollbar-width:thin; scrollbar-color:#d5dacd transparent; }
+.planner-category-filter { display:flex; align-items:center; gap:4px; flex:none; max-width:clamp(90px,23cqw,145px); min-height:24px; height:clamp(24px,5.2cqw,32px); padding:2px 7px; border:1px solid transparent; border-radius:6px; color:#74786e; font-size:clamp(10px,1.9cqw,12px); line-height:1.2; }
+.planner-category-filter span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.planner-category-filter svg { flex:none; width:17px; height:19px; color:var(--planner-color); }
+.planner-category-filter:hover { background:#f2f3ef; color:#42483b; }
+.planner-category-filter[aria-pressed="true"] { border-color:color-mix(in srgb,var(--planner-color) 60%,#74786e); background:color-mix(in srgb,var(--planner-color) 15%,#fffffe); color:#30382b; font-weight:600; }
+.planner-category-filter:focus-visible { outline:2px solid #747e68; outline-offset:-2px; }
+.planner-note-empty { margin:0; padding:0 5px; color:#85877f; font-size:clamp(11px,2.3cqw,14px); line-height:var(--note-rule); }
 .planner-note-back, .planner-note-date, .planner-note-today { position:absolute; top:5.2%; z-index:1; }
 .planner-note-back { left:18%; display:grid; place-items:center; width:28px; height:28px; padding:5px; color:#7b7e73; border-radius:50%; }
 .planner-note-back:hover { background:#f2f3ef; color:#33372d; }
@@ -27,8 +36,8 @@
 .planner-note-category:hover, .planner-note-category:focus-within { z-index:5; }
 .planner-note-flag { display:grid; place-items:center; width:100%; height:100%; padding:0; color:var(--planner-color); cursor:help; }
 .planner-note-flag svg { width:18px; height:20px; overflow:visible; }
-.planner-note-flag .flag-cloth { fill:currentColor; stroke:color-mix(in srgb,currentColor 75%,#54594d); stroke-width:1; stroke-linejoin:round; }
-.planner-note-flag .flag-pole { fill:none; stroke:color-mix(in srgb,currentColor 65%,#54594d); stroke-width:1.6; stroke-linecap:round; }
+.planner-note-flag .flag-cloth, .planner-category-filter .flag-cloth { fill:currentColor; stroke:color-mix(in srgb,currentColor 75%,#54594d); stroke-width:1; stroke-linejoin:round; }
+.planner-note-flag .flag-pole, .planner-category-filter .flag-pole { fill:none; stroke:color-mix(in srgb,currentColor 65%,#54594d); stroke-width:1.6; stroke-linecap:round; }
 .planner-note-category-tooltip { position:absolute; left:calc(100% + 6px); top:50%; width:max-content; max-width:min(240px,52cqw); padding:7px 11px; border:1px solid #e7e8e2; border-left:3px solid var(--planner-color); border-radius:8px; background:#fffffe; color:#42483b; box-shadow:0 4px 16px #30382818; font-size:12px; font-weight:500; line-height:1.4; white-space:normal; overflow-wrap:anywhere; text-align:left; visibility:hidden; opacity:0; transform:translate(4px,-50%); transition:opacity .15s,transform .15s,visibility .15s; }
 .planner-note-category-tooltip::before { content:''; position:absolute; right:100%; top:0; width:9px; height:100%; }
 .planner-note-category:hover .planner-note-category-tooltip, .planner-note-category:focus-within .planner-note-category-tooltip { visibility:visible; opacity:1; transform:translate(0,-50%); }
