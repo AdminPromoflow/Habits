@@ -38,14 +38,15 @@ class MindSpacePDF {
     space.pdfBusy = true; button.disabled = true; button.setAttribute('aria-busy', 'true');
     button.textContent = t('ms_pdf_preparing');
     try {
-      await this.libraries(space.isDiagram());
+      await this.libraries(space.isDiagram() || space.active.kind === 'notes');
+      if (space.active?.kind === 'notes') await window.document?.fonts?.ready;
       if (!current() || !await space.flush() || !current()) return;
       const item = JSON.parse(JSON.stringify({...space.active, content:space.draft}));
       if (item.kind === 'diagram') item.name = space.home.titleName();
       const pdf = new MindSpacePDF(item, space.spaceName());
       if (item.kind === 'diagram') await pdf.diagram(space.home);
       else if (item.kind === 'spreadsheet') pdf.sheet();
-      else if (item.kind === 'notes') pdf.notes();
+      else if (item.kind === 'notes') await pdf.notes(this.noteSnapshot(space));
       else if (item.kind === 'habits') pdf.habits();
       else pdf.board();
       if (!current()) return;
@@ -61,7 +62,7 @@ class MindSpacePDF {
 
   constructor(item, spaceName) {
     this.item = item; this.spaceName = spaceName;
-    this.doc = new window.jspdf.jsPDF({orientation:['spreadsheet','diagram'].includes(item.kind) ? 'landscape' : 'portrait', unit:'mm', format:'a4', compress:true, putOnlyUsedFonts:true});
+    this.doc = new window.jspdf.jsPDF({orientation:['spreadsheet','diagram'].includes(item.kind) ? 'landscape' : 'portrait', unit:'mm', format:item.kind === 'notes' ? [210,210 * 1272 / 902] : 'a4', compress:true, putOnlyUsedFonts:true});
     this.doc.addFileToVFS('NotoSans-Regular.ttf', window.MindSpacePDFFont);
     this.doc.addFont('NotoSans-Regular.ttf', 'NotoSans', 'normal');
     this.doc.setFont('NotoSans', 'normal');
@@ -70,6 +71,7 @@ class MindSpacePDF {
     this.height = this.doc.internal.pageSize.getHeight();
     this.margin = 16; this.bottom = this.height - 18;
     this.y = 20;
+    if (item.kind === 'notes') return;
     this.doc.setTextColor(112, 87, 149);
     this.text(item.name, 20, 3);
     this.doc.setTextColor(100, 95, 110);
@@ -91,17 +93,62 @@ class MindSpacePDF {
     this.y += gap;
   }
 
-  notes() {
-    const pages = this.item.content.pages;
-    if (!pages?.length) { this.text(this.item.content.text || t('ms_pdf_empty')); return; }
-    pages.forEach((page,index) => {
+  static noteSnapshot(space) {
+    const editor = space.editor?.notes, paper = editor?.root?.querySelector('.ms-note-paper');
+    if (!paper?.isConnected || editor.itemId !== space.active.id) throw new Error('Note is not mounted');
+    // Use the displayed pages, including reflow after resizing and legacy notes.
+    // Snapshot once so later edits or page turns cannot change a running export.
+    const style = element => {
+      const computed = getComputedStyle(element);
+      const properties = ['position','top','left','right','width','height','padding','margin','color','font-family','font-size','font-weight','font-style','line-height','letter-spacing','word-spacing','white-space','overflow-wrap','word-break','tab-size','text-align','text-transform','font-variant-numeric'];
+      return properties.map(name => `${name}:${computed.getPropertyValue(name)}`).join(';');
+    };
+    const date = paper.querySelector('.ms-note-date-area'), dateInput = date.querySelector('input');
+    const dateStyle = getComputedStyle(date), inputStyle = dateInput && getComputedStyle(dateInput);
+    const bounds = paper.getBoundingClientRect();
+    return {
+      width:bounds.width, height:bounds.height, image:paper.querySelector('.planner-note-art').src,
+      pages:editor.pages.map(page => ({...page})), writingStyle:style(editor.input),
+      counterStyle:style(paper.querySelector('.planner-note-page')),
+      dateStyle:`position:absolute;top:${dateStyle.top};right:${dateStyle.right};height:${dateStyle.height};display:flex;align-items:center;justify-content:flex-end;color:${dateStyle.color};font:400 ${inputStyle?.fontSize || '14px'} 'MRM Roboto',sans-serif`,
+    };
+  }
+
+  async noteCanvas(snapshot, page, index) {
+    // Freeze computed pixel sizes: html2canvas does not resolve cqw units.
+    // Render static text so the PDF contains no cursor, placeholders or controls.
+    const host = document.createElement('div'); host.id = 'ms-pdf-note'; host.setAttribute('aria-hidden','true');
+    host.style.cssText = `position:absolute;left:-100000px;top:0;width:${snapshot.width}px;height:${snapshot.height}px;overflow:hidden;pointer-events:none;background:transparent;`;
+    const writing = document.createElement('div'); writing.textContent = page.text;
+    writing.style.cssText = snapshot.writingStyle + ';border:0;background:transparent;overflow:hidden;box-sizing:border-box;';
+    const counter = document.createElement('span'); counter.textContent = t('planner_sheet_count',{page:index+1,count:snapshot.pages.length}); counter.style.cssText = snapshot.counterStyle;
+    host.append(writing,counter);
+    if (page.date) {
+      const date = document.createElement('time'); date.dateTime = page.date;
+      date.textContent = new Intl.DateTimeFormat(undefined,{day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date(page.date+'T12:00:00'));
+      date.style.cssText = snapshot.dateStyle; host.append(date);
+    }
+    document.body.append(host);
+    try {
+      return await window.html2canvas(host, {
+        backgroundColor:null, logging:false, width:snapshot.width, height:snapshot.height,
+        scale:1804 / snapshot.width,
+        onclone:doc => { doc.getElementById(host.id).style.left = '0'; },
+      });
+    } finally { host.remove(); }
+  }
+
+  async notes(snapshot) {
+    const image = new Image(); image.src = snapshot.image; await image.decode();
+    await document.fonts.load("14px 'MRM Roboto'");
+    for (const [index,page] of snapshot.pages.entries()) {
+      const canvas = await this.noteCanvas(snapshot,page,index);
       if (index) this.newPage();
-      if (page.date) {
-        this.doc.setFontSize(10);
-        this.doc.text(page.date,this.width-this.margin,this.y,{align:'right'}); this.y += 8;
-      }
-      if (page.text) this.text(page.text);
-    });
+      // Reuse the original artwork once; each page adds its own crisp text layer.
+      this.doc.addImage(image,'PNG',0,0,this.width,this.height,'note-paper','FAST');
+      this.doc.addImage(canvas,'PNG',0,0,this.width,this.height,`note-text-${index}`,'FAST');
+      canvas.width = 0; canvas.height = 0;
+    }
   }
 
   table(head, body, columnStyles = {}) {
@@ -208,6 +255,7 @@ class MindSpacePDF {
   }
 
   finish() {
+    if (this.item.kind === 'notes') return;
     const pages = this.doc.getNumberOfPages();
     for (let page = 1; page <= pages; page++) {
       this.doc.setPage(page); this.doc.setFontSize(8); this.doc.setTextColor(100,95,110);

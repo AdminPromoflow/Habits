@@ -195,8 +195,11 @@ class MindSpaceNotes {
       if (action) this.checkpoint();
       if (action === 'add') {
         if (this.pages.length >= MindSpaceNotes.MAX_PAGES || MindSpaceNotes.text(this.pages).length >= MindSpaceNotes.LIMIT) { toast(t('ms_note_limit'),true); return; }
-        this.pages.splice(this.index+1,0,{text:'',date:null,manual:true});
-        if (this.pages[this.index+2]) this.pages[this.index+2].manual = true;
+        const pages = this.pages.map(page => ({...page}));
+        pages.splice(this.index+1,0,{text:'',date:null,manual:true});
+        if (pages[this.index+2]) pages[this.index+2].manual = true;
+        if (MindSpaceNotes.text(pages).length > MindSpaceNotes.LIMIT) { toast(t('ms_note_limit'),true); return; }
+        this.pages = pages;
         this.turn(this.index+1,0); this.commit();
       }
       if (action === 'date' || action === 'remove-date') {

@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const Notes = vm.runInNewContext(fs.readFileSync('view/mindspace/notes.js','utf8')+'\nMindSpaceNotes;', {Intl});
+const Notes = vm.runInNewContext(fs.readFileSync('view/mindspace/notes.js','utf8')+'\nMindSpaceNotes;', {Intl,getComputedStyle:()=>({lineHeight:'30'})});
 const plain = value => JSON.parse(JSON.stringify(value));
 const linesFit = text => text.split('\n').length <= 15;
 
@@ -35,4 +35,28 @@ test('stored pages are copied before editing', () => {
   const content={pages:[{text:'Original',date:'2026-11-25',manual:true}]};
   const pages=Notes.pages(content); pages[0].text='Changed';
   assert.equal(content.pages[0].text,'Original');
+});
+
+test('reflow keeps dated and manual pages without inserting an empty automatic page before them', () => {
+  const notes = new Notes({});
+  notes.input = {clientWidth:400};
+  notes.measure = {textContent:'',getBoundingClientRect(){return {height:this.textContent.split('\n').length*30};}};
+  notes.pages = [{text:'Primera\n'.repeat(15),date:'2026-11-25',manual:true}, {text:'Nueva idea',date:null,manual:true}, {text:'Última idea',date:null,manual:true}];
+  notes.reflow({page:1,start:4,end:4,focus:true});
+  assert.equal(notes.pages.length,3); assert.equal(notes.index,1); assert.equal(notes.selection.start,4);
+  assert.equal(notes.pages[0].date,'2026-11-25'); assert.equal(notes.pages[2].text,'Última idea');
+  notes.pages[1].text='x\n'.repeat(16);
+  notes.reflow({page:1,start:32,end:32,focus:true});
+  assert.equal(notes.pages.length,4); assert.equal(notes.index,2); assert.equal(notes.pages[3].text,'Última idea');
+});
+
+test('read-only readers can turn pages but cannot add pages, dates or edit text', () => {
+  const notes = new Notes({can:()=>false}); notes.index=1;
+  let turned; notes.turn=index=>{turned=index;};
+  notes.commit=()=>{throw new Error('Read-only note was changed');};
+  for (const action of ['add','date','remove-date']) notes.event('click',{target:{closest:selector=>selector==='.ms-notebook' ? {} : {dataset:{noteAction:action}}}});
+  assert.equal(turned,undefined);
+  notes.event('click',{target:{closest:selector=>selector==='.ms-notebook' ? {} : {dataset:{noteAction:'previous'}}}});
+  assert.equal(turned,0);
+  notes.event('input',{target:{closest:()=>({})}});
 });

@@ -49,13 +49,25 @@ test('wide spreadsheets include the last column and calculated values across pag
   artifact(pdf, 'wide-sheet');
 });
 
-test('notebook exports preserve optional dates, manual blank pages and all text', () => {
-  const {PDF} = setup(), pdf = new PDF({name:'Cuaderno',kind:'notes',content:{pages:[
+test('notebook exports every displayed page with artwork and styled text, without generic headers or footers', async () => {
+  const {PDF,context} = setup(), item={name:'Cuaderno',kind:'notes',content:{text:'Legacy text is not the displayed pagination'}};
+  context.Image=class { async decode() {} };
+  context.document={fonts:{load:async()=>{}}};
+  const pdf = new PDF(item,'Mi espacio'), rendered=[], images=[];
+  const snapshot={width:620,height:620*1272/902,image:'assets/planner/notepaper.png',writingStyle:"font-family:'MRM Edwardian'",pages:[
     {text:'Primera idea',date:'2026-11-25'}, {text:'',date:null}, {text:'Última idea',date:'2026-12-01'},
-  ]}},'Mi espacio');
-  const text = capture(pdf); pdf.notes();
+  ]};
+  pdf.noteCanvas=async (layout,page,index)=>{rendered.push({layout,page,index});return {width:1804,height:2544};};
+  pdf.doc.addImage=(image,format,x,y,width,height,alias)=>images.push({image,format,x,y,width,height,alias});
+  const text = capture(pdf); await pdf.notes(snapshot); pdf.finish();
   assert.equal(pdf.doc.getNumberOfPages(),3);
-  for (const phrase of ['Primera idea','Última idea','2026-11-25','2026-12-01']) assert.ok(text.includes(phrase));
+  assert.deepEqual(rendered.map(entry=>entry.page),snapshot.pages);
+  assert.ok(rendered.every(entry=>entry.layout.writingStyle.includes('MRM Edwardian')));
+  assert.deepEqual(images.map(image=>image.alias),['note-paper','note-text-0','note-paper','note-text-1','note-paper','note-text-2']);
+  assert.ok(images.every(image=>image.x===0 && image.y===0 && image.width===pdf.width && image.height===pdf.height));
+  assert.ok(Math.abs(pdf.height/pdf.width - 1272/902)<0.001);
+  assert.deepEqual(text,[]);
+  assert.ok(images.filter(image=>image.alias.startsWith('note-text')).every(image=>image.image.width===0),'Canvases are released after each page');
 });
 
 test('long table cells split without dropping subsequent rows', () => {

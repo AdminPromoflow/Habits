@@ -16,9 +16,10 @@
 .ms-note-date-area .icon { width:15px; height:15px; }
 .ms-note-paper .planner-note-arrow { opacity:.65; }
 .ms-note-paper .planner-note-arrow:disabled { opacity:.2; }
-.ms-note-right { position:absolute; top:50%; right:1.5%; display:flex; flex-direction:column; align-items:center; transform:translateY(-50%); gap:8px; }
+.ms-note-right { position:absolute; top:50%; right:1.5%; display:flex; flex-direction:column; align-items:center; transform:translateY(-19px); gap:8px; }
+.ms-note-right:not(:has(.ms-note-add)) { transform:translateY(-50%); }
 .ms-note-right .planner-note-arrow.next { position:static; transform:none; }
-.ms-note-paper .ms-note-add { display:grid; place-items:center; width:32px; height:38px; border-radius:8px; padding:6px; color:#646f58; background:#eef0e9; }
+.ms-note-paper .ms-note-add { order:-1; display:grid; place-items:center; width:32px; height:38px; border-radius:8px; padding:6px; color:#646f58; background:#eef0e9; }
 .ms-note-add .icon { width:20px; height:20px; }
 .ms-note-add:hover { background:#e0e6d7; }
 .ms-note-paper .planner-note-page { font-size:max(11px,1.8cqw); }
@@ -31,7 +32,7 @@
   .ms-note-paper .ms-note-writing { font-size:max(22px,5.8cqw); }
   .ms-note-paper .ms-note-measure { height:auto; }
   [data-note-font="roboto"] .ms-note-paper .ms-note-writing { font-size:16px; }
-  .ms-note-date-area { top:4%; right:13%; }
+  .ms-note-date-area { top:4%; right:18%; }
   .ms-note-date-area input { font-size:14px; max-width:136px; }
   .ms-note-right, .ms-note-paper .planner-note-arrow.previous { right:0; }
   .ms-note-paper .planner-note-arrow.previous { left:0; right:auto; }
