@@ -3,8 +3,8 @@ const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const fs = require('node:fs');
 const context = vm.createContext({ Intl, Date, document: { addEventListener() {} } });
-vm.runInContext(fs.readFileSync('view/global/ui.js', 'utf8') + '\nclass PageController {}\n' + fs.readFileSync('view/calendar/calendar.js', 'utf8') + '\n' + fs.readFileSync('view/progress/progress.js', 'utf8') + '\nthis.api={S,progressRange,progressMoveDate,progressReport,progressChart,progressDetail,progressPage,ProgressPage};', context);
-const { S, progressRange, progressMoveDate, progressReport, progressChart, progressDetail } = context.api;
+vm.runInContext(fs.readFileSync('view/global/ui.js', 'utf8') + '\nclass PageController {}\n' + fs.readFileSync('view/calendar/calendar.js', 'utf8') + '\n' + fs.readFileSync('view/progress/progress.js', 'utf8') + '\nthis.api={S,progressRange,progressMoveDate,progressReport,progressSeries,progressLinePath,progressChart,progressDetail,progressPage,ProgressPage};', context);
+const { S, progressRange, progressMoveDate, progressReport, progressSeries, progressLinePath, progressChart, progressDetail } = context.api;
 const activity = (id, extra = {}) => ({ id, name: `Activity ${id}`, start_date: '2024-02-01', end_date: null, recurrence: 'once', schedule_days: [], category_id: 1, ...extra });
 function setup() {
   S.language = 'es';
@@ -22,18 +22,23 @@ test('calendar periods, leap years, week boundaries and month navigation', () =>
   assert.equal(progressReport('month', '2024-02-01').buckets.length, 29);
   assert.equal(progressReport('year', '2024-02-01').buckets.length, 12);
 });
-test('three of five tasks is 60 percent, with separate category contributions', () => {
+test('each line uses its own category denominator while period totals remain weighted', () => {
   setup();
   S.data.calendar.tasks = Array.from({ length: 5 }, (_, i) => activity(i + 1, { category_id: i < 2 ? 1 : 2 }));
   S.data.calendar.completions = [1, 2, 3].map(task_id => ({ task_id, completed_on: '2024-02-01' }));
   const report = progressReport('week', '2024-02-01');
   assert.equal(report.total, 5); assert.equal(report.completed, 3); assert.equal(report.percent, 60);
   assert.equal(report.buckets.find(b => b.key === '2024-02-01').percent, 60);
-  assert.equal(progressReport('day', '2024-02-01').buckets.length, 2);
+  assert.equal(progressReport('day', '2024-02-01').buckets.length, 1);
   const filtered = progressReport('week', '2024-02-01', '2');
   assert.equal(filtered.total, 3); assert.equal(filtered.percent, 33);
+  const lines = progressSeries(report);
+  const health = lines.find(line => line.key === '1').points.find(Boolean);
+  const learning = lines.find(line => line.key === '2').points.find(Boolean);
+  assert.equal(health.percent, 100); assert.equal(health.y, 0);
+  assert.equal(learning.percent, 33); assert.ok(Math.abs(learning.y - 180) < 0.001);
   const html = progressChart(report, { period: 'week' }, report.buckets[3]);
-  assert.match(html, /height:40%;background:#22AABB/); assert.match(html, /height:20%;background:#9977BB/);
+  assert.ok(html.includes('progress-line-svg')); assert.ok(!html.includes('progress-bar-track'));
 });
 test('period totals are weighted by activities; future and empty periods do not imply failure', () => {
   setup();
@@ -95,4 +100,36 @@ test('100 percent is reserved for finishing every scheduled activity', () => {
   assert.equal(progressReport('day', '2024-02-01').percent, 99);
   S.data.calendar.completions.push({ task_id: 200, completed_on: '2024-02-01' });
   assert.equal(progressReport('day', '2024-02-01').percent, 100);
+});
+
+test('lines stop at unscheduled or future dates, retain zero values, and show isolated points', () => {
+  setup(); S.data.today = '2024-02-03';
+  S.data.calendar.tasks = [activity(1), activity(2, { start_date:'2024-02-03' }), activity(3, { start_date:'2024-02-04' })];
+  S.data.calendar.completions = [{ task_id:1, completed_on:'2024-02-01' }];
+  const report = progressReport('week', '2024-02-01');
+  const line = progressSeries(report)[0];
+  assert.equal(line.points[3].percent, 100);
+  assert.equal(line.points[4], null);
+  assert.equal(line.points[5].percent, 0);
+  assert.equal(line.points[5].y, 270);
+  assert.equal(line.points[6], null);
+  assert.equal((progressLinePath(line.points).match(/M/g) || []).length, 2);
+  assert.ok(!progressLinePath(line.points).includes('L'));
+  assert.equal((progressChart(report, {period:'week'}, report.buckets[3]).match(/data-action="progress-point"/g) || []).length, 2);
+});
+test('daily points reflect scheduled hours and keep untimed activities separate', () => {
+  setup();
+  S.data.calendar.tasks = [activity(1, {scheduled_time:'18:30:00'}), activity(2, {scheduled_time:'09:00:00'}), activity(3), activity(4, {scheduled_time:'09:00:00',category_id:2})];
+  S.data.calendar.completions = [{task_id:2,completed_on:'2024-02-01'}];
+  const report = progressReport('day', '2024-02-01');
+  assert.deepEqual(Array.from(report.buckets, b=>b.key), ['09:00','18:30','untimed']);
+  assert.equal(report.total, 4);
+  const lines = progressSeries(report);
+  assert.equal(lines[0].points[0].percent, 100);
+  assert.equal(lines[0].points[1].percent, 0);
+  assert.equal(lines[0].points[2].percent, 0);
+  assert.equal(lines[1].points[0].percent, 0);
+  assert.equal(lines[1].points[1], null);
+  assert.equal(lines[1].points[2], null);
+  assert.equal((progressLinePath(lines[0].points).match(/L/g) || []).length, 2);
 });
