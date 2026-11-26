@@ -35,6 +35,7 @@ function render() {
   document.documentElement.lang = S.language;
   document.body.dataset.theme = S.user?.theme || 'light';
   document.title = `MyRemarkable Mind · ${t(S.mode === 'admin' ? 'admin_dashboard' : S.view === 'habits' ? 'categories' : S.view === 'categoryWeek' ? 'weekly_plan' : S.view === 'routine' ? 'routine' : S.view)}`;
+  pageControllers.calendar.unmount();
   $('#app').innerHTML = S.user && !S.setupToken && !S.resetToken ? shell() : authPage();
   mobileDocumentView.sync();
   if (S.user && S.mode === 'personal' && S.view === 'calendar') pageControllers.calendar.mount();
@@ -125,7 +126,7 @@ async function navigate(view) {
     S.sharingTab = 'all'; S.sharePerson = null;
     S.shareFilter = { permission: '', category: '', owner: '', status: '', search: '' };
   }
-  if (view === 'calendar') { pageControllers.calendar.scrollPosition = null; S.date = today(); S.month = S.date.slice(0, 7); }
+  if (view === 'calendar') { S.plannerMode = 'note'; S.plannerPage = 0; S.date = today(); S.month = S.date.slice(0, 7); }
   if (view === 'habits') {
     S.filter = { category: '', routine: '', status: 'active', search: '' };
     S.categoryId = null;

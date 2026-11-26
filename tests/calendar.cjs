@@ -3,8 +3,8 @@ const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
 const context=vm.createContext({Intl,Date,document:{addEventListener(){}}});
-vm.runInContext(fs.readFileSync('view/global/ui.js','utf8')+'\nclass PageController {}\n'+fs.readFileSync('view/calendar/calendar.js','utf8')+'\nthis.testApi={scheduled,plannerEntries,plannerWeek,CalendarPage,plannerCategoryOptions,plannerCategoryFields,S};',context);
-const {scheduled,plannerEntries,plannerWeek,CalendarPage,S}=context.testApi;
+vm.runInContext(fs.readFileSync('view/global/ui.js','utf8')+'\nclass PageController {}\n'+fs.readFileSync('view/calendar/calendar.js','utf8')+'\nthis.testApi={scheduled,plannerEntries,plannerNotePages,plannerNoteTurn,plannerNoteRow,plannerNoteMonth,CalendarPage,plannerCategoryOptions,plannerCategoryFields,S};',context);
+const {scheduled,plannerEntries,plannerNotePages,plannerNoteTurn,plannerNoteRow,plannerNoteMonth,CalendarPage,S}=context.testApi;
 const base={id:1,name:'<Task>',start_date:'2024-01-31',end_date:null,schedule_days:[1,3,5],recurrence:'monthly'};
 test('calendar recurrence preserves anchors and short-month semantics',()=>{
   for(const [entry,dates] of [
@@ -17,41 +17,57 @@ test('calendar recurrence preserves anchors and short-month semantics',()=>{
   ]) for(const [date,expected] of Object.entries(dates)) assert.equal(scheduled(entry,date),expected,`${entry.recurrence}: ${date}`);
   assert.equal(scheduled({...base,recurrence:undefined},'2024-02-05'),true,'legacy schedules stay weekly');
 });
-test('weekly timetable places habits and tasks in their date and hour, including midnight and late night',()=>{
-  S.date='2024-02-29';S.data={today:'2024-02-29',habits:[{...base,kind:'habit',permission:'owner',status:'active',scheduled_time:'10:30:00'}],completions:[],calendar:{tasks:[
+test('daily task rows retain their exact time, completion, category and safe literal title',()=>{
+  S.date='2024-02-29';S.data={today:'2024-02-29',categories:[{id:7,color:'#CBE8DD'}],habits:[{...base,kind:'habit',permission:'owner',status:'active',scheduled_time:'10:30:00',category_id:7}],completions:[],calendar:{tasks:[
     {...base,id:2,scheduled_time:null},
     {...base,id:3,name:'Midnight',scheduled_time:'00:00:00'},
     {...base,id:4,name:'Late night',scheduled_time:'23:59:00'},
-    {...base,id:5,name:'Same hour',scheduled_time:'10:45:00'},
   ],completions:[{task_id:2,completed_on:S.date}]}};
-  assert.equal(plannerEntries(S.date).length,5);
-  assert.equal(plannerEntries(S.date)[0].completed,true);
-  const html=plannerWeek();
-  assert.match(html,/data-week="2024-02-26"/);
-  for(const name of ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']) assert.ok(html.includes(name));
-  const slots=[...html.matchAll(/data-slot-date="([^"]+)" data-slot-time="([^"]*)">([\s\S]*?)(?=<div class="planner-slot |<\/div>\s*<\/div>)/g)];
-  const slot=time=>slots.find(match=>match[1]===S.date && match[2]===time)?.[3] || '';
-  assert.match(slot(''),/is-done/);
-  assert.match(slot('00:00'),/Midnight/);
-  assert.match(slot('23:00'),/Late night/);
-  assert.match(slot('10:00'),/10:30 · planner_habit/);
-  assert.match(slot('10:00'),/Same hour/);
-  assert.ok(html.includes('&lt;Task&gt;'));
-  assert.ok(!html.includes('<Task>'));
-  assert.equal((html.match(/data-hour="/g)||[]).length,24);
-  assert.equal((html.match(/data-slot-date="/g)||[]).length,25*7);
+  const entries=plannerEntries(S.date);
+  assert.equal(entries.length,4);
+  assert.equal(entries[0].completed,true);
+  const rows=entries.map(entry=>plannerNoteRow(entry,S.date)).join('');
+  assert.ok(rows.includes('&lt;Task&gt;'));assert.ok(!rows.includes('<Task>'));
+  assert.match(rows,/--planner-color:#CBE8DD/);
+  assert.match(rows,/aria-pressed="true"/);assert.match(rows,/is-done/);
+  assert.match(rows,/00:00/);assert.match(rows,/23:59/);assert.match(rows,/10:30/);
+  assert.match(plannerNoteRow(entries[2],'2024-03-01'),/disabled/);
+  assert.match(plannerNoteRow({...entries[2],permission:'viewer'},S.date),/disabled/);
 });
-test('week navigation crosses year boundaries and Today returns to the current week',async()=>{
+test('task pagination keeps every task once and reserves extra lines for long names',()=>{
+  const entries=Array.from({length:31},(_,id)=>({id}));
+  for(const [counts,expected] of [[[],[15,15,1]],[entries.map(()=>2),[7,7,7,7,3]]]) {
+    const pages=plannerNotePages(entries,counts);
+    assert.deepEqual(Array.from(pages,page=>page.length),expected);
+    assert.deepEqual(Array.from(pages.flat(),item=>item.entry.id),entries.map(entry=>entry.id));
+    assert.ok(pages.every(page=>page.reduce((sum,item)=>sum+item.lines,0)<=15));
+  }
+  assert.equal(plannerNotePages([]).length,1);
+  assert.equal(plannerNotePages(entries.slice(0,15)).length,1);
+});
+test('page arrows finish the selected day before moving to another date and reverse to the previous final sheet',()=>{
+  assert.deepEqual({...plannerNoteTurn('2024-12-31',0,2,1)},{date:'2024-12-31',page:1});
+  assert.deepEqual({...plannerNoteTurn('2024-12-31',1,2,1)},{date:'2025-01-01',page:0});
+  assert.deepEqual({...plannerNoteTurn('2025-01-01',1,2,-1)},{date:'2025-01-01',page:0});
+  assert.deepEqual({...plannerNoteTurn('2025-01-01',0,2,-1)},{date:'2024-12-31',page:-1});
+  assert.deepEqual({...plannerNoteTurn('2024-03-01',0,1,-1)},{date:'2024-02-29',page:-1});
+});
+test('month selection opens the selected day and Today resets to its first sheet',async()=>{
   context.render=()=>{};context.document.querySelector=()=>null;
   const controller=new CalendarPage();
-  S.date='2024-12-30'; S.data={today:'2024-02-29'};
-  await controller.handleAction('planner-next',{},0);
-  assert.equal(S.date,'2025-01-06');assert.equal(S.month,'2025-01');
-  await controller.handleAction('planner-prev',{},0);
-  assert.equal(S.date,'2024-12-30');
-  controller.scrollPosition={week:'2024-12-30',top:1200,left:0};
+  S.date='2024-12-31';S.plannerPage=2;S.data={today:'2024-02-29',habits:[],calendar:{tasks:[]}};
+  await controller.handleAction('planner-calendar-toggle',{},0);
+  assert.equal(S.plannerMode,'month');assert.equal(S.plannerMonth,'2024-12');
+  await controller.handleAction('planner-month-next',{},0);
+  assert.equal(S.plannerMonth,'2025-01');assert.equal(S.date,'2024-12-31');
+  await controller.handleAction('planner-note-date',{dataset:{date:'2025-01-06'}},0);
+  assert.equal(S.date,'2025-01-06');assert.equal(S.plannerMode,'note');assert.equal(S.plannerPage,0);
   await controller.handleAction('today',{},0);
-  assert.equal(S.date,'2024-02-29');assert.equal(controller.scrollPosition,null);
+  assert.equal(S.date,'2024-02-29');assert.equal(S.plannerPage,0);
+  S.plannerMonth='2024-02';
+  const month=plannerNoteMonth();
+  assert.match(month,/data-date="2024-02-29"/);
+  assert.equal((month.match(/data-action="planner-note-date"/g)||[]).length,42);
 });
 test('monthly date lists, month intervals, selected annual months and ordinal weekdays match',()=>{
   const monthly={...base,start_date:'2024-01-01',recurrence_rule:{month_mode:'dates',month_days:[5,20],interval:2}};

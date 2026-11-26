@@ -85,6 +85,22 @@ El modelo documentado desde las migraciones está en [database-model](database-m
 
 Para esta instalación, verificar siempre la base publicada desde Hostinger/phpMyAdmin en Chrome al revisar cambios o incidencias; las pruebas locales no sustituyen esa comprobación. Utilizar consultas de solo lectura para revisar migraciones, columnas y datos, y comprobar también la carga real del sitio.
 
+### Hoja diaria de tareas — 25 de noviembre de 2026
+
+Se sustituyó la agenda semanal por la hoja ilustrada solicitada, con título **Tareas**, fecha, checkbox con color de categoría, nombre y hora tenue. El paquete `.builds/mrm-note-20261125.zip` contiene ocho archivos de aplicación e imagen, con SHA-256 `8b96a9f467e5f0d4555c7390cf10fae22b1e5cddf72d82d760a4dd3dc19e2324`, y se extrajo en `public_html/MyRemarkableMind`. No requiere migraciones ni incluye configuración, sesiones o datos.
+
+Después de recargar, Chrome mostró las diez actividades existentes del 25 de noviembre. Se verificó en producción que la flecha superior abre el calendario mensual, elegir el 23 vuelve a su hoja, la flecha derecha avanza al 24 y **Today** vuelve al 25. Evidencia: `tests/.runtime/planner-note-hostinger.png`. No se modificaron actividades reales durante estas comprobaciones.
+
+Pasaron las doce pruebas de calendario y navegación, las comprobaciones de sintaxis y `git diff --check`. La revisión visual local cubrió escritorio y móvil de 390 px, texto largo en varios renglones, tachado persistente al completar y tres hojas de una misma fecha antes de avanzar al siguiente día. Retroceder abre la última hoja del día anterior. Las dieciocho tareas temporales se retiraron de la base aislada de pruebas al finalizar.
+
+### Horario semanal y colores por categoría — 25 de noviembre de 2026
+
+Se confirmó que Hostinger todavía entregaba las vistas Day/Week/Month/Year después de recargar. Se publicó `.builds/mrm-week-20261125.zip` en `public_html/MyRemarkableMind`, actualizando únicamente los siete archivos de calendario, estado/navegación y traducciones. No requiere migraciones ni incluye configuración, sesiones o datos.
+
+Chrome confirmó la vista única **Week**, las columnas Monday–Sunday, las 07:00 como primera hora visible y las actividades existentes. La flecha siguiente avanzó de 23–29 de noviembre a 30 de noviembre–6 de diciembre; **Today** volvió a la semana actual. Los bloques toman el color almacenado de su categoría, con una tonalidad suave de fondo y el color exacto en el borde, también en las listas de tareas por categoría. Los hábitos compartidos utilizan el color que acompaña al hábito si su categoría no aparece en el catálogo personal.
+
+La consulta de solo lectura de `habit_categories` en phpMyAdmin confirmó Ejercicios `#CBE8DD`, My day to day `#B8A4D4` y Nutrition `#F8D8C5`, coherentes con las tarjetas de Categorías y el horario publicado. No se crearon ni modificaron actividades de prueba en producción. Pasaron las 10 pruebas de calendario y navegación. Evidencia: `tests/.runtime/planner-week-hostinger.png`.
+
 ### Categorías y navegación del planificador — 25 de noviembre de 2026
 
 Se aplicó `020_planner_categories.sql` tanto en local como en Hostinger mediante phpMyAdmin, registrando el SHA-256 `8e6994d38bd11b612a2b9dd9ea609f9d4fd6cc2346096f7657835406fb0f5edc`. Añade la categoría opcional de las tareas y el vínculo de las categorías con carpetas o espacios principales. Los conteos de producción antes y después se conservaron: 42 hábitos, 0 tareas, 14 diagramas y 7 categorías.

@@ -709,6 +709,12 @@ return [
     'ms_hint_notes' => 'Un lugar para escribir y pensar.',
     'ms_default_notes' => 'Nueva nota',
 
+    'planner_open_month' => 'Elegir un día en el calendario',
+    'planner_back_note' => 'Volver a la hoja de tareas',
+    'planner_previous_sheet' => 'Hoja o día anterior',
+    'planner_next_sheet' => 'Hoja o día siguiente',
+    'planner_sheet_count' => 'Hoja {page} de {count}',
+
     'planner_day' => 'Día',
     'planner_week' => 'Semana',
     'planner_month' => 'Mes',

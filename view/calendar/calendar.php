@@ -1,20 +1,16 @@
 <?php if (!defined('PROJECT_ROOT')) { http_response_code(404); exit(); } ?>
 <template id="view-calendar">
-  <div class="planner">
-    {{heading}}
-    <div class="planner-toolbar">
-      <div class="planner-week-summary">
-        <span class="planner-week-badge">{{weekIcon}}{{weekLabel}}</span>
-        <h2 class="planner-period" id="planner-period" aria-live="polite">{{title}}</h2>
-      </div>
-      <div class="planner-navigation">
-        <button class="text-btn" data-action="today">{{todayLabel}}</button>
-        <button class="icon-btn" data-action="planner-prev" aria-label="{{previousLabel}}">{{previousIcon}}</button>
-        <button class="icon-btn" data-action="planner-next" aria-label="{{nextLabel}}">{{nextIcon}}</button>
-        <input type="date" id="planner-date" value="{{date}}" min="1000-01-01" max="9998-12-31" aria-label="{{dateLabel}}">
-      </div>
+  <div class="planner planner-notebook" data-mobile-document="planner-note" data-mobile-document-kind="planner">
+    <h1 class="sr-only">{{title}}</h1>
+    <div class="planner-note-toolbar">
+      <button class="text-btn" data-action="today">{{todayLabel}}</button>
+      <button class="btn secondary" data-action="planner-add">{{addIcon}}{{addLabel}}</button>
     </div>
-    <div id="planner-panel">{{content}}</div>
-    <p class="planner-hint">{{hintIcon}}{{hint}}</p>
+    <div class="planner-paper-stage">
+      <section class="planner-note" data-mode="{{mode}}" aria-labelledby="planner-note-title">
+        <img class="planner-note-art" src="assets/planner/notepaper.png" alt="" aria-hidden="true" width="902" height="1272">
+        {{content}}
+      </section>
+    </div>
   </div>
 </template>
