@@ -100,7 +100,8 @@ function progressChart(report, state, selected) {
           const count = bucket.records.filter(r => r.completed && r.category.key === category.key).length;
           return count ? `<i style="height:${100 * count / bucket.total}%;background:${category.color}"></i>` : '';
         }).join('');
-        return `<button type="button" class="progress-column ${bucket.key === selected?.key ? 'is-selected' : ''} ${bucket.future ? 'is-future' : ''} ${!bucket.total ? 'is-empty' : ''}" data-action="progress-bucket" data-bucket="${esc(bucket.key)}" aria-pressed="${bucket.key === selected?.key}" aria-controls="progress-detail" aria-label="${esc(description)}" title="${esc(description)}">
+        const remaining = bucket.total ? 100 * (bucket.total - bucket.completed) / bucket.total : 0;
+        return `<button type="button" class="progress-column ${bucket.key === selected?.key ? 'is-selected' : ''} ${bucket.future ? 'is-future' : ''} ${!bucket.total ? 'is-empty' : ''}" style="--bar-remaining:${remaining / 100}" data-action="progress-bucket" data-bucket="${esc(bucket.key)}" aria-pressed="${bucket.key === selected?.key}" aria-controls="progress-detail" aria-label="${esc(description)}" title="${esc(description)}">
           <span class="progress-bar-value">${bucket.percent === null ? '—' : bucket.percent + '%'}</span>
           <span class="progress-bar-track" aria-hidden="true">${segments}</span>
           <span class="progress-bar-label">${esc(bucket.label)}</span>${bucket.subtitle ? `<small>${esc(bucket.subtitle)}</small>` : ''}
@@ -136,13 +137,12 @@ function progressPage() {
   const currentKey = state.period === 'year' ? state.date.slice(0, 7) : state.date;
   const selected = report.buckets.find(b => b.key === state.bucket) || report.buckets.find(b => b.key === currentKey) || report.buckets.find(b => b.total) || report.buckets[0];
   state.bucket = selected?.key || '';
-  const title = progressPeriodLabel(state.period, report), percentage = report.percent === null ? '—' : report.percent + '%';
+  const title = progressPeriodLabel(state.period, report);
   return renderTemplate('progress', {
     heading: heading(t('progress'), t('progress_dashboard_subtitle'), badge('private')),
     tabs: PROGRESS_PERIODS.map(period => `<button id="progress-tab-${period}" role="tab" aria-selected="${period === state.period}" aria-controls="progress-panel" tabindex="${period === state.period ? 0 : -1}" class="${period === state.period ? 'selected' : ''}" data-action="progress-period" data-period="${period}">${t('planner_' + period)}</button>`).join(''),
     tabsLabel: t('progress_periods'), activeTab: `progress-tab-${state.period}`,
     controls: `<div class="progress-date-navigation"><button class="icon-btn" data-action="progress-prev" aria-label="${esc(t('previous'))}">${icon('chevron', 'flip')}</button><label class="progress-date-picker"><span>${esc(title)}</span><input id="progress-date" type="date" value="${state.date}" min="1900-01-01" max="9998-12-31" aria-label="${esc(t('select_date'))}">${icon('calendar')}</label><button class="icon-btn" data-action="progress-next" aria-label="${esc(t('next'))}">${icon('chevron')}</button></div><button class="btn secondary" data-action="progress-today">${t('today')}</button>`,
-    overview: `<div class="progress-overview-copy"><span class="progress-eyebrow">${t('progress_your_pace')}</span><h2>${t(report.total && report.pending === 0 ? 'progress_all_done' : 'progress_keep_going')}</h2><p>${t('progress_summary', { completed: report.completed, total: report.total })}</p><div class="progress-quick-stats"><span><strong>${report.completed}</strong>${t('progress_completed')}</span><span><strong>${report.pending}</strong>${t('progress_pending')}</span><span><strong>${report.total}</strong>${t('progress_scheduled')}</span></div></div><div class="progress-score" style="--score:${report.percent || 0}%" role="img" aria-label="${esc(t('completion_rate') + ': ' + percentage)}"><div><strong>${percentage}</strong><span>${t('progress_achieved')}</span></div></div>`,
     chartTitle: t('progress_chart_title'), chartHint: t('progress_axis_' + state.period),
     categoryFilter: `<label class="progress-filter"><span>${t('category')}</span><select id="progress-category" aria-label="${esc(t('category'))}"><option value="">${t('progress_all_categories')}</option>${report.categories.map(c => `<option value="${esc(c.key)}" ${state.category === c.key ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>`,
     chart: progressChart(report, state, selected),

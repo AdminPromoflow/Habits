@@ -10,7 +10,6 @@
       <div class="progress-controls">{{controls}}</div>
     </div>
     <div id="progress-panel" role="tabpanel" aria-labelledby="{{activeTab}}">
-      <section class="progress-overview">{{overview}}</section>
       <div class="progress-workspace">
         <section class="card progress-chart-card">
           <div class="progress-chart-heading"><div><h2>{{chartTitle}}</h2><p>{{chartHint}}</p></div>{{categoryFilter}}</div>
