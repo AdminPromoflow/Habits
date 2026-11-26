@@ -73,7 +73,7 @@
 .progress-y-axis { position:relative; flex:0 0 46px; height:var(--plot-height); margin-top:38px; display:flex; flex-direction:column; justify-content:space-between; font-size:.75rem; color:var(--chart-muted); }
 .progress-y-axis span { line-height:0; }
 .progress-chart-scroll { overflow-x:auto; flex:1; min-width:0; padding:38px 4px 10px; scrollbar-width:thin; }
-.progress-line-plot { min-width:var(--plot-min); }
+.progress-line-plot { position:relative; min-width:var(--plot-min); }
 .progress-line-canvas { height:var(--plot-height); position:relative; }
 .progress-gridlines { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:space-between; pointer-events:none; }
 .progress-gridlines > i { border-top:1px dashed var(--line); }
