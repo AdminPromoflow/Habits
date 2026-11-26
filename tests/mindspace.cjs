@@ -110,19 +110,20 @@ test('board previews group cards under their status and keep empty columns selec
   assert.equal(LinkTargets.label(board,{type:'column',id:'doing'}),'ms_status_doing');
 });
 
-function setup(url='http://localhost/?item=3') {
+function setup(url='http://localhost/?item=3', storage=new Map()) {
   const items=[{id:1,kind:'folder',name:'Parent',parent_id:null,content:{}},{id:2,kind:'folder',name:'Child',parent_id:1,content:{}},
     {id:3,kind:'notes',name:'Note',parent_id:2,version:1,content:{text:'before'}},{id:4,kind:'diagram',name:'Map',parent_id:null,diagram_id:10,content:{}}];
   const location={href:url,assign(href){this.assigned=href;}};
   const state={data:{mindspace:{items}}};
   const listeners={};
   const context=vm.createContext({URL,location,S:state,PageController:class{},MindSpaceEditors:class{constructor(){}},
+    localStorage:{getItem:key=>storage.get(key) ?? null,setItem:(key,value)=>storage.set(key,value)},
     document:{addEventListener(type,callback){(listeners[type]||=[]).push(callback);},getElementById(){return null;},querySelectorAll(){return[];}},
     clearTimeout(){},setTimeout(){return 1;},t:key=>key,icon:()=>'',esc:String});
   const Space=vm.runInContext(fs.readFileSync('view/mindspace/mindspace.js','utf8')+'\nMindSpace;',context);
   const home={makeRequest:async(action,data)=>({...items.find(i=>i.id===data.id),version:data.version+1,content:data.content}),finishBeforeSwitch:async()=>true};
   const space=new Space(home); space.resolve();
-  return {space,home,state,location,listeners,context};
+  return {space,home,state,location,listeners,context,storage};
 }
 test('folder root, nested documents and diagram deep links resolve independently',()=>{
   assert.equal(setup('http://localhost/?folder=0').space.active,null);
@@ -130,6 +131,95 @@ test('folder root, nested documents and diagram deep links resolve independently
   assert.equal(space.pathTo(space.folderId()).map(i=>i.name).join('/'),'Parent/Child');
   assert.equal(space.folders(1).length,0);
   assert.equal(setup('http://localhost/?diagram=10').space.active.id,4);
+});
+test('tabs contain only opened documents, retain opening order across reloads and never duplicate',async()=>{
+  const {space,state,location,storage}=setup('http://localhost/?folder=0');
+  assert.equal(space.tabs(),'');
+  await space.go(state.data.mindspace.items.find(item=>item.id===3));
+  let loaded=setup(location.assigned,storage);
+  assert.equal(loaded.space.tabItems().map(item=>item.id).join(','),'3');
+  await loaded.space.go(loaded.state.data.mindspace.items.find(item=>item.id===4));
+  loaded=setup(loaded.location.assigned,storage);
+  assert.equal(loaded.space.tabItems().map(item=>item.id).join(','),'3,4');
+  await loaded.space.go(loaded.state.data.mindspace.items.find(item=>item.id===3));
+  loaded=setup(loaded.location.assigned,storage);
+  loaded.space.resolve();
+  assert.equal(loaded.space.tabItems().map(item=>item.id).join(','),'3,4');
+  assert.equal((loaded.space.tabs().match(/role="tab"/g)||[]).length,2);
+  assert.equal((loaded.space.tabs().match(/data-action="ms-tab-close"/g)||[]).length,2);
+});
+test('closing an inactive tab preserves the active draft and does not save, navigate or delete',async()=>{
+  const {space,home,state,location,storage}=setup();
+  space.rememberTab(state.data.mindspace.items.find(item=>item.id===4));
+  space.draft.text='still editing';
+  home.makeRequest=async()=>{throw new Error('Closing another tab must not send a request');};
+  await space.handleAction('ms-tab-close',{dataset:{id:'4'}});
+  assert.equal(space.active.id,3); assert.equal(space.draft.text,'still editing');
+  assert.equal(location.assigned,undefined); assert.equal(state.data.mindspace.items.length,4);
+  assert.equal(space.tabItems().map(item=>item.id).join(','),'3');
+  assert.equal(setup('http://localhost/?item=3',storage).space.tabItems().map(item=>item.id).join(','),'3');
+});
+test('closing the active tab saves first and selects the next tab, or the previous one at the end',async()=>{
+  const {space,home,state,location,storage}=setup();
+  space.rememberTab(state.data.mindspace.items.find(item=>item.id===4));
+  space.draft.text='save before closing';
+  let release;
+  home.makeRequest=async(action,data)=>{
+    assert.equal(action,'saveMindSpaceItem');
+    await new Promise(resolve=>release=resolve);
+    return {...space.active,version:2,content:data.content};
+  };
+  const pending=space.closeTab(3);
+  assert.equal(space.tabItems().map(item=>item.id).join(','),'3,4'); assert.equal(location.assigned,undefined);
+  release(); await pending;
+  assert.equal(state.data.mindspace.items.find(item=>item.id===3).content.text,'save before closing');
+  assert.equal(new URL(location.assigned).searchParams.get('diagram'),'10');
+  assert.equal(setup(location.assigned,storage).space.tabItems().map(item=>item.id).join(','),'4');
+  const previous=setup();
+  previous.space.rememberTab(previous.state.data.mindspace.items.find(item=>item.id===4));
+  previous.location.href='http://localhost/?diagram=10'; previous.space.resolve();
+  await previous.space.closeTab(4);
+  assert.equal(new URL(previous.location.assigned).searchParams.get('item'),'3');
+});
+test('failed document or diagram saves keep the active tab and pending edits open',async()=>{
+  const {space,home,location}=setup();
+  space.draft.text='keep my text'; home.makeRequest=async()=>{throw new Error('offline');};
+  await space.closeTab(3);
+  assert.equal(space.tabItems().map(item=>item.id).join(','),'3');
+  assert.equal(space.draft.text,'keep my text'); assert.equal(location.assigned,undefined);
+  const diagram=setup('http://localhost/?diagram=10');
+  diagram.home.finishBeforeSwitch=async()=>false;
+  await diagram.space.closeTab(4);
+  assert.equal(diagram.space.tabItems().map(item=>item.id).join(','),'4'); assert.equal(diagram.location.assigned,undefined);
+});
+test('closing the last tab shows the directory and the document can be opened again',async()=>{
+  const {space,state,location,storage}=setup();
+  await space.closeTab(3);
+  assert.equal(new URL(location.assigned).searchParams.get('folder'),'0');
+  const loaded=setup(location.assigned,storage);
+  assert.equal(loaded.space.active,null); assert.equal(loaded.space.tabs(),'');
+  assert.equal(state.data.mindspace.items.length,4);
+  await loaded.space.go(loaded.state.data.mindspace.items.find(item=>item.id===3));
+  assert.equal(setup(loaded.location.assigned,storage).space.tabItems()[0].id,3);
+});
+test('saved tabs exclude deleted files and folders, and remain scoped to accounts and shared workspaces',()=>{
+  const {space,state,storage}=setup();
+  storage.set(space.tabKey(),JSON.stringify([4,3,3,1,999,'3'])); space.reset(); space.resolve();
+  assert.equal(space.tabItems().map(item=>item.id).join(','),'4,3');
+  state.data.mindspace.items=state.data.mindspace.items.filter(item=>item.id!==4);
+  assert.equal(space.tabItems().map(item=>item.id).join(','),'3');
+  state.user={id:2}; assert.equal(space.tabs(),'');
+  space.resolve(); assert.equal(space.tabItems().map(item=>item.id).join(','),'3');
+  state.sharedWorkspace={id:22}; assert.equal(space.tabs(),'');
+  state.sharedWorkspace=null; assert.equal(space.tabItems().map(item=>item.id).join(','),'3');
+});
+test('resetting the account while closing a tab cannot change the next account or navigate',async()=>{
+  const {space,home,state,location}=setup();
+  let release; home.makeRequest=()=>new Promise(resolve=>release=resolve);
+  space.draft.text='pending'; const pending=space.closeTab(3);
+  space.reset(); state.user={id:2}; state.data.mindspace.items=[];
+  release({id:3,kind:'notes',version:2,content:{text:'pending'}}); await pending;
+  assert.equal(location.assigned,undefined); assert.equal(space.tabs(),'');
 });
 test('autosave serializes edits typed during a request using the returned version',async()=>{
   const {space,home}=setup(); let release; const calls=[];
@@ -365,9 +455,10 @@ test('MindSpace selection scopes tabs and folders, while document deep links ide
   assert.equal(space.spaceName(),'Work'); assert.equal(space.active,null);
   assert.equal(space.items().map(i=>i.id).join(','),'5,6');
   assert.equal(space.folders().map(i=>i.name).join(','),'Work folder');
-  assert.ok(space.tabs().includes('Work note')); assert.ok(!space.tabs().includes('Note</span>'));
+  assert.equal(space.tabs(),'');
   const linked=multiple('http://localhost/?space=100&item=6').space;
   assert.equal(linked.spaceId(),200); assert.equal(linked.active.id,6); assert.equal(linked.pathTo(5)[0].name,'Work folder');
+  assert.ok(linked.tabs().includes('Work note')); assert.ok(!linked.tabs().includes('Note</span>'));
 });
 test('switching spaces saves the open document and preserves the other spaces in the shared catalog',async()=>{
   const {space,home,location,state}=multiple('http://localhost/?item=6'); let request;

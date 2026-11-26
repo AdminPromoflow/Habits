@@ -14,12 +14,18 @@
   color: var(--ink);
 }
 .mindspace-tabs { display: flex; gap: 3px; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
-.mindspace-tabs [role="tab"] { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; max-width: 220px; min-height: 42px; border: 1px solid transparent; border-bottom: 0; padding: 9px 13px; border-radius: 9px 9px 0 0; background: transparent; color: var(--purple-dark); font: inherit; font-size: .875rem; cursor: pointer; }
+.mindspace-tab { display: flex; align-items: center; flex: 0 0 auto; max-width: 250px; min-width: 0; border: 1px solid transparent; border-bottom: 0; border-radius: 9px 9px 0 0; color: var(--purple-dark); }
+.mindspace-tabs [role="tab"] { display: inline-flex; align-items: center; gap: 8px; flex: 1; min-width: 0; min-height: 42px; border: 0; padding: 9px 8px 9px 13px; border-radius: 9px 0 0 0; background: transparent; color: inherit; font: inherit; font-size: .875rem; cursor: pointer; }
 .mindspace-tabs [role="tab"] span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mindspace-tabs [aria-selected="true"] { background: var(--surface); border-color: var(--line); color: var(--ink); font-weight: 600; box-shadow: inset 0 2px 0 var(--lavender); }
+.mindspace-tab.is-active { background: var(--surface); border-color: var(--line); color: var(--ink); box-shadow: inset 0 2px 0 var(--lavender); }
+.mindspace-tabs [aria-selected="true"] { font-weight: 600; }
+.mindspace-tab-close { display: grid; place-items: center; flex: 0 0 26px; width: 26px; height: 26px; margin-right: 6px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: inherit; cursor: pointer; opacity: 0; pointer-events: none; }
+.mindspace-tab:hover .mindspace-tab-close, .mindspace-tab:focus-within .mindspace-tab-close { opacity: 1; pointer-events: auto; }
+.mindspace-tab-close:hover { background: #dfc3f633; color: var(--ink); }
+@media (hover: none), (pointer: coarse) { .mindspace-tab-close { opacity: 1; pointer-events: auto; } }
 .mindspace-tabs svg, .mindspace-add svg, .mindspace-explorer svg { width: 17px; height: 17px; flex-shrink: 0; }
 .mindspace-add { display: grid; place-items: center; flex: 0 0 36px; width: 36px; height: 36px; margin-top: 3px; border: 0; border-radius: 8px; color: var(--purple-dark); background: transparent; cursor: pointer; }
-.mindspace-add:hover, .mindspace-tabs [role="tab"]:hover { background: var(--surface); }
+.mindspace-add:hover, .mindspace-tab:hover { background: var(--surface); }
 .mindspace-shell button:focus-visible { outline: 2px solid var(--purple); outline-offset: -2px; }
 .mindspace-body { display: flex; min-height: 520px; flex: 1; min-width: 0; }
 .mindspace-explorer { margin: 2px 0 8px 20px; padding: 3px 0 3px 10px; border-left: 1px solid var(--line); font-size: .8125rem; min-width: 0; }
@@ -253,7 +259,7 @@ body[data-theme='dark'] .ms-sheet .ms-month-start > * { border-top-color: hsl(va
 @media (max-width: 760px) {
   .mindspace-body { flex-direction: column; }
   .mindspace-item-header { padding: 12px; }.mindspace-item-title { align-items: flex-start; }.mindspace-item-title .button-row { flex-wrap: wrap; }
-  .mindspace-tabs [role="tab"] { max-width: 160px; }.ms-kind-grid { grid-template-columns: 1fr; }.ms-board-editor,.ms-habits { padding: 12px; }
+  .mindspace-tab { max-width: 190px; }.ms-kind-grid { grid-template-columns: 1fr; }.ms-board-editor,.ms-habits { padding: 12px; }
 }
 
 .ms-linked-from { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 10px; font-size: .75rem; color: var(--muted); }

@@ -2,7 +2,7 @@
 
 class MindSpace extends PageController {
   constructor(home) {
-    super(['ms-new','ms-new-kind','ms-open','ms-folder','ms-rename','ms-move','ms-retry',
+    super(['ms-new','ms-new-kind','ms-open','ms-tab-close','ms-folder','ms-rename','ms-move','ms-retry',
       'ms-link-return','ms-link-returns','ms-sidebar-open','ms-sidebar-toggle','ms-sidebar-add','ms-space-open','ms-space-new','ms-entry-menu','ms-space-rename','ms-share','ms-delete','ms-space-delete',
       'ms-card-new','ms-card-edit','ms-column-new','ms-sprint','ms-habits-select','ms-habit-new','ms-sheet-row','ms-sheet-column','ms-sheet-export','ms-download-pdf','ms-sheet-settings']);
     this.home = home;
@@ -74,6 +74,7 @@ class MindSpace extends PageController {
     this.error = ''; this.savePromise = null; this.draggingId = null;
     this.titleEdit = null; this.titleSave = null;
     this.sidebarExpanded = undefined; this.treeExpanded = undefined; this.linkArrival = null;
+    this.openTabs = new Map();
   }
   enabled() { return !!S.data?.mindspace; }
   can(right, item = this.active) { return !S.sharedWorkspace || !!(item?.permissions || S.sharedWorkspace.permissions)[right]; }
@@ -106,6 +107,7 @@ class MindSpace extends PageController {
       if (chosen?.kind === 'spreadsheet') this.draft.cells = { ...this.draft.cells };
       this.baseline = JSON.stringify(this.draft);
     }
+    this.rememberTab(this.active);
   }
 
   pathTo(id, spaceId = this.spaceId()) {
@@ -119,12 +121,54 @@ class MindSpace extends PageController {
     return path;
   }
 
+  tabKey(spaceId = this.spaceId()) {
+    return `mindspace-tabs:${new URL(location.href).pathname}:${S.user?.id || 'guest'}:${S.sharedWorkspace?.id || 'own'}:${spaceId || 0}`;
+  }
+  storeTabs(ids, spaceId = this.spaceId()) {
+    const key = this.tabKey(spaceId);
+    this.openTabs.set(key, ids);
+    try { localStorage.setItem(key, JSON.stringify(ids)); } catch {}
+  }
+  tabItems(spaceId = this.spaceId()) {
+    const key = this.tabKey(spaceId);
+    if (!this.openTabs.has(key)) {
+      let ids;
+      try { ids = JSON.parse(localStorage.getItem(key) || '[]'); } catch {}
+      this.openTabs.set(key, Array.isArray(ids) ? ids : []);
+    }
+    const stored = this.openTabs.get(key), items = new Map(this.items(spaceId).filter(item => item.kind !== 'folder').map(item => [item.id, item]));
+    const ids = [...new Set(stored)].filter(id => Number.isInteger(id) && items.has(id));
+    if (JSON.stringify(ids) !== JSON.stringify(stored)) this.storeTabs(ids, spaceId);
+    return ids.map(id => items.get(id));
+  }
+  rememberTab(item) {
+    if (!item || item.kind === 'folder') return;
+    const spaceId = item.mindspace_id || this.spaceId(), ids = this.tabItems(spaceId).map(entry => entry.id);
+    if (!ids.includes(item.id)) this.storeTabs([...ids, item.id], spaceId);
+  }
   tabs() {
-    const docs = this.items().filter(item => item.kind !== 'folder');
-    return docs.map((item, index) => `<button type="button" role="tab" id="ms-tab-${item.id}" aria-controls="mindspace-panel"
-      aria-selected="${item.id === this.active?.id}" tabindex="${item.id === this.active?.id || (!this.active && index === 0) ? 0 : -1}"
-      draggable="true" data-ms-draggable="${item.id}" data-action="ms-open" data-id="${item.id}" ${this.contextAttributes('item', item.id)} title="${esc(item.name)}">
-      ${this.kindIcon(item.kind)}<span>${esc(item.name)}</span></button>`).join('');
+    const docs = this.tabItems(), hasActive = docs.some(item => item.id === this.active?.id);
+    return docs.map((item, index) => `<div class="mindspace-tab ${item.id === this.active?.id ? 'is-active' : ''}" role="presentation" ${this.contextAttributes('item', item.id)}>
+      <button type="button" role="tab" id="ms-tab-${item.id}" aria-controls="mindspace-panel"
+      aria-selected="${item.id === this.active?.id}" tabindex="${item.id === this.active?.id || (!hasActive && index === 0) ? 0 : -1}"
+      draggable="true" data-ms-draggable="${item.id}" data-action="ms-open" data-id="${item.id}" title="${esc(item.name)}">
+      ${this.kindIcon(item.kind)}<span>${esc(item.name)}</span></button>
+      <button type="button" class="mindspace-tab-close" data-action="ms-tab-close" data-id="${item.id}" aria-label="${esc(t('ms_close_tab', {name:item.name}))}" title="${esc(t('ms_close_tab', {name:item.name}))}">${icon('close')}</button>
+      </div>`).join('');
+  }
+  async closeTab(id) {
+    const generation = this.generation, spaceId = this.spaceId();
+    if (!this.tabItems(spaceId).some(item => item.id === id)) return;
+    const isActive = this.active?.id === id;
+    if (isActive && (!await this.flush() || generation !== this.generation)) return;
+    const docs = this.tabItems(spaceId), index = docs.findIndex(item => item.id === id);
+    if (index < 0) return;
+    const next = docs[index + 1] || docs[index - 1] || null;
+    this.storeTabs(docs.filter(item => item.id !== id).map(item => item.id), spaceId);
+    this.closeMenu();
+    if (isActive) { this.navigateTo(next, spaceId); return; }
+    this.syncTabs();
+    (document.getElementById(`ms-tab-${next?.id}`) || document.querySelector?.('.mindspace-add'))?.focus();
   }
 
   sidebarKey() { return `mindspace-sidebar:${new URL(location.href).pathname}:${S.user?.id || 'guest'}`; }
@@ -413,6 +457,7 @@ class MindSpace extends PageController {
       mindspace_id:old?.mindspace_id || this.spaceId(), parent_id:old?.parent_id || null, content:{}, version:old?.version || 1 };
     this.upsert(item);
     this.active = item;
+    this.rememberTab(item);
   }
   upsert(item) {
     const items = this.allItems(), index = items.findIndex(entry => entry.id === item.id);
@@ -456,7 +501,12 @@ class MindSpace extends PageController {
     return this.flushContent();
   }
   async go(item, spaceId = this.spaceId(), target = null) {
-    if (!await this.flush()) return;
+    const generation = this.generation;
+    if (!await this.flush() || generation !== this.generation) return;
+    this.navigateTo(item, spaceId, target);
+  }
+  navigateTo(item, spaceId = this.spaceId(), target = null) {
+    this.rememberTab(item);
     const url = new URL(location.href);
     for (const key of ['diagram','topic','item','folder','space','cell','card','column','habit']) url.searchParams.delete(key);
     if (item?.mindspace_id || spaceId) url.searchParams.set('space', item?.mindspace_id || spaceId);
@@ -742,6 +792,7 @@ class MindSpace extends PageController {
     if (action === 'ms-space-open') return this.go(null, Number(button.dataset.space));
     if (action === 'ms-new') return this.newMenu();
     if (action === 'ms-new-kind') return this.newForm(button.dataset.kind, this.creationContext(button));
+    if (action === 'ms-tab-close') return this.closeTab(Number(button.dataset.id));
     if (action === 'ms-open' || action === 'ms-folder') return this.go(this.allItems().find(item => item.id === Number(button.dataset.id)) || null);
     if (action === 'ms-rename') return this.rename(Number(button.dataset.id) || this.active?.id);
     if (action === 'ms-move') return this.moveForm();
