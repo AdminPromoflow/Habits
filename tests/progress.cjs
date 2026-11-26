@@ -114,7 +114,7 @@ test('lines stop at unscheduled or future dates, retain zero values, and show is
   assert.equal(line.points[5].y, 270);
   assert.equal(line.points[6], null);
   assert.equal((progressLinePath(line.points).match(/M/g) || []).length, 2);
-  assert.ok(!progressLinePath(line.points).includes('L'));
+  assert.ok(!progressLinePath(line.points).includes('C'));
   assert.equal((progressChart(report, {period:'week'}, report.buckets[3]).match(/data-action="progress-point"/g) || []).length, 2);
 });
 test('daily points reflect scheduled hours and keep untimed activities separate', () => {
@@ -131,5 +131,24 @@ test('daily points reflect scheduled hours and keep untimed activities separate'
   assert.equal(lines[1].points[0].percent, 0);
   assert.equal(lines[1].points[1], null);
   assert.equal(lines[1].points[2], null);
-  assert.equal((progressLinePath(lines[0].points).match(/L/g) || []).length, 2);
+  assert.equal((progressLinePath(lines[0].points).match(/C/g) || []).length, 2);
+});
+
+test('rounded curves pass through real points and never overshoot peaks, plateaus or 0–100 percent', () => {
+  for (const ys of [[0,270,0,270],[270,135,0,0,135],[10,20,250,260],[270,270,270],[0,0,0]]) {
+    const points=ys.map((y,i)=>({x:i*100+25,y}));
+    const path=progressLinePath(points);
+    const curves=[...path.matchAll(/C([\d., -]+)/g)].map(match=>match[1].trim().split(/[ ,]+/).map(Number));
+    assert.equal(curves.length,points.length-1);
+    curves.forEach(([x1,y1,x2,y2,x3,y3],index)=>{
+      const from=points[index],to=points[index+1];
+      assert.equal(x3,to.x); assert.equal(y3,to.y);
+      assert.ok(x1>from.x && x2<x3 && x1<=x2);
+      for(let step=0;step<=100;step++) {
+        const t=step/100,u=1-t;
+        const y=u*u*u*from.y+3*u*u*t*y1+3*u*t*t*y2+t*t*t*y3;
+        assert.ok(y>=Math.min(from.y,to.y)-0.001 && y<=Math.max(from.y,to.y)+0.001,`overshoot: ${y}`);
+      }
+    });
+  }
 });

@@ -94,9 +94,8 @@ function progressPeriodLabel(period, report) {
 // A line measures its own category, never its share of the total across categories.
 // Null points break a path: an unscheduled or future period is not a zero.
 function progressSeries(report) {
-  return report.categoryStats.map((category, index) => ({
+  return report.categoryStats.map(category => ({
     ...category,
-    dash: ['', '8 5', '3 5', '10 4 2 4'][index % 4],
     points: report.buckets.map((bucket, bucketIndex) => {
       const records = bucket.records.filter(record => record.category.key === category.key);
       if (!records.length || bucket.future) return null;
@@ -107,12 +106,35 @@ function progressSeries(report) {
 }
 
 function progressLinePath(points) {
-  let connected = false;
-  return points.map(point => {
-    if (!point) { connected = false; return ''; }
-    const command = connected ? 'L' : 'M'; connected = true;
-    return `${command}${point.x.toFixed(2)},${point.y.toFixed(2)}`;
-  }).filter(Boolean).join(' ');
+  const commands = [];
+  let run = [];
+  const coordinate = point => `${point.x.toFixed(2)},${point.y.toFixed(2)}`;
+  const appendRun = () => {
+    if (!run.length) return;
+    commands.push(`M${coordinate(run[0])}`);
+    const slopes = run.slice(1).map((point, index) => (point.y - run[index].y) / (point.x - run[index].x));
+    const tangents = run.map((point, index) => {
+      if (index === 0) return slopes[0] || 0;
+      if (index === run.length - 1) return slopes[index - 1] || 0;
+      const before = slopes[index - 1], after = slopes[index];
+      // Flatten peaks and plateaus; limit other tangents to the gentler slope.
+      // This keeps each curve inside its endpoints' values, including 0–100%.
+      return before * after > 0 ? Math.sign(before) * Math.min(Math.abs(before), Math.abs(after)) : 0;
+    });
+    for (let index = 1; index < run.length; index++) {
+      const before = run[index - 1], point = run[index], third = (point.x - before.x) / 3;
+      const first = { x: before.x + third, y: before.y + tangents[index - 1] * third };
+      const second = { x: point.x - third, y: point.y - tangents[index] * third };
+      commands.push(`C${coordinate(first)} ${coordinate(second)} ${coordinate(point)}`);
+    }
+    run = [];
+  };
+  for (const point of points) {
+    if (point) run.push(point);
+    else appendRun();
+  }
+  appendRun();
+  return commands.join(' ');
 }
 
 function progressChart(report, state, selected) {
@@ -127,7 +149,7 @@ function progressChart(report, state, selected) {
         <div class="progress-gridlines" aria-hidden="true">${[100, 75, 50, 25, 0].map(n => `<i class="${n === 100 ? 'is-target' : ''}"></i>`).join('')}</div>
         ${selectedIndex >= 0 ? `<div class="progress-crosshair" aria-hidden="true" style="left:${100 * (selectedIndex + 0.5) / report.buckets.length}%"></div>` : ''}
         <svg class="progress-line-svg" viewBox="0 0 1000 270" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-          ${series.map(category => `<path class="progress-series-line ${state.pointCategory && state.pointCategory !== category.key ? 'is-muted' : ''}" style="--series-color:${category.color}" d="${progressLinePath(category.points)}" fill="none" stroke-dasharray="${category.dash}" vector-effect="non-scaling-stroke"/>`).join('')}
+          ${series.map(category => `<path class="progress-series-line ${state.pointCategory && state.pointCategory !== category.key ? 'is-muted' : ''}" style="--series-color:${category.color}" d="${progressLinePath(category.points)}" fill="none" vector-effect="non-scaling-stroke"/>`).join('')}
         </svg>
         ${series.map(category => category.points.map(point => {
           if (!point) return '';
@@ -143,7 +165,7 @@ function progressChart(report, state, selected) {
 }
 
 function progressLegend(report, state) {
-  return progressSeries(report).map(category => `<button type="button" data-action="progress-series" data-category="${esc(category.key)}" class="${state.pointCategory === category.key ? 'is-selected' : ''} ${state.pointCategory && state.pointCategory !== category.key ? 'is-muted' : ''}" aria-pressed="${state.pointCategory === category.key}" aria-controls="progress-detail" title="${esc(t('progress_highlight_category', { category: category.name }))}"><svg viewBox="0 0 32 12" aria-hidden="true" style="--series-color:${category.color}"><path d="M0 6H32" stroke-dasharray="${category.dash}"/><circle cx="16" cy="6" r="3"/></svg>${esc(category.name)}</button>`).join('');
+  return progressSeries(report).map(category => `<button type="button" data-action="progress-series" data-category="${esc(category.key)}" class="${state.pointCategory === category.key ? 'is-selected' : ''} ${state.pointCategory && state.pointCategory !== category.key ? 'is-muted' : ''}" aria-pressed="${state.pointCategory === category.key}" aria-controls="progress-detail" title="${esc(t('progress_highlight_category', { category: category.name }))}"><svg viewBox="0 0 32 12" aria-hidden="true" style="--series-color:${category.color}"><path d="M0 6H32"/><circle cx="16" cy="6" r="3"/></svg>${esc(category.name)}</button>`).join('');
 }
 
 function progressDetail(bucket) {
