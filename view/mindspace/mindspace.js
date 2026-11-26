@@ -28,6 +28,7 @@ class MindSpace extends PageController {
     document.addEventListener('click', event => {
       if (!event.target.closest?.('#ms-context-menu,[data-action="ms-entry-menu"]')) this.closeMenu();
     });
+    document.addEventListener('contextmenu', event => this.contextMenu(event));
     document.addEventListener('dblclick', event => {
       const heading = event.target.closest?.('[data-ms-title]');
       if (!heading || !this.enabled()) return;
@@ -122,7 +123,7 @@ class MindSpace extends PageController {
     const docs = this.items().filter(item => item.kind !== 'folder');
     return docs.map((item, index) => `<button type="button" role="tab" id="ms-tab-${item.id}" aria-controls="mindspace-panel"
       aria-selected="${item.id === this.active?.id}" tabindex="${item.id === this.active?.id || (!this.active && index === 0) ? 0 : -1}"
-      draggable="true" data-ms-draggable="${item.id}" data-action="ms-open" data-id="${item.id}" title="${esc(item.name)}">
+      draggable="true" data-ms-draggable="${item.id}" data-action="ms-open" data-id="${item.id}" ${this.contextAttributes('item', item.id)} title="${esc(item.name)}">
       ${this.kindIcon(item.kind)}<span>${esc(item.name)}</span></button>`).join('');
   }
 
@@ -173,11 +174,12 @@ class MindSpace extends PageController {
     if (S.sharedWorkspace && !['edit','delete','share'].some(right => this.can(right, entry))) return '';
     return `<button type="button" class="ms-entry-more" data-action="ms-entry-menu" data-target="${target}" data-id="${id}" aria-haspopup="menu" aria-expanded="false" aria-label="${esc(t('ms_options_for', {name}))}" title="${esc(t('more'))}"><span aria-hidden="true">⋯</span></button>`;
   }
+  contextAttributes(target, id) { return `data-ms-context="${target}" data-ms-context-id="${id}"`; }
   homeList() {
     const spaces = this.spaces();
     return renderTemplate('home-spaces', {
       heading:esc(t('ms_main_spaces')),
-      spaces:spaces.length ? `<ul class="home-space-list">${spaces.map(space => `<li><button type="button" data-action="ms-space-open" data-space="${space.id}">${this.kindIcon('folder')}<span>${esc(space.name)}</span>${icon('chevron')}</button></li>`).join('')}</ul>`
+      spaces:spaces.length ? `<ul class="home-space-list">${spaces.map(space => `<li><button type="button" data-action="ms-space-open" data-space="${space.id}" ${this.contextAttributes('space', space.id)}>${this.kindIcon('folder')}<span>${esc(space.name)}</span>${icon('chevron')}</button></li>`).join('')}</ul>`
         : `<p class="muted">${esc(t('ms_no_spaces'))}</p>`,
     });
   }
@@ -197,13 +199,13 @@ class MindSpace extends PageController {
         const folder = item.kind === 'folder', current = item.id === this.active?.id && (S.view === 'mindspaces' || S.sharedWorkspace);
         const row = `<button type="button" class="ms-entry-label ${current ? 'is-current' : ''}" data-action="${folder ? 'ms-folder' : 'ms-open'}" data-id="${item.id}"
           ${folder ? `data-ms-drop="${item.id}"` : ''} draggable="true" data-ms-draggable="${item.id}" ${current ? 'aria-current="page"' : ''} title="${esc(item.name)}">${this.kindIcon(item.kind)}<span>${esc(item.name)}</span></button>${this.moreButton('item', item.id, item.name)}`;
-        if (!folder) return `<div class="ms-tree-row ms-tree-document">${row}</div>`;
-        return `<details data-ms-tree="item-${item.id}" ${expanded[`item-${item.id}`] ?? ancestors.has(item.id) ? 'open' : ''}><summary class="ms-tree-row">${row}</summary>
+        if (!folder) return `<div class="ms-tree-row ms-tree-document" ${this.contextAttributes('item', item.id)}>${row}</div>`;
+        return `<details data-ms-tree="item-${item.id}" ${expanded[`item-${item.id}`] ?? ancestors.has(item.id) ? 'open' : ''}><summary class="ms-tree-row" ${this.contextAttributes('item', item.id)}>${row}</summary>
           <div class="ms-tree-children">${tree(spaceId, item.id, new Set([...seen, item.id]))}${this.addButton(spaceId, item.id)}</div></details>`;
       }).join('');
     return this.spaces().map(space => {
       const selected = hasSelection && space.id === this.spaceId(), current = selected && !this.active && (S.view === 'mindspaces' || S.sharedWorkspace);
-      return `<details class="ms-sidebar-space" data-ms-tree="space-${space.id}" ${expanded[`space-${space.id}`] ?? selected ? 'open' : ''}><summary class="ms-tree-row">
+      return `<details class="ms-sidebar-space" data-ms-tree="space-${space.id}" ${expanded[`space-${space.id}`] ?? selected ? 'open' : ''}><summary class="ms-tree-row" ${this.contextAttributes('space', space.id)}>
         <button type="button" class="ms-entry-label ms-explorer-root ${current ? 'is-current' : ''}" data-action="ms-space-open" data-space="${space.id}"
         data-ms-drop="0" data-ms-space="${space.id}" ${current ? 'aria-current="page"' : ''} title="${esc(space.name)}">${this.kindIcon('folder')}<span>${esc(space.name)}</span></button>${this.moreButton('space', space.id, space.name)}</summary>
         <div class="ms-tree-children ms-sidebar-folders">${tree(space.id, null)}${this.addButton(space.id)}</div></details>`;
@@ -212,17 +214,30 @@ class MindSpace extends PageController {
 
   closeMenu(restoreFocus = false) {
     document.getElementById('ms-context-menu')?.remove();
-    this.menuTrigger?.setAttribute('aria-expanded', 'false');
+    if (this.menuTrigger?.dataset.action === 'ms-entry-menu') this.menuTrigger.setAttribute('aria-expanded', 'false');
     if (restoreFocus && this.menuTrigger?.isConnected) this.menuTrigger.focus();
-    this.menuTrigger = null;
+    this.menuTrigger = null; this.menuPosition = null;
   }
-  entryMenu(button) {
+  contextMenu(event) {
+    if (!this.enabled() || event.defaultPrevented || event.target.closest?.('#ms-context-menu')) return;
+    const entry = event.target.closest?.('[data-ms-context],[data-action="ms-entry-menu"]');
+    if (!entry || event.target.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"])')) {
+      this.closeMenu(); return;
+    }
+    const button = entry.querySelector('[data-action="ms-entry-menu"]') || entry;
+    const rect = button.getBoundingClientRect();
+    const point = event.clientX || event.clientY ? {x:event.clientX, y:event.clientY} : {x:rect.left, y:rect.bottom};
+    if (this.entryMenu(button, point)) { event.preventDefault(); event.stopPropagation(); }
+  }
+  entryMenu(button, point = null) {
     const wasOpen = this.menuTrigger === button;
     this.closeMenu();
-    if (wasOpen) return;
-    const isSpace = button.dataset.target === 'space', id = Number(button.dataset.id);
+    if (wasOpen && !point) return false;
+    const entry = button.closest('[data-ms-context]');
+    const isSpace = (entry?.dataset.msContext || button.dataset.target) === 'space';
+    const id = Number(entry?.dataset.msContextId || button.dataset.id);
     const target = (isSpace ? this.spaces() : this.allItems()).find(item => item.id === id);
-    if (!target) return;
+    if (!target || !['edit','delete','share'].some(right => this.can(right, target))) return false;
     const spaceId = isSpace ? id : target.mindspace_id || this.spaceId();
     const parent = isSpace ? 0 : target.kind === 'folder' ? id : target.parent_id || 0;
     const context = `data-space="${spaceId}" data-parent="${parent}"`;
@@ -240,8 +255,10 @@ class MindSpace extends PageController {
       + (this.can('edit', target) ? option(isSpace ? 'ms-space-rename' : 'ms-rename', t('ms_rename'), `data-id="${id}"`) : '')
       + (this.can('share', target) ? option('ms-share', t('ms_share'), `data-target="${isSpace ? 'space' : 'item'}" data-id="${id}"`) : '')
       + (this.can('delete', target) ? option(isSpace ? 'ms-space-delete' : 'ms-delete', t('delete'), `data-id="${id}"`, '', 'is-danger') : '');
-    document.body.append(menu); this.menuTrigger = button;
-    button.setAttribute('aria-expanded', 'true'); button.setAttribute('aria-controls', menu.id);
+    document.body.append(menu); this.menuTrigger = button; this.menuPosition = point;
+    if (button.dataset.action === 'ms-entry-menu') {
+      button.setAttribute('aria-expanded', 'true'); button.setAttribute('aria-controls', menu.id);
+    }
     const branch = menu.querySelector('.ms-context-new'), newButton = menu.querySelector('#ms-context-new');
     branch.addEventListener('mouseenter', () => this.newSubmenu(true));
     branch.addEventListener('mouseleave', () => this.newSubmenu(false));
@@ -250,14 +267,15 @@ class MindSpace extends PageController {
       if (!branch.contains(event.target)) this.newSubmenu(false);
     });
     this.positionMenu();
-    (canNew ? newButton : menu.querySelector('[data-action="ms-rename"],[data-action="ms-space-rename"],[data-action="ms-share"],[data-action="ms-delete"],[data-action="ms-space-delete"]'))?.focus();
+    (canNew ? newButton : menu.querySelector('[data-action="ms-rename"],[data-action="ms-space-rename"],[data-action="ms-share"],[data-action="ms-delete"],[data-action="ms-space-delete"]'))?.focus({preventScroll:true});
+    return true;
   }
   positionMenu() {
     const menu = document.getElementById('ms-context-menu');
     if (!menu || !this.menuTrigger) return;
     const rect = this.menuTrigger.getBoundingClientRect();
-    menu.style.left = `${Math.max(8, Math.min(rect.right + 6, window.innerWidth - menu.offsetWidth - 8))}px`;
-    menu.style.top = `${Math.max(8, Math.min(rect.top, window.innerHeight - menu.offsetHeight - 8))}px`;
+    menu.style.left = `${Math.max(8, Math.min(this.menuPosition?.x ?? rect.right + 6, window.innerWidth - menu.offsetWidth - 8))}px`;
+    menu.style.top = `${Math.max(8, Math.min(this.menuPosition?.y ?? rect.top, window.innerHeight - menu.offsetHeight - 8))}px`;
   }
   newSubmenu(open, focusFirst = false) {
     const submenu = document.getElementById('ms-context-submenu'), button = document.getElementById('ms-context-new');
@@ -299,24 +317,24 @@ class MindSpace extends PageController {
 
   folderContent() {
     const children = this.items().filter(item => item.parent_id === this.folderId()).sort((a,b) => Number(b.kind === 'folder') - Number(a.kind === 'folder') || a.name.localeCompare(b.name));
-    return `<div class="mindspace-directory" data-ms-drop="${this.folderId() || 0}">${children.length ? `<div class="ms-file-grid">${children.map(item =>
-      `<button type="button" class="ms-file" data-action="ms-open" data-id="${item.id}" draggable="true" data-ms-draggable="${item.id}" ${item.kind === 'folder' ? `data-ms-drop="${item.id}"` : ''}>
+    return `<div class="mindspace-directory" tabindex="-1" ${this.contextAttributes(this.active ? 'item' : 'space', this.active?.id || this.spaceId())} data-ms-drop="${this.folderId() || 0}">${children.length ? `<div class="ms-file-grid">${children.map(item =>
+      `<button type="button" class="ms-file" data-action="ms-open" data-id="${item.id}" ${this.contextAttributes('item', item.id)} draggable="true" data-ms-draggable="${item.id}" ${item.kind === 'folder' ? `data-ms-drop="${item.id}"` : ''}>
         ${this.kindIcon(item.kind)}<strong>${esc(item.name)}</strong><small>${esc(this.kindLabel(item.kind))}</small></button>`).join('')}</div>`
       : `<div class="ms-empty">${this.kindIcon('folder')}<p>${esc(t('ms_folder_empty'))}</p><button type="button" class="btn primary" data-action="ms-new">${icon('plus')}${esc(t('ms_add'))}</button></div>`}</div>`;
   }
 
   frame(content) {
     const parent = this.folderId();
-    const path = (S.sharedWorkspace ? '' : `<button type="button" data-view="mindspaces">${esc(t('mindspaces'))}</button><span aria-hidden="true">/</span>`) + `<button type="button" data-action="ms-folder" data-id="0" data-ms-drop="0">${esc(this.spaceName())}</button>` + this.pathTo(parent).map(folder =>
-      `<span aria-hidden="true">/</span><button type="button" data-action="ms-folder" data-id="${folder.id}" data-ms-drop="${folder.id}">${esc(folder.name)}</button>`).join('');
+    const path = (S.sharedWorkspace ? '' : `<button type="button" data-view="mindspaces">${esc(t('mindspaces'))}</button><span aria-hidden="true">/</span>`) + `<button type="button" data-action="ms-folder" data-id="0" data-ms-drop="0" ${this.contextAttributes('space', this.spaceId())}>${esc(this.spaceName())}</button>` + this.pathTo(parent).map(folder =>
+      `<span aria-hidden="true">/</span><button type="button" data-action="ms-folder" data-id="${folder.id}" data-ms-drop="${folder.id}" ${this.contextAttributes('item', folder.id)}>${esc(folder.name)}</button>`).join('');
     return renderTemplate('mindspace', {
       spaceName:esc(this.spaceName()), intro:t('ms_intro'), tabsLabel:t('ms_tabs'), tabs:this.tabs(), plus:icon('plus'), addLabel:t('ms_add'),
       pathLabel:t('ms_folder_path'), path, linkedFrom:this.linkedFrom(),
       name:esc(this.active?.name || t('ms_files')),
       documentKey:this.active && this.active.kind !== 'folder' ? `${S.user?.id || ''}:item:${this.active.id}` : '',
       documentKind:esc(this.active?.kind || ''),
-      spaceHeading:`<h1 ${this.spaces().some(space => space.id === this.spaceId() && this.can('edit', space)) ? `data-ms-title="space" title="${esc(t('ms_title_edit_hint'))}"` : ''}>${esc(this.spaceName())}</h1>`,
-      itemHeading:`<h2 id="mindspace-item-name" ${this.active && this.can('edit') ? `data-ms-title="item" title="${esc(t('ms_title_edit_hint'))}"` : ''}>${esc(this.active?.name || t('ms_files'))}</h2>`,
+      spaceHeading:`<h1 tabindex="-1" ${this.contextAttributes('space', this.spaceId())} ${this.spaces().some(space => space.id === this.spaceId() && this.can('edit', space)) ? `data-ms-title="space" title="${esc(t('ms_title_edit_hint'))}"` : ''}>${esc(this.spaceName())}</h1>`,
+      itemHeading:`<h2 id="mindspace-item-name" tabindex="-1" ${this.contextAttributes(this.active ? 'item' : 'space', this.active?.id || this.spaceId())} ${this.active && this.can('edit') ? `data-ms-title="item" title="${esc(t('ms_title_edit_hint'))}"` : ''}>${esc(this.active?.name || t('ms_files'))}</h2>`,
       actions:this.active ? `${this.can('edit') ? `<button type="button" class="text-btn" data-action="ms-rename">${esc(t('ms_rename'))}</button>` : ''}${this.can('move') ? `<button type="button" class="text-btn" data-action="ms-move">${esc(t('ms_move'))}</button>` : ''}` : '', content,
       download:this.active && this.active.kind !== 'folder' ? `<footer class="mindspace-item-footer"><button type="button" class="btn secondary" data-action="ms-download-pdf">${esc(t('ms_download_pdf'))}</button></footer>` : '',
     });
