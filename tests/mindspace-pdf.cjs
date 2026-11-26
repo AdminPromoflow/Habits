@@ -54,6 +54,7 @@ test('notebook exports every displayed page with artwork and styled text, withou
   context.Image=class { async decode() {} };
   context.document={fonts:{load:async()=>{}}};
   const pdf = new PDF(item,'Mi espacio'), rendered=[], images=[];
+  assert.ok(!pdf.doc.internal.pages[1].join('\n').includes('Tj'),'Notebook pages have no generic document heading');
   const snapshot={width:620,height:620*1272/902,image:'assets/planner/notepaper.png',writingStyle:"font-family:'MRM Edwardian'",pages:[
     {text:'Primera idea',date:'2026-11-25'}, {text:'',date:null}, {text:'Última idea',date:'2026-12-01'},
   ]};

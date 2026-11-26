@@ -5,6 +5,7 @@
 class MindSpaceNotes {
   static LIMIT = 200000;
   static MAX_PAGES = 20000;
+  static dateLabel(date) { return date.split('-').reverse().join('/'); }
   constructor(space) { this.space = space; this.index = 0; this.pages = []; }
   static pages(content) {
     return content.pages?.length ? content.pages.map(page => ({...page}))
@@ -136,7 +137,7 @@ class MindSpaceNotes {
     const signature = `${this.index}:${page.date}:${editable}`;
     if (date.dataset.state !== signature) {
       date.dataset.state = signature;
-      date.innerHTML = page.date ? `<label class="sr-only" for="ms-note-date">${esc(t('date'))}</label><input type="date" id="ms-note-date" data-note-date value="${esc(page.date)}" min="1000-01-01" max="9998-12-31" ${editable ? '' : 'readonly'}>${editable ? `<button type="button" data-note-action="remove-date" aria-label="${esc(t('ms_note_remove_date'))}" title="${esc(t('ms_note_remove_date'))}">×</button>` : ''}`
+      date.innerHTML = page.date ? `<label class="ms-note-date-control"><span class="sr-only">${esc(t('date'))}</span><time datetime="${esc(page.date)}" aria-hidden="true">${esc(MindSpaceNotes.dateLabel(page.date))}</time><input type="date" id="ms-note-date" data-note-date aria-label="${esc(t('date'))}" value="${esc(page.date)}" min="1000-01-01" max="9998-12-31" ${editable ? '' : 'readonly'}></label>${editable ? `<button type="button" data-note-action="remove-date" aria-label="${esc(t('ms_note_remove_date'))}" title="${esc(t('ms_note_remove_date'))}">×</button>` : ''}`
         : editable ? `<button type="button" data-note-action="date">${icon('calendar')}<span>${esc(t('ms_note_add_date'))}</span></button>` : '';
     }
     this.input.maxLength = Math.max(page.text.length, MindSpaceNotes.LIMIT - MindSpaceNotes.text(this.pages).length + page.text.length);
@@ -188,6 +189,7 @@ class MindSpaceNotes {
     if (!event.target.closest?.('.ms-notebook')) return;
     const editable = this.space.can('edit'), target = event.target;
     if (type === 'click') {
+      if (editable && target.matches('[data-note-date]')) target.showPicker?.();
       const action = target.closest('[data-note-action]')?.dataset.noteAction;
       if (action === 'previous') this.turn(this.index-1);
       if (action === 'next') this.turn(this.index+1);

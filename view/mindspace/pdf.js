@@ -125,7 +125,7 @@ class MindSpacePDF {
     host.append(writing,counter);
     if (page.date) {
       const date = document.createElement('time'); date.dateTime = page.date;
-      date.textContent = new Intl.DateTimeFormat(undefined,{day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date(page.date+'T12:00:00'));
+      date.textContent = MindSpaceNotes.dateLabel(page.date);
       date.style.cssText = snapshot.dateStyle; host.append(date);
     }
     document.body.append(host);

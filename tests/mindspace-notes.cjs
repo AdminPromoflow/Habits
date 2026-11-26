@@ -6,6 +6,11 @@ const Notes = vm.runInNewContext(fs.readFileSync('view/mindspace/notes.js','utf8
 const plain = value => JSON.parse(JSON.stringify(value));
 const linesFit = text => text.split('\n').length <= 15;
 
+test('the notebook and PDF share an unambiguous day/month/year date label', () => {
+  assert.equal(Notes.dateLabel('2026-11-25'),'25/11/2026');
+  assert.equal(Notes.dateLabel('2026-12-01'),'01/12/2026');
+});
+
 test('legacy notes retain literal whitespace and Unicode without a migration', () => {
   const text = '\n <script>literal</script>\n\n  acción, año, 👩🏽‍💻  ';
   assert.deepEqual(plain(Notes.pages({text})),[{text,date:null,manual:true}]);

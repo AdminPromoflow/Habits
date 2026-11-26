@@ -3,38 +3,32 @@
     exit();
 } ?>
 <template id="view-progress">
-  {{heading}}
-  <div class="progress-stats">
-    <article class="card metric">
-      {{checkIcon}}<strong>{{completions}}</strong><span>{{completionsLabel}}</span>
-    </article>
-    <article class="card metric">
-      {{progressIcon}}<strong>{{percent}}%</strong><span>{{percentLabel}}</span>
-    </article>
-    <article class="card metric">
-      {{streakIcon}}<strong>{{streak}}</strong><span>{{streakLabel}}</span>
-    </article>
-  </div>
-  <div class="progress-columns">
-    <section class="card">
-      <div class="section-heading">
-        <h2>{{consistencyLabel}}</h2>
-        {{privacyBadge}}
-      </div>
-      <div class="bar-chart">{{bars}}</div>
-    </section>
-    <section class="card">
-      <h2>{{categoryLabel}}</h2>
-      <div class="category-progress">{{categories}}</div>
-    </section>
-  </div>
-  <section class="card heatmap-card">
-    <div class="section-heading">
-      <h2>{{activityLabel}}</h2>
-      <span class="muted">{{startDate}} – {{endDate}}</span>
+  <div class="progress-dashboard">
+    {{heading}}
+    <div class="progress-toolbar">
+      <div class="segmented progress-tabs" role="tablist" aria-label="{{tabsLabel}}">{{tabs}}</div>
+      <div class="progress-controls">{{controls}}</div>
     </div>
-    <div class="heatmap">{{heatmap}}</div>
-    <div class="heatmap-key"><span>{{lessLabel}}</span>{{legend}}<span>{{moreLabel}}</span></div>
-  </section>
-  <p class="field-help">{{explanation}}</p>
+    <div id="progress-panel" role="tabpanel" aria-labelledby="{{activeTab}}">
+      <section class="progress-overview">{{overview}}</section>
+      <div class="progress-workspace">
+        <section class="card progress-chart-card">
+          <div class="progress-chart-heading"><div><h2>{{chartTitle}}</h2><p>{{chartHint}}</p></div>{{categoryFilter}}</div>
+          <div class="progress-formula">{{formula}}</div>
+          {{chart}}
+          <div class="progress-legend">{{legend}}</div>
+          <p class="progress-chart-help">{{chartHelp}}</p>
+        </section>
+        <section class="card progress-category-card">
+          <h2>{{categoryTitle}}</h2><p>{{categoryHint}}</p>
+          <div class="progress-category-list">{{categories}}</div>
+        </section>
+      </div>
+      <section class="card progress-detail" id="progress-detail" aria-live="polite" aria-atomic="false">
+        <div class="progress-detail-heading"><div><span class="progress-eyebrow">{{detailEyebrow}}</span><h2>{{detailTitle}}</h2></div><strong>{{detailCount}}</strong></div>
+        {{detail}}
+      </section>
+      <p class="progress-explanation">{{explanation}}</p>
+    </div>
+  </div>
 </template>
