@@ -5,6 +5,7 @@ async function bootstrap() {
     pageControllers.home.reset();
     S.sharedWorkspace = null; S.ownedWorkspace = null; S.sharePerson = null; S.sharingTab = 'all';
     S.sharingSidebarExpanded = undefined;
+    S.progress = null;
   }
   Object.assign(S, {
     user: r.user,

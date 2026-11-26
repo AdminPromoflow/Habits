@@ -27,7 +27,9 @@ function progressMoveDate(period, date, direction) {
 
 function progressSummary(records) {
   const total = records.length, completed = records.filter(record => record.completed).length;
-  return { total, completed, pending: total - completed, percent: total ? Math.round(100 * completed / total) : null };
+  // Rounding must never report 100% while an activity is still pending.
+  const percent = total ? Math.min(completed === total ? 100 : 99, Math.round(100 * completed / total)) : null;
+  return { total, completed, pending: total - completed, percent };
 }
 
 // Use the same recurrence rules and personal completion records as My day to day.
@@ -125,8 +127,13 @@ function progressDetail(bucket) {
 }
 
 function progressPage() {
-  const state = progressState(), report = progressReport(state.period, state.date, state.category);
-  const currentKey = state.period === 'year' ? today().slice(0, 7) : today();
+  const state = progressState();
+  let report = progressReport(state.period, state.date, state.category);
+  if (state.category && !report.categories.some(category => category.key === state.category)) {
+    state.category = ''; state.bucket = '';
+    report = progressReport(state.period, state.date);
+  }
+  const currentKey = state.period === 'year' ? state.date.slice(0, 7) : state.date;
   const selected = report.buckets.find(b => b.key === state.bucket) || report.buckets.find(b => b.key === currentKey) || report.buckets.find(b => b.total) || report.buckets[0];
   state.bucket = selected?.key || '';
   const title = progressPeriodLabel(state.period, report), percentage = report.percent === null ? '—' : report.percent + '%';
@@ -137,7 +144,7 @@ function progressPage() {
     controls: `<div class="progress-date-navigation"><button class="icon-btn" data-action="progress-prev" aria-label="${esc(t('previous'))}">${icon('chevron', 'flip')}</button><label class="progress-date-picker"><span>${esc(title)}</span><input id="progress-date" type="date" value="${state.date}" min="1900-01-01" max="9998-12-31" aria-label="${esc(t('select_date'))}">${icon('calendar')}</label><button class="icon-btn" data-action="progress-next" aria-label="${esc(t('next'))}">${icon('chevron')}</button></div><button class="btn secondary" data-action="progress-today">${t('today')}</button>`,
     overview: `<div class="progress-overview-copy"><span class="progress-eyebrow">${t('progress_your_pace')}</span><h2>${t(report.total && report.pending === 0 ? 'progress_all_done' : 'progress_keep_going')}</h2><p>${t('progress_summary', { completed: report.completed, total: report.total })}</p><div class="progress-quick-stats"><span><strong>${report.completed}</strong>${t('progress_completed')}</span><span><strong>${report.pending}</strong>${t('progress_pending')}</span><span><strong>${report.total}</strong>${t('progress_scheduled')}</span></div></div><div class="progress-score" style="--score:${report.percent || 0}%" role="img" aria-label="${esc(t('completion_rate') + ': ' + percentage)}"><div><strong>${percentage}</strong><span>${t('progress_achieved')}</span></div></div>`,
     chartTitle: t('progress_chart_title'), chartHint: t('progress_axis_' + state.period),
-    categoryFilter: `<label class="progress-filter"><span>${t('category')}</span><select id="progress-category"><option value="">${t('progress_all_categories')}</option>${report.categories.map(c => `<option value="${esc(c.key)}" ${state.category === c.key ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>`,
+    categoryFilter: `<label class="progress-filter"><span>${t('category')}</span><select id="progress-category" aria-label="${esc(t('category'))}"><option value="">${t('progress_all_categories')}</option>${report.categories.map(c => `<option value="${esc(c.key)}" ${state.category === c.key ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>`,
     chart: progressChart(report, state, selected),
     legend: report.categoryStats.map(c => `<span><i class="progress-swatch" style="background:${c.color}"></i>${esc(c.name)}</span>`).join('') + `<span><i class="progress-swatch is-pending"></i>${t('progress_pending')}</span>`,
     formula: t('progress_formula'), chartHelp: t('progress_chart_help'),
@@ -176,7 +183,13 @@ class ProgressPage extends PageController {
     const scroll = $('.progress-chart-scroll')?.scrollLeft || 0;
     const top = window.scrollY;
     render();
-    if ($('.progress-chart-scroll')) $('.progress-chart-scroll').scrollLeft = scroll;
+    const chart = $('.progress-chart-scroll'), selected = $('.progress-column.is-selected');
+    if (chart) {
+      chart.scrollLeft = scroll;
+      if (selected && !focus.includes('progress-bucket')) {
+        chart.scrollLeft = Math.max(0, selected.offsetLeft - (chart.clientWidth - selected.offsetWidth) / 2);
+      }
+    }
     $(focus)?.focus({ preventScroll: true });
     window.scrollTo({ top, behavior: 'instant' });
   }
