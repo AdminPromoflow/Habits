@@ -23,6 +23,15 @@
 .planner-note-check[aria-pressed=true]::before { background:var(--planner-color); border-color:var(--planner-color); }
 .planner-note-check .icon { position:absolute; width:11px; height:11px; stroke-width:2; }
 .planner-note-check:disabled { opacity:.5; }
+.planner-note-category { position:relative; flex:none; width:20px; height:var(--note-rule); z-index:2; }
+.planner-note-category:hover, .planner-note-category:focus-within { z-index:5; }
+.planner-note-flag { display:grid; place-items:center; width:100%; height:100%; padding:0; color:var(--planner-color); cursor:help; }
+.planner-note-flag svg { width:18px; height:20px; overflow:visible; }
+.planner-note-flag .flag-cloth { fill:currentColor; stroke:color-mix(in srgb,currentColor 75%,#54594d); stroke-width:1; stroke-linejoin:round; }
+.planner-note-flag .flag-pole { fill:none; stroke:color-mix(in srgb,currentColor 65%,#54594d); stroke-width:1.6; stroke-linecap:round; }
+.planner-note-category-tooltip { position:absolute; left:calc(100% + 6px); top:50%; width:max-content; max-width:min(240px,52cqw); padding:7px 11px; border:1px solid #e7e8e2; border-left:3px solid var(--planner-color); border-radius:8px; background:#fffffe; color:#42483b; box-shadow:0 4px 16px #30382818; font-size:12px; font-weight:500; line-height:1.4; white-space:normal; overflow-wrap:anywhere; text-align:left; visibility:hidden; opacity:0; transform:translate(4px,-50%); transition:opacity .15s,transform .15s,visibility .15s; }
+.planner-note-category-tooltip::before { content:''; position:absolute; right:100%; top:0; width:9px; height:100%; }
+.planner-note-category:hover .planner-note-category-tooltip, .planner-note-category:focus-within .planner-note-category-tooltip { visibility:visible; opacity:1; transform:translate(0,-50%); }
 .planner-note-name { flex:1; min-width:0; text-align:left; padding:0; margin:0; line-height:var(--note-rule); font-weight:400; overflow-wrap:anywhere; white-space:pre-wrap; max-height:calc(var(--note-rule) * var(--note-lines)); overflow:auto; }
 .planner-note-measure .planner-note-row { height:auto; }
 .planner-note-measure .planner-note-name { max-height:none; overflow:visible; }
@@ -58,6 +67,8 @@
   .planner-note-check { width:18px; }
   .planner-note-check::before { width:10px; height:10px; }
   .planner-note-check .icon { width:9px; height:9px; }
+  .planner-note-category { width:16px; }
+  .planner-note-flag svg { width:15px; height:17px; }
   .planner-note-arrow { width:23px; height:38px; }
   .planner-note-arrow .icon { width:16px; height:16px; }
   .planner-month-navigation { margin-bottom:14px; }

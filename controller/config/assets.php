@@ -59,6 +59,7 @@ return [
         'view/admin/admin.js',
         'view/layout/layout.js',
         'view/layout/mobile-document.js',
+        'view/layout/main-scroll.js',
         'view/global/application.js',
     ],
     'templates' => [

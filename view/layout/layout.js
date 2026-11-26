@@ -43,6 +43,7 @@ function render() {
     pageControllers.home.mount();
     if (S.sharedWorkspace) mountSharedWorkspace();
   }
+  mainScrollNavigation.sync();
 }
 
 function shell() {

@@ -165,11 +165,18 @@ function plannerEntries(date) {
   return [...habits,...tasks].sort((a,b) => (a.scheduled_time || '').localeCompare(b.scheduled_time || '') || a.name.localeCompare(b.name));
 }
 
-function plannerEntryColor(entry) {
+function plannerEntryCategory(entry) {
   const category = [...(S.data.categories || []),...(S.data.category_catalog || [])].find(item => Number(item.id) === Number(entry.category_id));
-  // Shared habits also carry their category color when it is absent from the personal catalog.
+  // Shared habits carry their category name and color even outside the personal catalog.
   const categoryColor = category?.color || entry.color;
-  return /^#[0-9a-f]{6}$/i.test(categoryColor || '') ? categoryColor : '#B8A4D4';
+  return {
+    name:(category ? categoryName(category) : habitCategory(entry)) || t('planner_no_category'),
+    color:/^#[0-9a-f]{6}$/i.test(categoryColor || '') ? categoryColor : '#B8A4D4',
+  };
+}
+
+function plannerEntryColor(entry) {
+  return plannerEntryCategory(entry).color;
 }
 
 function plannerEntry(entry, date, compact = false) {
@@ -203,10 +210,12 @@ function plannerNoteTurn(date, page, pageCount, direction) {
 
 function plannerNoteRow(entry, date, lines = 1, measure = false) {
   const isHabit = entry.kind === 'habit', key = `${entry.kind}:${entry.id}`;
+  const category = plannerEntryCategory(entry), tooltipId = `planner-category-${entry.kind}-${entry.id}`;
   const edit = isHabit ? (entry.permission === 'owner' ? 'planner-edit-habit' : 'habit-detail') : 'planner-edit';
   const disabled = date > today() || (isHabit && entry.permission === 'viewer');
-  return `<div class="planner-note-row ${entry.completed ? 'is-done' : ''}" style="--planner-color:${plannerEntryColor(entry)};--note-lines:${lines}" ${measure ? 'data-note-measure' : `data-note-entry="${key}"`}>
+  return `<div class="planner-note-row ${entry.completed ? 'is-done' : ''}" style="--planner-color:${category.color};--note-lines:${lines}" ${measure ? 'data-note-measure' : `data-note-entry="${key}"`}>
     ${measure ? '<span class="planner-note-check"></span>' : `<button class="planner-note-check" data-action="${isHabit ? 'toggle-habit' : 'planner-complete'}" data-id="${entry.id}" data-date="${date}" aria-label="${esc(t('record_progress')+': '+entry.name)}" aria-pressed="${entry.completed}" ${disabled ? 'disabled' : ''}>${entry.completed ? icon('check') : ''}</button>`}
+    <span class="planner-note-category">${measure ? '' : `<button type="button" class="planner-note-flag" aria-label="${esc(t('category'))}" aria-describedby="${tooltipId}"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="flag-cloth" d="M5 4c5-3 9 3 14 0v10c-5 3-9-3-14 0Z"/><path class="flag-pole" d="M5 3v18"/></svg></button><span class="planner-note-category-tooltip" role="tooltip" id="${tooltipId}">${esc(category.name)}</span>`}</span>
     ${measure ? `<span class="planner-note-name">${esc(entry.name)}</span>` : `<button class="planner-note-name" data-action="${edit}" data-id="${entry.id}" data-date="${date}">${esc(entry.name)}</button>`}
     <time class="planner-note-time">${entry.scheduled_time?.slice(0,5) || ''}</time>
   </div>`;
