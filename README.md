@@ -148,7 +148,7 @@ El menú de tres puntos permite **Copiar**, **Cortar**, **Pegar** y **Eliminar**
 
 Cada actividad muestra una banderita entre el checkbox y el nombre, rellena con el color de su categoría. Al pasar el mouse, enfocar con teclado o tocar la banderita, aparece el nombre de la categoría a su derecha, sin cubrir el checkbox. Los hábitos compartidos conservan el nombre y color de su categoría aunque esta no esté en el catálogo personal.
 
-Todas las páginas con contenido principal desplazable tienen flechas flotantes para ir al inicio o al final. Cada flecha se oculta al llegar a su extremo; ambas desaparecen cuando el contenido cabe completo. En pantalla completa desplazan el documento ampliado y respetan la preferencia del sistema para reducir movimiento.
+Todas las páginas con contenido principal desplazable tienen flechas flotantes para ir al inicio o al final, centradas horizontalmente en `main`: una arriba y otra abajo. Cada flecha se oculta al llegar a su extremo; ambas desaparecen cuando el contenido cabe completo. En pantalla completa se centran en el documento ampliado y lo desplazan, respetando la preferencia del sistema para reducir movimiento.
 
 La hoja abre en vista normal. Comparte con los diagramas el botón para entrar en pantalla completa y la **X** para salir; la vista ampliada se conserva al cambiar de día o abrir el calendario mensual, pero no al recargar la página. En escritorio amplía la hoja hasta 820 px.
 

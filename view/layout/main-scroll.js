@@ -74,6 +74,11 @@ class MainScrollNavigation {
 
   update() {
     if (!this.controls) return;
+    if (this.main?.isConnected) {
+      const surface = this.main.querySelector('.mobile-document-surface') || this.main;
+      const bounds = surface.getBoundingClientRect();
+      this.controls.style.setProperty('--main-scroll-center', `${bounds.left + bounds.width / 2}px`);
+    }
     const target = this.target();
     const maximum = target ? this.maximum(target) : 0;
     this.controls.hidden = maximum <= 2;
