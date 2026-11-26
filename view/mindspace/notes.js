@@ -108,8 +108,11 @@ class MindSpaceNotes {
       group.text += page.text;
     });
     const pages = []; let nextAnchor;
-    for (const group of groups) {
+    for (const [groupIndex,group] of groups.entries()) {
       const parts = MindSpaceNotes.paginate(group.text, fits); let offset = 0;
+      // A newline consumed at an automatic page boundary must not create a
+      // phantom blank page when a manual page is subsequently inserted there.
+      if (groupIndex < groups.length-1 && parts.length > 1 && parts.at(-1) === '' && !(group.anchor?.focus && group.anchor.start === group.text.length)) parts.pop();
       parts.forEach((text,index) => {
         if (group.anchor && !nextAnchor && (group.anchor.start < offset + text.length || index === parts.length - 1)) {
           nextAnchor = {...group.anchor, page:pages.length, start:group.anchor.start-offset, end:Math.min(text.length,group.anchor.end-offset)};
@@ -154,6 +157,7 @@ class MindSpaceNotes {
     this.space.changed();
   }
   snapshot() { return JSON.stringify({pages:this.pages, font:this.space.draft.font || 'edwardian', index:this.index}); }
+  checkpoint() { if (this.history) this.history[this.historyIndex] = this.snapshot(); }
   undo(direction) {
     const index = this.historyIndex + direction;
     if (!this.history?.[index]) return;
@@ -161,12 +165,14 @@ class MindSpaceNotes {
     const saved = JSON.parse(this.history[index]); this.pages = saved.pages; this.index = saved.index;
     this.space.draft.font = saved.font; this.root.dataset.noteFont = saved.font;
     this.root.querySelector('[data-note-font-choice]').value = saved.font;
+    this.reflow({page:this.index,start:0,end:0});
     const end = this.pages[this.index].text.length;
-    this.reflow({page:this.index,start:end,end,focus:true}); this.show();
+    this.selection = {start:end,end,focus:true}; this.show();
     this.space.draft = {...this.space.draft, pages:this.pages.map(page => ({...page})), text:MindSpaceNotes.text(this.pages)};
     this.space.changed();
   }
   edit() {
+    this.checkpoint();
     const anchor = this.anchor(), previous = this.pages[this.index].text;
     this.pages[this.index].text = this.input.value;
     if (MindSpaceNotes.text(this.pages).length > MindSpaceNotes.LIMIT) {
@@ -186,6 +192,7 @@ class MindSpaceNotes {
       if (action === 'previous') this.turn(this.index-1);
       if (action === 'next') this.turn(this.index+1);
       if (!editable) return;
+      if (action) this.checkpoint();
       if (action === 'add') {
         if (this.pages.length >= MindSpaceNotes.MAX_PAGES || MindSpaceNotes.text(this.pages).length >= MindSpaceNotes.LIMIT) { toast(t('ms_note_limit'),true); return; }
         this.pages.splice(this.index+1,0,{text:'',date:null,manual:true});
@@ -209,11 +216,13 @@ class MindSpaceNotes {
       else this.edit();
     }
     if (type === 'change' && target.matches('[data-note-font-choice]')) {
+      this.checkpoint();
       const anchor = this.anchor(); this.space.draft.font = target.value;
       this.root.dataset.noteFont = target.value; this.reflow(anchor); this.show(); this.commit();
       this.afterFonts(true);
     }
     if (type === 'change' && target.matches('[data-note-date]') && target.validity.valid) {
+      this.checkpoint();
       this.pages[this.index].date = target.value || null; this.pages[this.index].manual = true; this.show(); this.commit();
     }
     if (type === 'keydown' && target === this.input && !event.isComposing && !this.composing) {
@@ -226,6 +235,7 @@ class MindSpaceNotes {
       if (event.key === 'ArrowRight' && end === target.value.length && this.index < this.pages.length-1) { event.preventDefault(); this.turn(this.index+1,0); }
       if (event.key === 'Backspace' && start === 0 && this.index) {
         event.preventDefault();
+        this.checkpoint();
         const previous = this.pages[this.index-1], offset = previous.text.length;
         const manual = this.pages[this.index].manual || this.pages[this.index].date;
         previous.text += this.pages[this.index].text; this.pages.splice(this.index,1); this.index--;
