@@ -3,9 +3,14 @@ const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
 const context=vm.createContext({Intl,Date,document:{addEventListener(){}}});
-vm.runInContext(fs.readFileSync('view/global/ui.js','utf8')+'\nclass PageController {}\n'+fs.readFileSync('view/calendar/calendar.js','utf8')+'\nthis.testApi={scheduled,plannerEntries,plannerNotePages,plannerNoteTurn,plannerNoteRow,plannerNoteMonth,CalendarPage,plannerCategoryOptions,plannerCategoryFields,plannerPendingEntries,plannerPendingsPage,S};',context);
+vm.runInContext(fs.readFileSync('view/global/ui.js','utf8')+'\nclass PageController {}\n'+fs.readFileSync('view/calendar/calendar.js','utf8')+'\nthis.testApi={scheduled,plannerEntries,plannerNotePages,plannerNoteTurn,plannerNoteRow,plannerNoteMonth,CalendarPage,plannerCategoryOptions,plannerCategoryFields,plannerPendingEntries,plannerPendingsPage,plannerPickerTime,S};',context);
 const {scheduled,plannerEntries,plannerNotePages,plannerNoteTurn,plannerNoteRow,plannerNoteMonth,CalendarPage,S}=context.testApi;
 const base={id:1,name:'<Task>',start_date:'2024-01-31',end_date:null,schedule_days:[1,3,5],recurrence:'monthly'};
+test('time picker preserves minutes and distinguishes midnight, noon and AM/PM',()=>{
+  for(const [hour,minute,period,expected] of [[12,0,'AM','00:00'],[12,0,'PM','12:00'],[1,7,'AM','01:07'],[1,7,'PM','13:07'],[11,59,'AM','11:59'],[11,59,'PM','23:59']]) {
+    assert.equal(context.testApi.plannerPickerTime(String(hour),String(minute),period),expected);
+  }
+});
 test('pending activities stay outside every calendar date and appear together by category',()=>{
   S.data={today:'2024-02-29',categories:[{id:1,name:'Work',color:'#AABBCC'}],habits:[
     {...base,id:10,name:'Pending habit',recurrence:'pending',start_date:null,schedule_days:[],status:'active',permission:'owner',category_id:1},
