@@ -122,11 +122,14 @@ def test_categories(owner, other, task, check):
     before=len(owner.data()['categories'])
     owner.request('saveCalendarEntry',dict(task,category_choice='new',new_category_name='Rollback category',start_date='invalid'),422)
     owner.request('saveCalendarEntry',dict(task,category_choice='new',new_category_name='  '),422)
+    owner.request('saveCalendarEntry',dict(task,category_choice='new',new_category_name='Invalid color',new_category_color='red'),422)
     check(len(owner.data()['categories'])==before,'A failed activity save does not leave an orphan category')
-    custom=owner.request('saveCalendarEntry',dict(task,category_choice='new',new_category_name='Planner new category'))['id']
+    custom=owner.request('saveCalendarEntry',dict(task,category_choice='new',new_category_name='Planner new category',new_category_color='#2874A6'))['id']
     custom_category=next(t for t in owner.data()['calendar']['tasks'] if t['id']==custom)['category_id']
-    second=owner.request('saveCalendarEntry',dict(task,category_choice='new',new_category_name='Planner new category'))['id']
+    check(next(c for c in owner.data()['categories'] if c['id']==custom_category)['color']=='#2874A6','Inline category creation preserves the selected color')
+    second=owner.request('saveCalendarEntry',dict(task,category_choice='new',new_category_name='Planner new category',new_category_color='#CC3366'))['id']
     check(next(t for t in owner.data()['calendar']['tasks'] if t['id']==second)['category_id']==custom_category,'Inline category creation saves atomically and reuses an existing private name')
+    check(next(c for c in owner.data()['categories'] if c['id']==custom_category)['color']=='#2874A6','Reusing a category name does not recolor its other activities')
     owner.request('saveCalendarEntry',dict(task,kind='habit',id=habit,category_choice=f'category:{custom_category}'))
     check(next(h for h in owner.data()['habits'] if h['id']==habit)['category_id']==custom_category,'Existing habits can change category from the planner')
     global_category=next(c for c in owner.data()['category_catalog'] if not c['selected'])['id']

@@ -46,7 +46,7 @@ function plannerCategoryOptions(value = {}, existing = false) {
 
 function plannerCategoryFields(value, existing) {
   const {selected,groups} = plannerCategoryOptions(value,existing);
-  return `<label class="field"><span>${t('category')}</span><select name="category_choice" aria-label="${esc(t('category'))}">${groups.filter(([,options])=>options.length).map(([label,options])=>`${label ? `<optgroup label="${esc(t(label))}">` : ''}${options.map(([key,name])=>`<option value="${esc(key)}" ${key === selected ? 'selected' : ''}>${esc(name)}</option>`).join('')}${label ? '</optgroup>' : ''}`).join('')}</select></label><div data-new-planner-category hidden>${field('new_category_name','planner_new_category_name','text','',{maxlength:100})}</div>`;
+  return `<label class="field"><span>${t('category')}</span><select name="category_choice" aria-label="${esc(t('category'))}">${groups.filter(([,options])=>options.length).map(([label,options])=>`${label ? `<optgroup label="${esc(t(label))}">` : ''}${options.map(([key,name])=>`<option value="${esc(key)}" ${key === selected ? 'selected' : ''}>${esc(name)}</option>`).join('')}${label ? '</optgroup>' : ''}`).join('')}</select></label><div data-new-planner-category hidden><div class="form-grid">${field('new_category_name','planner_new_category_name','text','',{maxlength:100})}${field('new_category_color','color','color','#B8A4D4')}</div></div>`;
 }
 
 function plannerScheduleFields(entry = {}, kind = null) {
@@ -141,6 +141,7 @@ function plannerForm(entry = null, defaults = {}) {
     $('[data-new-planner-category]',form).hidden = !isNew;
     const input = $('[name=new_category_name]',form);
     input.disabled = !isNew; input.required = isNew;
+    $('[name=new_category_color]',form).disabled = !isNew;
   };
   $('[name=category_choice]',form).addEventListener('change',()=>{syncCategory(); if ($('[name=category_choice]',form).value === 'new') $('[name=new_category_name]',form).focus();});
   syncCategory();
@@ -239,9 +240,9 @@ function plannerCategoryKey(entry) {
 }
 
 function plannerFilterCategories() {
-  const categories = new Map((S.data.categories || []).map(category => [String(Number(category.id)),plannerEntryCategory({category_id:category.id})]));
-  const entries = [...(S.data.calendar?.tasks || []),...(S.data.habits || []).filter(habit => habit.status === 'active' && habit.permission !== 'viewer')];
-  for (const entry of entries) {
+  const categories = new Map();
+  // Use the day's unfiltered entries so a deselected category can be enabled again.
+  for (const entry of plannerEntries(S.date)) {
     const key = plannerCategoryKey(entry);
     if (!categories.has(key)) categories.set(key,plannerEntryCategory(entry));
   }

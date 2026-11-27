@@ -86,8 +86,9 @@ final class CalendarModel extends BaseModel
         if ($choice === 'none' && $kind === 'task') return null;
         if ($choice === 'new' || $choice === 'default') {
             $name = $choice === 'new' ? trim(Validate::text($d, 'new_category_name', 100)) : ($this->user['language'] === 'es' ? 'Mi día a día' : 'My day to day');
+            $color = $choice === 'new' ? Validate::color($d['new_category_color'] ?? '#B8A4D4') : '#B8A4D4';
             $existing = $this->db->one('SELECT id FROM habit_categories WHERE owner_user_id=? AND name=? ORDER BY id LIMIT 1 FOR UPDATE', [$this->uid(), $name]);
-            return $existing ? (int) $existing['id'] : (new CategoriesModel($this->db, $this->user))->saveCategory(['name'=>$name]);
+            return $existing ? (int) $existing['id'] : (new CategoriesModel($this->db, $this->user))->saveCategory(['name'=>$name,'color'=>$color]);
         }
         if (!preg_match('/^(category|folder|space):([1-9][0-9]*)$/D', $choice, $match)) fail('error_validation');
         $id = (int) $match[2];

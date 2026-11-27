@@ -17,7 +17,7 @@ test('flags never repeat colors, including duplicate, missing and shared categor
   const {S,plannerCategoryColors,plannerEntryCategory,plannerCategoryFilters,plannerNoteRow}=fixture();
   S.data.categories=Array.from({length:200},(_,id)=>({id:id+1,name:`Category ${id+1}`,color:'#B8A4D4'}));
   S.data.habits=[{id:90,category_id:901,category_name:'Shared',color:'#b8a4d4'}];
-  S.data.calendar.tasks.push({id:12,name:'Uncategorized'});
+  S.data.calendar.tasks.push({id:12,name:'Uncategorized',recurrence:'daily',start_date:S.date});
   const colors=plannerCategoryColors();
   assert.equal(colors.size,202);assert.equal(new Set(colors.values()).size,202);
   assert.ok([...colors.values()].every(color=>/^#[0-9A-F]{6}$/.test(color)));
