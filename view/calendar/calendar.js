@@ -307,6 +307,20 @@ function plannerNoteTurn(date, page, pageCount, direction) {
   return {date:next,page:direction < 0 ? -1 : 0};
 }
 
+function plannerNoteSchedule(entry, measure = false) {
+  const start = entry.scheduled_time?.slice(0,5) || '', end = entry.end_time?.slice(0,5) || '';
+  const hours = start && end ? `${start}–${end}` : start || (end ? `→ ${end}` : '');
+  const summary = hours ? esc(hours) : icon('clock');
+  if (measure) return `<span class="planner-note-schedule"><span class="planner-note-time">${summary}</span></span>`;
+  const tooltipId = `planner-schedule-${entry.kind}-${entry.id}`;
+  const detail = (date,time) => [date ? fmt(date,{day:'numeric',month:'short',year:'numeric'}) : t('planner_no_date'),time || t('planner_untimed')].join(' · ');
+  const finish = entry.end_date || end ? detail(entry.end_date,end) : t('planner_no_end');
+  return `<span class="planner-note-schedule">
+    <button type="button" class="planner-note-time" data-action="planner-schedule-details" aria-label="${esc(t('planner_schedule_details',{name:entry.name}))}" aria-describedby="${tooltipId}">${summary}</button>
+    <span class="planner-note-schedule-tooltip" role="tooltip" id="${tooltipId}"><span><strong>${esc(t('planner_start'))}</strong><span>${esc(detail(entry.start_date,start))}</span></span><span><strong>${esc(t('planner_finish'))}</strong><span>${esc(finish)}</span></span></span>
+  </span>`;
+}
+
 function plannerNoteRow(entry, date, lines = 1, measure = false) {
   const isHabit = entry.kind === 'habit', key = `${entry.kind}:${entry.id}`;
   const category = plannerEntryCategory(entry), tooltipId = `planner-category-${entry.kind}-${entry.id}`;
@@ -316,7 +330,7 @@ function plannerNoteRow(entry, date, lines = 1, measure = false) {
     ${measure ? '<span class="planner-note-check"></span>' : `<button class="planner-note-check" data-action="${isHabit ? 'toggle-habit' : 'planner-complete'}" data-id="${entry.id}" data-date="${date}" aria-label="${esc(t('record_progress')+': '+entry.name)}" aria-pressed="${entry.completed}" ${disabled ? 'disabled' : ''}>${entry.completed ? icon('check') : ''}</button>`}
     <span class="planner-note-category">${measure ? '' : `<button type="button" class="planner-note-flag" aria-label="${esc(t('category'))}" aria-describedby="${tooltipId}">${plannerFlagIcon()}</button><span class="planner-note-category-tooltip" role="tooltip" id="${tooltipId}">${esc(category.name)}</span>`}</span>
     ${measure ? `<span class="planner-note-name">${esc(entry.name)}</span>` : `<button class="planner-note-name" data-action="${edit}" data-id="${entry.id}" data-date="${date}" title="${esc(t('planner_drag_hint'))}">${esc(entry.name)}</button>`}
-    <time class="planner-note-time">${entry.scheduled_time?.slice(0,5) || ''}</time>
+    ${plannerNoteSchedule(entry,measure)}
     ${measure ? '<span class="planner-drag-handle"></span>' : `<button type="button" class="planner-drag-handle" data-planner-drag aria-label="${esc(t('planner_reorder', {name:entry.name}))}" title="${esc(t('planner_drag_hint'))}"><span aria-hidden="true">⠿</span></button>`}
   </div>`;
 }
@@ -386,7 +400,11 @@ function plannerPendingsPage() {
 
 class CalendarPage extends PageController {
   constructor() {
-    super(['date-prev','date-next','today','pick-date','calendar-date','planner-calendar-toggle','planner-month-prev','planner-month-next','planner-note-date','planner-note-prev','planner-note-next','planner-filter-category','planner-categories-left','planner-categories-right','planner-add','planner-edit','planner-delete','planner-delete-habit','planner-edit-habit','planner-complete']);
+    super(['date-prev','date-next','today','pick-date','calendar-date','planner-calendar-toggle','planner-month-prev','planner-month-next','planner-note-date','planner-note-prev','planner-note-next','planner-filter-category','planner-categories-left','planner-categories-right','planner-schedule-details','planner-add','planner-edit','planner-delete','planner-delete-habit','planner-edit-habit','planner-complete']);
+    for (const type of ['pointerover','focusin']) document.addEventListener(type,event => {
+      const schedule = event.target.closest?.('.planner-note-schedule');
+      if (schedule && !schedule.contains(event.relatedTarget)) schedule.classList.remove('is-dismissed');
+    });
     document.addEventListener('scroll',event => {
       if (event.target.matches?.('.planner-category-filters')) this.updateCategoryArrows();
     }, true);
@@ -396,6 +414,9 @@ class CalendarPage extends PageController {
     });
     document.addEventListener('keydown',async event => {
       if (event.key === 'Escape' && this.drag) { event.preventDefault(); this.cancelDrag(); return; }
+      if (event.key === 'Escape') {
+        $$('.planner-note-schedule').forEach(schedule => schedule.classList.add('is-dismissed'));
+      }
       const row = event.target.closest?.('[data-note-entry]');
       if (row && event.altKey && ['ArrowUp','ArrowDown'].includes(event.key)) {
         event.preventDefault();
@@ -410,7 +431,11 @@ class CalendarPage extends PageController {
         await navigate(view); $(`#planner-section-${view}`).focus(); return;
       }
     });
-    document.addEventListener('pointerdown',event => this.startDrag(event));
+    document.addEventListener('pointerdown',event => {
+      const focused = document.activeElement;
+      if (focused?.matches('.planner-note-time') && !focused.closest('.planner-note-schedule').contains(event.target)) focused.blur();
+      this.startDrag(event);
+    });
     document.addEventListener('pointermove',event => this.moveDrag(event), {passive:false});
     document.addEventListener('pointerup',event => {
       if (!this.drag || event.pointerId !== this.drag.pointerId) return;
@@ -584,6 +609,11 @@ class CalendarPage extends PageController {
   }
 
   async handleAction(action, el, id) {
+    if (action === 'planner-schedule-details') {
+      el.closest('.planner-note-schedule').classList.remove('is-dismissed');
+      el.focus({preventScroll:true});
+      return;
+    }
     if (['planner-categories-left','planner-categories-right'].includes(action)) {
       const filters = $('.planner-category-filters');
       if (filters) filters.scrollBy({left:(action.endsWith('right') ? 1 : -1) * Math.max(100,filters.clientWidth * .75),

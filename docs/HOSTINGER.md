@@ -99,6 +99,10 @@ Se aplicó `024_activity_end_time.sql` en local y en Hostinger mediante phpMyAdm
 
 Pasaron 366 comprobaciones HTTP, 9 de esquema/código y 31 pruebas JavaScript. La revisión en navegador de la base aislada confirmó los cuatro campos al reabrir una tarea después de recargar, un hábito con hora final sin fecha final y las etiquetas en inglés y español.
 
+En la revisión posterior del aviso de que la hora no cambiaba, Hostinger todavía mostraba el formulario anterior: **Date / Time (optional)**, sin los campos de fin. La publicación del código mediante Git sigue pendiente. Se comprobó en la base aislada la edición de horas sin cambiar fechas: una tarea pasó de `00:15 / 01:45` a `14:20 / 15:55`; un hábito guardó `10:10 / 11:40` manteniendo la fecha final vacía. Ambos recuperaron las nuevas horas tras recargar. En producción solo se inspeccionó y cerró el formulario, sin guardar actividades.
+
+La hoja de **Mi día a día** muestra ahora el intervalo horario en pequeño a la derecha de cada actividad. Al pasar el mouse, enfocar con el teclado o tocarlo, aparece un detalle de dos líneas con las fechas y horas de inicio y fin. Los datos opcionales sin definir se indican explícitamente; un pequeño reloj permite consultar las fechas de actividades sin horas. Escape cierra el detalle. Se comprobaron tareas, hábitos, hover sin foco y navegación por teclado; pasaron las 31 pruebas JavaScript del calendario y la navegación. Este ajuste solo modifica código y traducciones, no requiere otra migración y queda para publicar mediante Git.
+
 ### Pendientes, calendario de tarjetas y orden diario — 26 de noviembre de 2026
 
 El aviso «The database is unavailable» al guardar una actividad pendiente correspondía a un esquema desactualizado: producción solo tenía las migraciones 001–020. Se descargó primero una copia SQL completa desde phpMyAdmin (`u348170507_habits.sql`, 72.837 bytes, en Descargas; contiene datos privados y no se incorpora al repositorio). Después se aplicaron las tres migraciones pendientes y se registraron sus checksums:

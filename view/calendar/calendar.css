@@ -67,7 +67,15 @@
 .planner-drag-preview { position:fixed; z-index:1100; pointer-events:none; padding:12px 16px; max-height:100px; overflow:hidden; border:1px solid #ded9e6; border-left:4px solid; border-radius:8px; background:#fffffe; color:#30332e; box-shadow:0 8px 24px #302c2430; font-size:14px; line-height:1.4; white-space:pre-wrap; }
 body.planner-is-dragging, body.planner-is-dragging * { cursor:grabbing !important; user-select:none !important; }
 @media(hover:none), (pointer:coarse) { .planner-drag-handle { width:24px; opacity:.7; } }
-.planner-note-time { flex:none; width:3.2em; margin-left:3px; text-align:right; line-height:var(--note-rule); font-size:clamp(8px,1.65cqw,10.5px); font-variant-numeric:tabular-nums; color:#85877f; }
+.planner-note-schedule { position:relative; flex:none; margin-left:3px; height:var(--note-rule); font-size:clamp(8px,1.65cqw,10.5px); z-index:2; }
+.planner-note-schedule:hover, .planner-note-schedule:focus-within { z-index:6; }
+.planner-note-time { display:block; min-width:3.2em; height:var(--note-rule); padding:0; text-align:right; line-height:var(--note-rule); font-size:inherit; font-weight:400; font-variant-numeric:tabular-nums; color:#85877f; white-space:nowrap; cursor:help; }
+.planner-note-time .icon { width:12px; height:12px; vertical-align:middle; }
+.planner-note-time:focus-visible { outline:1px solid #85877f; outline-offset:3px; border-radius:3px; }
+.planner-note-schedule-tooltip { position:absolute; right:0; bottom:100%; width:max-content; max-width:min(260px,68cqw); padding:8px 10px; border:1px solid #e7e8e2; border-radius:7px; background:#fffffe; color:#61665a; box-shadow:0 4px 16px #30382818; text-align:left; font-size:11px; font-weight:400; line-height:1.5; visibility:hidden; opacity:0; pointer-events:none; }
+.planner-note-schedule-tooltip > span { display:grid; grid-template-columns:auto 1fr; gap:8px; }
+.planner-note-schedule-tooltip strong { min-width:3em; font-weight:500; }
+.planner-note-schedule:not(.is-dismissed):hover .planner-note-schedule-tooltip, .planner-note-schedule:not(.is-dismissed):focus-within .planner-note-schedule-tooltip { visibility:visible; opacity:1; pointer-events:auto; }
 .planner-note-page { position:absolute; top:85.4%; left:20%; right:20%; text-align:center; color:#8a8d83; font-size:clamp(9px,1.7cqw,11px); }
 .planner-note-arrow { position:absolute; top:50%; transform:translateY(-50%); display:grid; place-items:center; width:32px; height:48px; padding:5px; border-radius:8px; color:#858b7d; opacity:0; transition:opacity .18s,background .18s; }
 .planner-note-arrow.previous { left:1.5%; }
