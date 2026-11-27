@@ -49,6 +49,142 @@ function plannerCategoryFields(value, existing) {
   return `<label class="field"><span>${t('category')}</span><select name="category_choice" aria-label="${esc(t('category'))}">${groups.filter(([,options])=>options.length).map(([label,options])=>`${label ? `<optgroup label="${esc(t(label))}">` : ''}${options.map(([key,name])=>`<option value="${esc(key)}" ${key === selected ? 'selected' : ''}>${esc(name)}</option>`).join('')}${label ? '</optgroup>' : ''}`).join('')}</select></label><div data-new-planner-category hidden><div class="form-grid">${field('new_category_name','planner_new_category_name','text','',{maxlength:100})}${field('new_category_color','color','color','#B8A4D4')}</div></div>`;
 }
 
+function plannerScheduleField(name, label, type, value, attrs = {}) {
+  const id = `planner-picker-${name}`, title = esc(t(label));
+  return `<div class="planner-picker-field" data-planner-picker="${type}">
+    ${field(name,label,type,value,{...attrs,'aria-haspopup':'dialog','aria-expanded':'false','aria-controls':id})}
+    <button type="button" class="planner-picker-trigger" data-picker-toggle aria-label="${title}" aria-haspopup="dialog" aria-expanded="false" aria-controls="${id}">${icon(type === 'date' ? 'calendar' : 'clock')}</button>
+    <div class="planner-picker-panel" data-planner-picker-panel id="${id}" role="dialog" aria-label="${title}" hidden></div>
+  </div>`;
+}
+
+function plannerPickerTime(hour, minute, period) {
+  return `${String(Number(hour) % 12 + (period === 'PM' ? 12 : 0)).padStart(2,'0')}:${String(minute).padStart(2,'0')}`;
+}
+
+function bindPlannerPickers(form) {
+  bindPlannerPickers.controller?.abort();
+  const controller = bindPlannerPickers.controller = new AbortController(), options = {signal:controller.signal};
+  const dialog = form.closest('dialog');
+  let active = null;
+  const close = (focus = false) => {
+    if (!active) return;
+    const {panel,input,trigger} = active;
+    active = null; panel.hidden = true; panel.innerHTML = '';
+    input.setAttribute('aria-expanded','false'); trigger.setAttribute('aria-expanded','false');
+    if (focus) input.focus({preventScroll:true});
+  };
+  const position = () => {
+    if (!active) return;
+    const {panel,input} = active, bounds = dialog.getBoundingClientRect(), anchor = input.getBoundingClientRect();
+    const top = Math.max(bounds.top + 12, $('.modal-header',dialog).getBoundingClientRect().bottom + 8), bottom = Math.min(innerHeight - 12,bounds.bottom - 12);
+    panel.style.width = `${Math.min(310,bounds.width - 28)}px`;
+    panel.style.maxHeight = `${Math.max(100,bottom - top)}px`;
+    const rect = panel.getBoundingClientRect();
+    panel.style.left = `${Math.max(bounds.left + 14,Math.min(anchor.left,bounds.right - rect.width - 14))}px`;
+    const y = anchor.bottom + 6 + rect.height <= bottom ? anchor.bottom + 6 : anchor.top - rect.height - 6;
+    panel.style.top = `${Math.max(top,Math.min(y,bottom - rect.height))}px`;
+  };
+  const commit = value => {
+    const input = active.input;
+    input.value = value;
+    close(true);
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+  };
+  const footer = () => `<div class="planner-picker-footer">${!active.input.required ? `<button type="button" class="text-btn" data-picker-clear>${esc(t('planner_picker_clear'))}</button>` : '<span></span>'}${active.type === 'date' ? `<button type="button" class="text-btn" data-picker-today ${today() < active.min || today() > active.max ? 'disabled' : ''}>${esc(t('today'))}</button>` : `<button type="button" class="btn primary" data-picker-apply>${esc(t('planner_picker_apply'))}</button>`}</div>`;
+  const paintDays = () => {
+    const {panel,input,month,min,max} = active, first = month+'-01', offset = dayNum(first)-1;
+    const date = dateObj(first); date.setUTCMonth(date.getUTCMonth()+1,0);
+    $('[data-picker-month]',panel).value = String(Number(month.slice(5)));
+    $('[data-picker-year]',panel).value = month.slice(0,4);
+    $('[data-picker-prev]',panel).disabled = month <= min.slice(0,7);
+    $('[data-picker-next]',panel).disabled = month >= max.slice(0,7);
+    $('[data-picker-days]',panel).innerHTML = [1,2,3,4,5,6,7].map(day=>`<span>${esc(dayLabel(day))}</span>`).join('')
+      + '<span aria-hidden="true"></span>'.repeat(offset)
+      + Array.from({length:date.getUTCDate()},(_,index)=>{
+        const value = `${month}-${String(index+1).padStart(2,'0')}`;
+        return `<button type="button" data-picker-day="${value}" aria-label="${esc(fmt(value,{dateStyle:'full'}))}" aria-pressed="${value === input.value}" ${value === today() ? 'aria-current="date"' : ''} ${value < min || value > max ? 'disabled' : ''}>${index+1}</button>`;
+      }).join('');
+    position();
+  };
+  const changeMonth = (year,month) => {
+    if (!Number.isInteger(year) || year < 1000 || year > 9998 || month < 1 || month > 12) return;
+    active.month = `${year}-${String(month).padStart(2,'0')}`;
+    active.month = [active.min.slice(0,7),active.month,active.max.slice(0,7)].sort()[1];
+    paintDays();
+  };
+  const open = wrapper => {
+    const input = $('input',wrapper), trigger = $('[data-picker-toggle]',wrapper), panel = $('[data-planner-picker-panel]',wrapper);
+    if (input.disabled) return;
+    if (active?.input === input) { close(true); return; }
+    close();
+    const type = wrapper.dataset.plannerPicker;
+    active = {input,trigger,panel,type,min:input.min || '1000-01-01',max:input.max || '9998-12-31'};
+    const heading = `<div class="planner-picker-heading"><strong>${esc(input.closest('label').querySelector('span').textContent)}</strong><button type="button" class="icon-btn" data-picker-close aria-label="${esc(t('close'))}">${icon('close')}</button></div>`;
+    if (type === 'date') {
+      active.month = [active.min,input.value || today(),active.max].sort()[1].slice(0,7);
+      panel.innerHTML = heading + `<div class="planner-picker-month"><button type="button" class="icon-btn" data-picker-prev aria-label="${esc(t('previous'))}">${icon('chevron','flip')}</button><select data-picker-month aria-label="${esc(t('month'))}">${Array.from({length:12},(_,i)=>`<option value="${i+1}">${esc(fmt(`2026-${String(i+1).padStart(2,'0')}-01`,{month:'long'}))}</option>`).join('')}</select><input type="number" data-picker-year aria-label="${esc(t('ms_date_year'))}" min="1000" max="9998" step="1"><button type="button" class="icon-btn" data-picker-next aria-label="${esc(t('next'))}">${icon('chevron')}</button></div><div class="planner-picker-days" data-picker-days></div>` + footer();
+    } else {
+      const [hours,minutes] = (input.value || '00:00').split(':').map(Number);
+      panel.innerHTML = heading + `<div class="planner-picker-clock"><label><span>${esc(t('planner_picker_hour'))}</span><select data-picker-hour>${Array.from({length:12},(_,i)=>`<option value="${i+1}" ${i+1 === (hours%12 || 12) ? 'selected' : ''}>${String(i+1).padStart(2,'0')}</option>`).join('')}</select></label><label><span>${esc(t('planner_picker_minute'))}</span><select data-picker-minute>${Array.from({length:60},(_,i)=>`<option value="${i}" ${i === minutes ? 'selected' : ''}>${String(i).padStart(2,'0')}</option>`).join('')}</select></label><label><span>AM / PM</span><select data-picker-period><option ${hours < 12 ? 'selected' : ''}>AM</option><option ${hours >= 12 ? 'selected' : ''}>PM</option></select></label></div>` + footer();
+    }
+    panel.hidden = false;
+    input.setAttribute('aria-expanded','true'); trigger.setAttribute('aria-expanded','true');
+    if (type === 'date') paintDays(); else position();
+    (type === 'date' ? $('[data-picker-day][aria-pressed=true]:not(:disabled)',panel) || $('[data-picker-day]:not(:disabled)',panel) : $('[data-picker-hour]',panel))?.focus({preventScroll:true});
+  };
+  const applyTime = () => commit(plannerPickerTime($('[data-picker-hour]',active.panel).value,$('[data-picker-minute]',active.panel).value,$('[data-picker-period]',active.panel).value));
+  form.addEventListener('click',event => {
+    const wrapper = event.target.closest('[data-planner-picker]');
+    if (!wrapper) return;
+    if (event.target.closest('[data-picker-toggle]') || event.target === $('input',wrapper)) { event.preventDefault(); open(wrapper); return; }
+    if (!active || !active.panel.contains(event.target)) return;
+    const day = event.target.closest('[data-picker-day]');
+    if (day && !day.disabled) { commit(day.dataset.pickerDay); return; }
+    if (event.target.closest('[data-picker-close]')) { close(true); return; }
+    if (event.target.closest('[data-picker-clear]')) { commit(''); return; }
+    if (event.target.closest('[data-picker-today]')) { commit(today()); return; }
+    if (event.target.closest('[data-picker-apply]')) { applyTime(); return; }
+    const prev = event.target.closest('[data-picker-prev]'), next = event.target.closest('[data-picker-next]');
+    if (prev || next) {
+      const date = dateObj(active.month+'-01'); date.setUTCMonth(date.getUTCMonth()+(prev ? -1 : 1));
+      changeMonth(date.getUTCFullYear(),date.getUTCMonth()+1);
+    }
+  },options);
+  form.addEventListener('change',event => {
+    if (active?.type === 'date' && event.target.matches('[data-picker-month],[data-picker-year]')) changeMonth(Number($('[data-picker-year]',active.panel).value),Number($('[data-picker-month]',active.panel).value));
+  },options);
+  form.addEventListener('keydown',event => {
+    if (active && event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(true); return; }
+    const input = event.target.closest('[data-planner-picker] > label > input');
+    if (input && ['Enter',' ','ArrowDown'].includes(event.key)) { event.preventDefault(); open(input.closest('[data-planner-picker]')); return; }
+    if (!active || !active.panel.contains(event.target)) return;
+    if (event.key === 'Enter' && event.target.matches('input,select')) {
+      event.preventDefault();
+      if (active.type === 'time') applyTime();
+      else changeMonth(Number($('[data-picker-year]',active.panel).value),Number($('[data-picker-month]',active.panel).value));
+    }
+    const day = event.target.closest('[data-picker-day]'), delta = {ArrowLeft:-1,ArrowRight:1,ArrowUp:-7,ArrowDown:7}[event.key];
+    if (day && delta) {
+      event.preventDefault();
+      const date = shift(day.dataset.pickerDay,delta);
+      if (date >= active.min && date <= active.max) { active.month = date.slice(0,7); paintDays(); $(`[data-picker-day="${date}"]`,active.panel)?.focus({preventScroll:true}); }
+    }
+  },options);
+  form.addEventListener('focusout',event => {
+    if (active && event.relatedTarget && !active.panel.contains(event.relatedTarget) && event.relatedTarget !== active.input && event.relatedTarget !== active.trigger) close();
+  },options);
+  dialog.addEventListener('pointerdown',event => {
+    if (!form.isConnected) { controller.abort(); return; }
+    if (active && !event.target.closest('[data-planner-picker]')) close();
+  },options);
+  dialog.addEventListener('scroll',() => close(),options);
+  window.addEventListener('resize',() => close(),options);
+  dialog.addEventListener('close',() => controller.abort(),{...options,once:true});
+  return close;
+}
+
 function plannerScheduleFields(entry = {}, kind = null) {
   const recurrence = entry.recurrence === 'pending' ? (kind === 'task' ? 'once' : 'weekly') : entry.recurrence || (kind === 'habit' ? 'weekly' : 'once');
   const start = entry.start_date || S.date || today(), rule = plannerRule(entry);
@@ -71,8 +207,8 @@ function plannerScheduleFields(entry = {}, kind = null) {
         <div data-month-weekdays>${plannerChoices('rule_positions','planner_which_weeks',[1,2,3,4,5,-1].map(n=>[n,t('planner_position_'+n)]),rule.positions || [Math.ceil(Number(start.slice(8))/7)],'planner-position-choices')}${plannerChoices('rule_weekdays','days',[1,2,3,4,5,6,7].map(n=>[n,dayLabel(n)]),rule.weekdays || [dayNum(start)],'planner-weekday-choices')}</div>
       </div>
     </div>
-    <fieldset class="planner-date-range"><legend>${t('planner_start')}</legend><div class="form-grid">${field('start_date','start_date','date',start,{required:true,min:'1000-01-01',max:'9998-12-31'})}${field('scheduled_time','planner_start_time','time',entry.scheduled_time?.slice(0,5) || '')}</div></fieldset>
-    <fieldset class="planner-date-range"><legend>${t('planner_finish')}</legend><div class="form-grid">${field('end_date','planner_end_date','date',entry.end_date || '',{min:start,max:'9998-12-31'})}${field('end_time','planner_end_time','time',entry.end_time?.slice(0,5) || '')}</div></fieldset>
+    <fieldset class="planner-date-range"><legend>${t('planner_start')}</legend><div class="form-grid">${plannerScheduleField('start_date','start_date','date',start,{required:true,min:'1000-01-01',max:'9998-12-31'})}${plannerScheduleField('scheduled_time','planner_start_time','time',entry.scheduled_time?.slice(0,5) || '')}</div></fieldset>
+    <fieldset class="planner-date-range"><legend>${t('planner_finish')}</legend><div class="form-grid">${plannerScheduleField('end_date','planner_end_date','date',entry.end_date || '',{min:start,max:'9998-12-31'})}${plannerScheduleField('end_time','planner_end_time','time',entry.end_time?.slice(0,5) || '')}</div></fieldset>
   </div>`;
 }
 
@@ -81,9 +217,10 @@ function plannerPendingField(entry = {}) {
 }
 
 function bindPlannerSchedule(form) {
-  const schedule = $('.planner-schedule',form);
+  const schedule = $('.planner-schedule',form), closePicker = bindPlannerPickers(form);
   const sync = () => {
     const pending = !!$('[data-planner-pending]',form)?.checked;
+    if (pending) closePicker();
     schedule.hidden = pending;
     $$('input,select,button',schedule).forEach(input => { input.disabled = pending && !['recurrence','recurrence_rule'].includes(input.name); });
     const quick = schedule.hasAttribute('data-quick-schedule');
@@ -102,6 +239,7 @@ function bindPlannerSchedule(form) {
     $('[name=recurrence_rule]',form).value = JSON.stringify(pending ? null : rule);
   };
   form.addEventListener('change',event => {
+    if (event.target.closest('[data-planner-picker-panel]')) return;
     if (event.target.name === 'month_preset' && Number(event.target.value)) {
       const interval = Number(event.target.value), startMonth = Number($('[name=start_date]',form).value.slice(5,7));
       $$('[name=rule_months]',form).forEach(input => { input.checked = ((Number(input.value)-startMonth+12)%12)%interval === 0; });
