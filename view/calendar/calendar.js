@@ -239,6 +239,24 @@ function plannerCategoryKey(entry) {
   return entry.category_id ? String(Number(entry.category_id)) : 'none';
 }
 
+function plannerCategoryStorageKey() {
+  return `planner-category-selection:${new URL(location.href).pathname}:${S.user.id}`;
+}
+
+function restorePlannerCategorySelection() {
+  S.plannerHiddenCategories = [];
+  if (!S.user) return;
+  try {
+    const saved = JSON.parse(localStorage.getItem(plannerCategoryStorageKey()) || '[]');
+    if (Array.isArray(saved)) S.plannerHiddenCategories = [...new Set(saved.filter(key => typeof key === 'string' && /^(?:none|[1-9][0-9]*)$/.test(key)))];
+  } catch {}
+}
+
+function savePlannerCategorySelection() {
+  if (!S.user) return;
+  try { localStorage.setItem(plannerCategoryStorageKey(), JSON.stringify(S.plannerHiddenCategories)); } catch {}
+}
+
 function plannerFilterCategories() {
   const categories = new Map();
   // Use the day's unfiltered entries so a deselected category can be enabled again.
@@ -259,7 +277,6 @@ function plannerFlagIcon() {
 
 function plannerCategoryFilters() {
   const categories = plannerFilterCategories();
-  S.plannerHiddenCategories = S.plannerHiddenCategories.filter(key => categories.some(category => category.key === key));
   const arrow = direction => `<button type="button" class="planner-category-scroll" data-action="planner-categories-${direction}" aria-label="${esc(t(`planner_categories_${direction}`))}" aria-controls="planner-category-filters" hidden disabled>${icon('chevron',direction === 'left' ? 'flip' : '')}</button>`;
   return `<div class="planner-category-bar">${arrow('left')}<div class="planner-category-filters" id="planner-category-filters" role="group" aria-label="${esc(t('planner_filter_category'))}">${categories.map(category => `<button type="button" class="planner-category-filter" data-action="planner-filter-category" data-category="${category.key}" style="--planner-color:${category.color}" aria-pressed="${!S.plannerHiddenCategories.includes(category.key)}" aria-controls="planner-note-entries" title="${esc(category.name)}">${plannerFlagIcon()}<span>${esc(category.name)}</span></button>`).join('')}</div>${arrow('right')}</div>`;
 }
@@ -536,7 +553,8 @@ class CalendarPage extends PageController {
     const note = $('.planner-note[data-mode="note"]');
     if (!note) return;
     const entries = plannerNoteEntries(S.date);
-    const emptyMessage = S.plannerHiddenCategories.length ? t(plannerFilterCategories().some(category => !S.plannerHiddenCategories.includes(category.key)) ? 'planner_category_empty' : 'planner_categories_none') : '';
+    const categories = plannerFilterCategories();
+    const emptyMessage = categories.length && S.plannerHiddenCategories.length ? t(categories.some(category => !S.plannerHiddenCategories.includes(category.key)) ? 'planner_category_empty' : 'planner_categories_none') : '';
     const layout = () => {
       if (!note.isConnected) return;
       const lineHeight = $('.planner-note-lines',note).getBoundingClientRect().height / PLANNER_NOTE_LINES;
@@ -581,6 +599,7 @@ class CalendarPage extends PageController {
       S.plannerCategoryScroll = $('.planner-category-filters')?.scrollLeft || 0;
       S.plannerHiddenCategories = S.plannerHiddenCategories.includes(category)
         ? S.plannerHiddenCategories.filter(key => key !== category) : [...S.plannerHiddenCategories,category];
+      savePlannerCategorySelection();
       S.plannerPage = 0;
       render();
       $(`.planner-category-filter[data-category="${category}"]`)?.focus({preventScroll:true});

@@ -1,12 +1,13 @@
 async function bootstrap() {
   const r = await api('bootstrap');
-  if (S.user?.id !== r.user?.id) {
+  const userChanged = S.user?.id !== r.user?.id;
+  if (userChanged) {
     if (S.user) pageControllers.home.nodeTools.clearClipboard();
     pageControllers.home.reset();
     S.sharedWorkspace = null; S.ownedWorkspace = null; S.sharePerson = null; S.sharingTab = 'all';
     S.sharingSidebarExpanded = undefined;
     S.progress = null;
-    S.plannerHiddenCategories = []; S.plannerCategoryScroll = 0;
+    S.plannerCategoryScroll = 0;
   }
   Object.assign(S, {
     user: r.user,
@@ -17,6 +18,7 @@ async function bootstrap() {
     registration: r.registration_enabled,
     platformName: r.platform_name,
   });
+  if (userChanged) restorePlannerCategorySelection();
   if (!S.date) S.date = today();
   if (!S.month) S.month = S.date.slice(0, 7);
   if (S.user && S.mode === 'admin') S.admin = await api('admin');

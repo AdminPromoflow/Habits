@@ -52,11 +52,11 @@ test('Pendings remains selected after navigation and reload',async()=>{
   assert.equal(f.context.initialPersonalView(),'pendings');
 });
 
-test('entering My Day Today selects all categories and starts the category strip at the left',async()=>{
+test('entering My Day Today preserves category selection and starts the category strip at the left',async()=>{
   const f=fixture();f.context.today=()=> '2026-11-26';
   f.S.plannerHiddenCategories=['1','2'];f.S.plannerCategoryScroll=400;
   await f.context.navigate('calendar');
-  assert.equal(f.S.view,'calendar');assert.equal(f.S.plannerHiddenCategories.length,0);
+  assert.equal(f.S.view,'calendar');assert.deepEqual(f.S.plannerHiddenCategories,['1','2']);
   assert.equal(f.S.plannerCategoryScroll,0);assert.equal(f.S.plannerPage,0);
 });
 

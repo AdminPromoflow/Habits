@@ -2,9 +2,11 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
-function fixture() {
-  const context=vm.createContext({Intl,Date,document:{addEventListener(){},querySelector(){return null;}}});
-  vm.runInContext(fs.readFileSync('view/global/ui.js','utf8')+'\nclass PageController {}\n'+fs.readFileSync('view/calendar/calendar.js','utf8')+'\nthis.api={S,CalendarPage,plannerEntries,plannerNoteEntries,plannerMovedOrder,plannerCategoryColors,plannerEntryCategory,plannerCategoryFilters,plannerNoteRow};',context);
+function fixture(storage=new Map()) {
+  const context=vm.createContext({Intl,Date,URL,location:{href:'http://localhost/MyRemarkableMind/?view=calendar'},
+    localStorage:{getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,value)},
+    document:{addEventListener(){},querySelector(){return null;}}});
+  vm.runInContext(fs.readFileSync('view/global/ui.js','utf8')+'\nclass PageController {}\n'+fs.readFileSync('view/calendar/calendar.js','utf8')+'\nthis.api={S,CalendarPage,plannerEntries,plannerNoteEntries,plannerMovedOrder,plannerCategoryColors,plannerEntryCategory,plannerCategoryFilters,plannerNoteRow,restorePlannerCategorySelection};',context);
   const {S}=context.api;
   S.user={id:1};S.view='calendar';S.date='2026-11-26';
   S.data={today:S.date,categories:[{id:1,name:'Work',color:'#B8A4D4'},{id:2,name:'Home',color:'#B8A4D4'}],habits:[],completions:[],calendar:{tasks:[
@@ -72,8 +74,48 @@ test('new and uncategorized tasks start visible, and category choices survive da
   assert.deepEqual(Array.from(plannerNoteEntries(S.date),entry=>entry.id),[5,6,2,4]);
   await page.handleAction('planner-filter-category',{dataset:{category:'none'}});
   assert.deepEqual(Array.from(plannerNoteEntries(S.date),entry=>entry.id),[5,2,4]);
-  S.plannerHiddenCategories.push('deleted');plannerCategoryFilters();
+  S.date='2020-01-01';assert.doesNotMatch(plannerCategoryFilters(),/data-category=/);
   assert.deepEqual(Array.from(S.plannerHiddenCategories),['1','none']);
+  S.date='2026-11-27';plannerCategoryFilters();
+  assert.deepEqual(Array.from(plannerNoteEntries(S.date),entry=>entry.id),[5,2,4]);
+});
+test('category selections survive reload, including all deselected and reselecting a category',async()=>{
+  const storage=new Map(),first=fixture(storage),page=new first.CalendarPage();
+  for(const category of ['1','2']) await page.handleAction('planner-filter-category',{dataset:{category}});
+  const reloaded=fixture(storage);reloaded.restorePlannerCategorySelection();
+  assert.equal(reloaded.plannerNoteEntries(reloaded.S.date).length,0);
+  assert.equal((reloaded.plannerCategoryFilters().match(/aria-pressed="false"/g)||[]).length,2);
+  await new reloaded.CalendarPage().handleAction('planner-filter-category',{dataset:{category:'1'}});
+  const again=fixture(storage);again.restorePlannerCategorySelection();
+  assert.deepEqual(Array.from(again.plannerNoteEntries(again.S.date),entry=>entry.id),[1,3]);
+  await new again.CalendarPage().handleAction('planner-filter-category',{dataset:{category:'2'}});
+  const all=fixture(storage);all.restorePlannerCategorySelection();
+  assert.equal(all.plannerNoteEntries(all.S.date).length,4);
+});
+test('saved category selection is scoped by account and installation',async()=>{
+  const f=fixture(),page=new f.CalendarPage();
+  await page.handleAction('planner-filter-category',{dataset:{category:'1'}});
+  f.S.user={id:2};f.restorePlannerCategorySelection();
+  assert.equal(f.S.plannerHiddenCategories.length,0);
+  await page.handleAction('planner-filter-category',{dataset:{category:'2'}});
+  f.S.user={id:1};f.restorePlannerCategorySelection();
+  assert.deepEqual(Array.from(f.S.plannerHiddenCategories),['1']);
+  f.context.location.href='http://localhost/another-installation/?view=calendar';f.restorePlannerCategorySelection();
+  assert.equal(f.S.plannerHiddenCategories.length,0);
+  f.S.user=null;f.restorePlannerCategorySelection();assert.equal(f.S.plannerHiddenCategories.length,0);
+});
+test('invalid or unavailable local storage cannot break category filtering',async()=>{
+  const storage=new Map(),f=fixture(storage),page=new f.CalendarPage();
+  await page.handleAction('planner-filter-category',{dataset:{category:'1'}});
+  const key=[...storage.keys()][0];
+  for(const value of ['not JSON','null','{}']) {
+    storage.set(key,value);f.restorePlannerCategorySelection();assert.equal(f.S.plannerHiddenCategories.length,0);
+  }
+  storage.set(key,JSON.stringify(['1','1','none',2,null,'invalid']));f.restorePlannerCategorySelection();
+  assert.deepEqual(Array.from(f.S.plannerHiddenCategories),['1','none']);
+  f.context.localStorage={getItem(){throw new Error('blocked');},setItem(){throw new Error('blocked');}};
+  f.restorePlannerCategorySelection();await page.handleAction('planner-filter-category',{dataset:{category:'2'}});
+  assert.deepEqual(Array.from(f.plannerNoteEntries(f.S.date),entry=>entry.id),[1,3]);
 });
 test('category arrows follow overflow and both ends; toggling retains scroll position and focus',async()=>{
   const {S,CalendarPage,context}=fixture(),page=new CalendarPage();

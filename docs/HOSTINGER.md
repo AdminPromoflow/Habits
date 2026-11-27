@@ -61,6 +61,8 @@ Los enlaces duran 30 minutos y solo pueden usarse una vez. Pedir un enlace no ca
 
 Desde el 25 de noviembre de 2026, la usuaria publica los cambios desde su terminal mediante Git. Dejar las modificaciones en el proyecto local, sin crear paquetes ZIP, carpetas de builds ni subir archivos de aplicación a Hostinger. Revisar e indicar si cada cambio requiere migraciones de base de datos. El ajuste de posición y centrado de las flechas de desplazamiento solo modifica CSS y no requiere cambios de base de datos.
 
+Confirmado el 26 de noviembre de 2026: cuando una modificación requiera cambios de base de datos, aplicarlos también en Hostinger y verificar el resultado. Cuando solo cambie el código, dejarlo preparado para que la usuaria lo publique mediante Git. La selección de categorías de My Day Today se conserva en el navegador por cuenta e instalación; no requiere migración.
+
 Se retiraron a la papelera de Hostinger los siete ZIP históricos de `.builds` (planner, categories, week, note, note-fullscreen, flags-scroll y scroll-center), conservando `logs`, y `mindspace-sidebar-update.zip` de la raíz publicada. Se eliminaron también los catorce ZIP temporales locales de `/private/tmp` y `tests/.runtime`; las referencias posteriores a esos paquetes son un registro histórico.
 
 Para los enlaces entre diagramas/cuadros, aplicar `012_diagram_node_links.sql` antes de habilitar el modelo actualizado. Se aplicó en esta instalación el 24 de noviembre de 2026, conservando dos diagramas y quince nodos. El guardado pendiente del enlace en Safari pasó de `error_database` a «Diagram saved» al reintentar después de añadir `link_json`.
