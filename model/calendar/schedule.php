@@ -7,14 +7,22 @@ final class Schedule
     {
         $recurrence = Validate::choice($d['recurrence'] ?? 'weekly', ['once','daily','weekly','monthly','yearly','pending']);
         // Pending is an unscheduled activity, with no placeholder date or repeat rule.
-        if ($recurrence === 'pending') return ['pending', '[]', null, null, null, null];
+        if ($recurrence === 'pending') return ['pending', '[]', null, null, null, null, null];
         $days = Validate::days($recurrence === 'weekly' ? ($d['schedule_days'] ?? [1,2,3,4,5,6,7]) : [1,2,3,4,5,6,7]);
         $start = Validate::date($d['start_date'] ?? $today);
         $end = !empty($d['end_date']) ? Validate::date($d['end_date']) : null;
-        if ($end && $end < $start) fail('error_date');
-        $time = ($d['scheduled_time'] ?? '') ?: null;
-        if ($time !== null && (!is_string($time) || !preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d(?::00)?$/D', $time))) fail('error_validation');
-        return [$recurrence, $days, $start, $recurrence === 'once' ? null : $end, $time, self::validateRule($d['recurrence_rule'] ?? null, $recurrence, $start)];
+        if ($end && $end < $start) fail('error_end_before_start');
+        $time = self::time($d['scheduled_time'] ?? null);
+        $endTime = self::time($d['end_time'] ?? null);
+        if ($end === $start && $time !== null && $endTime !== null && $endTime < $time) fail('error_end_before_start');
+        return [$recurrence, $days, $start, $end, $time, self::validateRule($d['recurrence_rule'] ?? null, $recurrence, $start), $endTime];
+    }
+
+    private static function time(mixed $value): ?string
+    {
+        if ($value === null || $value === '') return null;
+        if (!is_string($value) || !preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d(?::00)?$/D', $value)) fail('error_validation');
+        return substr($value, 0, 5);
     }
 
     public static function rule(array $entry): array

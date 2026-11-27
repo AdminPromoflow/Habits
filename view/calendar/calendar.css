@@ -145,6 +145,8 @@ body.planner-is-dragging, body.planner-is-dragging * { cursor:grabbing !importan
 .planner-pending-entry strong { display:block; font-size:.9375rem; font-weight:500; overflow-wrap:anywhere; white-space:pre-wrap; }
 .planner-pending-entry small { display:block; font-size:.75rem; color:var(--muted); margin-top:4px; }
 .planner-schedule .day-field span { text-transform:capitalize; }
+.planner-date-range { margin:18px 0; padding:0; border:0; min-width:0; }
+.planner-date-range legend { margin-bottom:10px; font-weight:600; color:var(--purple-dark); }
 /* The quick planner starts with the activity, then two explicit choices. */
 #modal.planner-dialog { width:min(660px,calc(100% - 28px)); }
 .planner-section-tabs { display:flex; gap:24px; border-bottom:1px solid var(--line); margin:0 0 28px; }

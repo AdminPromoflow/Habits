@@ -78,11 +78,11 @@ final class Habits extends BaseModel
         $description = Validate::text($d, 'description', 5000, false);
         $goal = Validate::number($d['goal'] ?? 1, 0.01);
         $unit = Validate::text($d, 'unit', 40, false);
-        [$recurrence, $days, $start, $end, $time, $rule] = Schedule::fields($d + ['recurrence' => $old['recurrence'] ?? 'weekly', 'recurrence_rule' => Schedule::rule($old ?? [])], $this->today());
+        [$recurrence, $days, $start, $end, $time, $rule, $endTime] = Schedule::fields($d + ['recurrence' => $old['recurrence'] ?? 'weekly', 'recurrence_rule' => Schedule::rule($old ?? []), 'end_time' => $old['end_time'] ?? null], $this->today());
         $section = Validate::text($d, 'section', 150, false);
         if ($old) {
             $this->db->run(
-                'UPDATE habits SET name=?,description=?,category_id=?,routine_id=?,goal=?,unit=?,schedule_days=?,scheduled_time=?,start_date=?,end_date=?,section=?,recurrence=?,recurrence_rule=? WHERE id=?',
+                'UPDATE habits SET name=?,description=?,category_id=?,routine_id=?,goal=?,unit=?,schedule_days=?,scheduled_time=?,start_date=?,end_date=?,section=?,recurrence=?,recurrence_rule=?,end_time=? WHERE id=?',
                 [
                     $name,
                     $description,
@@ -97,6 +97,7 @@ final class Habits extends BaseModel
                     $section,
                     $recurrence,
                     $rule,
+                    $endTime,
                     $id,
                 ],
             );
@@ -110,7 +111,7 @@ final class Habits extends BaseModel
             $this->activity($id, 'habit_updated');
         } else {
             $this->db->run(
-                'INSERT INTO habits(owner_user_id,category_id,routine_id,name,description,goal,unit,schedule_days,scheduled_time,start_date,end_date,section,recurrence,recurrence_rule) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+                'INSERT INTO habits(owner_user_id,category_id,routine_id,name,description,goal,unit,schedule_days,scheduled_time,start_date,end_date,section,recurrence,recurrence_rule,end_time) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                 [
                     $owner,
                     $category,
@@ -126,6 +127,7 @@ final class Habits extends BaseModel
                     $section,
                     $recurrence,
                     $rule,
+                    $endTime,
                 ],
             );
             $id = $this->db->id();

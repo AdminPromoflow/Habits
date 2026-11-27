@@ -68,12 +68,12 @@ final class CalendarModel extends BaseModel
         if ($category) $this->selectedCategory($category);
         $name = Validate::text($d, 'name');
         $description = Validate::text($d, 'description', 5000, false);
-        [$repeat,$days,$start,$end,$time,$rule] = Schedule::fields($d + ['recurrence'=>$old['recurrence'] ?? 'once'], $this->today());
-        $values = [$name,$description,$repeat,$days,$time,$start,$end,$rule,$category];
+        [$repeat,$days,$start,$end,$time,$rule,$endTime] = Schedule::fields($d + ['recurrence'=>$old['recurrence'] ?? 'once','end_time'=>$old['end_time'] ?? null], $this->today());
+        $values = [$name,$description,$repeat,$days,$time,$start,$end,$rule,$category,$endTime];
         if ($id) {
-            $this->db->run('UPDATE calendar_tasks SET name=?,description=?,recurrence=?,schedule_days=?,scheduled_time=?,start_date=?,end_date=?,recurrence_rule=?,category_id=? WHERE id=? AND owner_user_id=?', [...$values,$id,$this->uid()]);
+            $this->db->run('UPDATE calendar_tasks SET name=?,description=?,recurrence=?,schedule_days=?,scheduled_time=?,start_date=?,end_date=?,recurrence_rule=?,category_id=?,end_time=? WHERE id=? AND owner_user_id=?', [...$values,$id,$this->uid()]);
         } else {
-            $this->db->run('INSERT INTO calendar_tasks(name,description,recurrence,schedule_days,scheduled_time,start_date,end_date,recurrence_rule,category_id,owner_user_id) VALUES (?,?,?,?,?,?,?,?,?,?)', [...$values,$this->uid()]);
+            $this->db->run('INSERT INTO calendar_tasks(name,description,recurrence,schedule_days,scheduled_time,start_date,end_date,recurrence_rule,category_id,end_time,owner_user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)', [...$values,$this->uid()]);
             $id = $this->db->id();
         }
         if ($source) $this->attachSource('calendar_tasks', $id, $source);

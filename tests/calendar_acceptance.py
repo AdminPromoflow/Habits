@@ -85,7 +85,45 @@ def run(owner, other, guest, check):
     owner.request('deleteDiagram',{'id':diagram['id'],'version':diagram['version']})
     for tid in [task_id, weekly, monthly, yearly]: owner.request('deleteCalendarTask', {'id':tid})
     check(not any(c['task_id'] in [task_id,weekly,monthly,yearly] for c in owner.data()['calendar']['completions']), 'Deleting recurring tasks also removes their completion records')
+    test_schedule_range(owner, check)
     test_categories(owner, other, task, check)
+
+
+def test_schedule_range(owner, check):
+    start, end = '2024-02-01', '2024-02-02'
+    for kind in ['task', 'habit']:
+        payload = dict(kind=kind, name=f'{kind} with start and end', recurrence='once' if kind == 'task' else 'daily', start_date=start, scheduled_time='09:30', end_date=end, end_time='10:45')
+        created = owner.request('saveCalendarEntry', payload)['id']
+        payload['id'] = created
+        def saved():
+            data = owner.boot()['data']
+            return next(e for e in (data['calendar']['tasks'] if kind == 'task' else data['habits']) if e['id'] == created)
+        entry = saved()
+        check((entry['start_date'], entry['scheduled_time'], entry['end_date'], entry['end_time']) == (start, '09:30:00', end, '10:45:00'), f'{kind} start/end dates and times persist through bootstrap')
+        complete_action = 'completeCalendarTask' if kind == 'task' else 'complete'
+        complete_data = {'id':created, 'completed':True} if kind == 'task' else {'habit_id':created, 'amount':1}
+        owner.request(complete_action, dict(complete_data, date=end), 422 if kind == 'task' else 200)
+        owner.request(complete_action, dict(complete_data, date='2024-02-03'), 422)
+        check(True, f'{kind} end fields preserve its one-off or recurring schedule')
+        owner.request('saveCalendarEntry', {key:value for key,value in payload.items() if key != 'end_time'})
+        check(saved()['end_time'] == '10:45:00', f'An older client omitting end_time preserves the saved {kind} end time')
+        for date, time in [('', '10:45'), (end, ''), ('', ''), (start, '09:30:00'), (end, '00:00')]:
+            owner.request('saveCalendarEntry', dict(payload, end_date=date, end_time=time))
+            entry = saved()
+            check(entry['end_date'] == (date or None) and entry['end_time'] == (time[:5]+':00' if time else None), f'{kind} accepts independent optional end fields ({date!r}, {time!r})')
+        for change in [dict(end_date=start, end_time='09:29'), dict(end_date='2024-01-31'), dict(end_time='24:00'), dict(end_time='12:60'), dict(end_time=False), dict(end_time='10:45:01')]:
+            owner.request('saveCalendarEntry', dict(payload, **change), 422)
+        check(saved()['end_time'] == '00:00:00', f'Invalid {kind} end dates/times are rejected without changing its saved schedule')
+        owner.request('saveCalendarEntry', dict(payload, scheduled_time='', end_date='', end_time='10:45'))
+        check(saved()['scheduled_time'] is None and saved()['end_time'] == '10:45:00', f'{kind} end time can be saved without a start time or end date')
+        # The separate habit editor uses saveHabit, which must share the same validation/persistence.
+        if kind == 'habit':
+            owner.request('saveHabit', dict(payload, category_id=saved()['category_id'], end_time='11:15'))
+            check(saved()['end_time'] == '11:15:00', 'The full habit editor saves end times too')
+        owner.request('saveCalendarEntry', dict(payload, recurrence='pending'))
+        entry = saved()
+        check(all(entry[key] is None for key in ['start_date','end_date','scheduled_time','end_time']), f'Moving {kind} to Pendings clears the full date/time range')
+        owner.request('deleteCalendarTask' if kind == 'task' else 'deleteHabit', {'id':created})
 
 
 def test_categories(owner, other, task, check):
@@ -143,12 +181,12 @@ def test_categories(owner, other, task, check):
     today = owner.data()['today']
     for kind in ['task', 'habit']:
         pending = {'kind': kind, 'name': f'Pending {kind}', 'recurrence': 'pending', 'category_choice': 'default'}
-        created = owner.request('saveCalendarEntry', dict(pending, start_date='invalid', end_date='invalid', scheduled_time='25:99', schedule_days=[9], recurrence_rule={'invalid': True}))['id']
+        created = owner.request('saveCalendarEntry', dict(pending, start_date='invalid', end_date='invalid', scheduled_time='25:99', end_time='invalid', schedule_days=[9], recurrence_rule={'invalid': True}))['id']
         def saved():
             data = owner.boot()['data']
             return next(e for e in (data['calendar']['tasks'] if kind == 'task' else data['habits']) if e['id'] == created)
         entry = saved()
-        check(entry['recurrence'] == 'pending' and entry['start_date'] is None and entry['end_date'] is None and entry['scheduled_time'] is None and entry['schedule_days'] == [] and not entry['recurrence_rule'], f'Pending {kind} persists without dates, times, weekdays or recurrence rules, even if stale fields are submitted')
+        check(entry['recurrence'] == 'pending' and entry['start_date'] is None and entry['end_date'] is None and entry['scheduled_time'] is None and entry['end_time'] is None and entry['schedule_days'] == [] and not entry['recurrence_rule'], f'Pending {kind} persists without dates, times, weekdays or recurrence rules, even if stale fields are submitted')
         other.request('saveCalendarEntry', dict(pending, id=created), 404)
         complete_action = 'completeCalendarTask' if kind == 'task' else 'complete'
         complete_data = {'id':created, 'date':today, 'completed':True} if kind == 'task' else {'habit_id':created, 'date':today, 'amount':1}

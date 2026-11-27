@@ -71,8 +71,8 @@ function plannerScheduleFields(entry = {}, kind = null) {
         <div data-month-weekdays>${plannerChoices('rule_positions','planner_which_weeks',[1,2,3,4,5,-1].map(n=>[n,t('planner_position_'+n)]),rule.positions || [Math.ceil(Number(start.slice(8))/7)],'planner-position-choices')}${plannerChoices('rule_weekdays','days',[1,2,3,4,5,6,7].map(n=>[n,dayLabel(n)]),rule.weekdays || [dayNum(start)],'planner-weekday-choices')}</div>
       </div>
     </div>
-    <div class="form-grid">${field('start_date',kind === 'task' ? 'planner_on_date' : 'start_date','date',start,{required:true,min:'1000-01-01',max:'9998-12-31'})}${field('scheduled_time','planner_time','time',entry.scheduled_time?.slice(0,5) || '')}</div>
-    <details data-end-field ${entry.end_date ? 'open' : ''}><summary>${t('planner_end')}</summary>${field('end_date','end_date','date',entry.end_date || '',{min:start,max:'9998-12-31'})}</details>
+    <fieldset class="planner-date-range"><legend>${t('planner_start')}</legend><div class="form-grid">${field('start_date','start_date','date',start,{required:true,min:'1000-01-01',max:'9998-12-31'})}${field('scheduled_time','planner_start_time','time',entry.scheduled_time?.slice(0,5) || '')}</div></fieldset>
+    <fieldset class="planner-date-range"><legend>${t('planner_finish')}</legend><div class="form-grid">${field('end_date','planner_end_date','date',entry.end_date || '',{min:start,max:'9998-12-31'})}${field('end_time','planner_end_time','time',entry.end_time?.slice(0,5) || '')}</div></fieldset>
   </div>`;
 }
 
@@ -96,10 +96,7 @@ function bindPlannerSchedule(form) {
     $('[data-month-interval]',form).hidden = !repeat || frequency !== 'monthly';
     $('[data-month-dates]',form).hidden = monthMode !== 'dates';
     $('[data-month-weekdays]',form).hidden = monthMode !== 'weekdays';
-    $('[data-end-field]',form).hidden = !repeat;
-    $('[name=end_date]',form).disabled = pending || !repeat;
     $('[name=end_date]',form).min = $('[name=start_date]',form).value;
-    if (quick) $('[name=start_date]',form).previousElementSibling.textContent = t(repeat ? 'start_date' : 'planner_on_date');
     const selected = name => $$(`[name=${name}]:checked`,form).map(input=>Number(input.value));
     const rule = visible.month ? {month_mode:monthMode,...(monthMode === 'dates' ? {month_days:selected('rule_month_days')} : {positions:selected('rule_positions'),weekdays:selected('rule_weekdays')}),...(frequency === 'yearly' ? {months:selected('rule_months')} : {interval:Number($('[name=rule_interval]',form).value)})} : null;
     $('[name=recurrence_rule]',form).value = JSON.stringify(pending ? null : rule);

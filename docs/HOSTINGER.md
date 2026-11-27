@@ -91,6 +91,14 @@ El modelo documentado desde las migraciones está en [database-model](database-m
 
 Para esta instalación, verificar siempre la base publicada desde Hostinger/phpMyAdmin en Chrome al revisar cambios o incidencias; las pruebas locales no sustituyen esa comprobación. Utilizar consultas de solo lectura para revisar migraciones, columnas y datos, y comprobar también la carga real del sitio.
 
+### Inicio y fin de actividades — 26 de noviembre de 2026
+
+El formulario compartido por tareas y hábitos muestra **Inicio** (fecha y hora) y **Fin** (fecha y hora). La fecha y la hora finales son opcionales e independientes; la hora inicial sigue siendo opcional. Las tareas de una sola fecha conservan ahora su fecha de fin al guardar, sin convertirse en actividades repetitivas. Los hábitos mantienen su límite de repetición y los pendientes se guardan sin fechas ni horas.
+
+Se aplicó `024_activity_end_time.sql` en local y en Hostinger mediante phpMyAdmin, con SHA-256 `958d345732921e6b69572ebfa31f94ea382c6700b73c913f6a0ab30ea803c5d0`. Añade `end_time TIME NULL` a `habits` y `calendar_tasks`. Se verificaron ambas columnas y el registro de migración. Los conteos permanecieron iguales: 40 hábitos y 0 tareas en local; 48 hábitos y 3 tareas en producción. No se ejecutaron semillas ni se subieron archivos de aplicación; el código queda para publicar mediante Git.
+
+Pasaron 366 comprobaciones HTTP, 9 de esquema/código y 31 pruebas JavaScript. La revisión en navegador de la base aislada confirmó los cuatro campos al reabrir una tarea después de recargar, un hábito con hora final sin fecha final y las etiquetas en inglés y español.
+
 ### Pendientes, calendario de tarjetas y orden diario — 26 de noviembre de 2026
 
 El aviso «The database is unavailable» al guardar una actividad pendiente correspondía a un esquema desactualizado: producción solo tenía las migraciones 001–020. Se descargó primero una copia SQL completa desde phpMyAdmin (`u348170507_habits.sql`, 72.837 bytes, en Descargas; contiene datos privados y no se incorpora al repositorio). Después se aplicaron las tres migraciones pendientes y se registraron sus checksums:
