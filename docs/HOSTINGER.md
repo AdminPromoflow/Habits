@@ -192,6 +192,8 @@ El código añade My Goals / Mis metas, selección múltiple de metas en tareas,
 
 Los archivos de aplicación quedan en el proyecto para el despliegue habitual por Git de la usuaria. Debe incluirse `.htaccess`, que permite el nuevo endpoint `controller/goals/index.php`, además de las nuevas carpetas `controller/goals`, `model/goals` y `view/goals`. No se subió código mediante el administrador de archivos. La verificación visual se realizó en una base aislada con datos de prueba.
 
+Validación final: 385 comprobaciones HTTP, 9 de esquema/código y 45 pruebas JavaScript. En navegador se verificó crear, editar y eliminar metas, crear una meta sin cerrar el formulario de una tarea, asignar dos metas a una actividad, registrar su cumplimiento, guardar una tarjeta Kanban en Done y conservar los aportes al recargar My Progress.
+
 ## Referencias oficiales consultadas
 
 - [Crear una base MySQL](https://www.hostinger.com/support/1583542-how-to-create-a-new-mysql-database-in-hostinger/)
