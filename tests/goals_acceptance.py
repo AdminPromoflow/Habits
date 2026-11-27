@@ -32,9 +32,9 @@ def run(owner, other, guest, check):
     check(goal_ids('task', task) == {first, second}, 'Older clients that omit goal selection preserve activity associations')
     owner.request('completeCalendarTask', dict(id=task, date=today, completed=True))
     check(any(c['task_id'] == task for c in owner.data()['calendar']['completions']), 'Linked task completions are available to goal progress')
-    category = owner.request('saveCategory', {'name': 'Goal exercises'})
+    category = owner.request('saveCategory', {'name': 'Goal exercises'})['id']
     habit_data = dict(name='Stretch', category_id=category, recurrence='daily', start_date=today, goal=5, goal_ids=[second])
-    habit = owner.request('saveHabit', habit_data)
+    habit = owner.request('saveHabit', habit_data)['id']
     check(goal_ids('habit', habit) == {second}, 'Full habit forms support goals independently of the numeric habit target')
 
     board = owner.request('createMindSpaceItem', dict(kind='kanban', name='Goals board', client_key=str(uuid.uuid4())))
