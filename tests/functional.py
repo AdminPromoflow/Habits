@@ -282,6 +282,8 @@ try:
  test_card_calendar(ms_owner, ms_other, guest, check)
  from card_completion_acceptance import run as test_card_completion
  test_card_completion(ms_owner, ms_other, guest, check)
+ from goals_acceptance import run as test_goals
+ test_goals(ms_owner, ms_other, guest, check)
  subprocess.run([PHP,'tests/constraints.php'],cwd=ROOT,env=env,check=True)
  (ROOT/'tests/.runtime/environment.json').write_text(json.dumps({'database':DB,'base_url':BASE,'env':{k:v for k,v in env.items() if k.startswith('RUTINA_')}},indent=2))
  check(True,'All tests ran against a dedicated MySQL database, without touching Aleina’s real data')
