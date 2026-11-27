@@ -117,8 +117,12 @@ class MindSpaceFiles {
     const queue = files.map(file => ({file,key:crypto.randomUUID(),done:false}));
     openModal('files_upload', `<div id="files-upload-status"><p>${esc(t('files_upload_hint'))}</p><ul class="files-upload-list">${queue.map((item,i) => `<li><strong>${esc(item.file.name)}</strong><span data-upload-row="${i}"></span></li>`).join('')}</ul><p role="status" data-upload-summary></p><button class="btn primary" data-upload-retry hidden>${esc(t('files_retry'))}</button></div>`, true);
     const status = document.getElementById('files-upload-status');
+    let running = false;
     const run = async () => {
+      if (running) return;
+      running = true;
       status.querySelector('[data-upload-retry]').hidden = true;
+      status.querySelector('[data-upload-retry]').disabled = true;
       for (const [index, item] of queue.entries()) {
         if (item.done) continue;
         const row = status.querySelector(`[data-upload-row="${index}"]`); row.textContent = t('files_uploading');
@@ -129,6 +133,8 @@ class MindSpaceFiles {
       }
       const count = queue.filter(item => item.done).length;
       status.querySelector('[data-upload-summary]').textContent = t('files_uploaded_count', {count,total:queue.length});
+      running = false;
+      status.querySelector('[data-upload-retry]').disabled = false;
       status.querySelector('[data-upload-retry]').hidden = count === queue.length;
       if (root === this.root && root.isConnected) await this.refresh();
     };
@@ -149,6 +155,8 @@ class MindSpaceFiles {
     const paint = () => {
       form.querySelector('.files-photo-list').innerHTML = pages.map((page,i) => `<li><img src="${page.url}" alt="${esc(t('files_page', {page:i+1}))}"><span>${esc(t('files_page', {page:i+1}))}</span><div><button type="button" data-photo-move="${i}" data-step="-1" ${i ? '' : 'disabled'} aria-label="${esc(t('files_move_up'))}">↑</button><button type="button" data-photo-move="${i}" data-step="1" ${i === pages.length - 1 ? 'disabled' : ''} aria-label="${esc(t('files_move_down'))}">↓</button><button type="button" data-photo-remove="${i}" aria-label="${esc(t('delete'))}">×</button></div></li>`).join('');
       form.querySelector('[type=submit]').disabled = !pages.length || busy || adding;
+      form.querySelectorAll('[data-add-photos],[data-take-photo],[data-photo-remove]').forEach(button => { button.disabled = busy || adding; });
+      if (busy || adding) form.querySelectorAll('[data-photo-move]').forEach(button => { button.disabled = true; });
     };
     const add = async input => {
       if (busy || adding) return;
@@ -278,7 +286,7 @@ class FileBookReader {
     this.host.querySelector('[data-book=prev]').disabled=this.page===1;
     this.host.querySelector('[data-book=next]').disabled=pages.at(-1)===this.pdf.numPages;
     this.host.querySelector('input').value=this.page;
-    const mode=this.host.querySelector('[data-book=mode]'); mode.textContent=t(count===2?'files_single_page':'files_double_page');mode.setAttribute('aria-pressed',String(count===2));
+    const mode=this.host.querySelector('[data-book=mode]'); mode.textContent=t(count===2?'files_single_page':'files_double_page');mode.setAttribute('aria-pressed',String(count===2));mode.hidden=this.viewport.clientWidth<600;
     const status=this.host.querySelector('[role=status]');status.textContent=t('files_loading');
     const sheetWidth=Math.max(180,(this.viewport.clientWidth-48)/count),sheetHeight=Math.max(220,this.viewport.clientHeight-32);
     const fragment=document.createDocumentFragment();
