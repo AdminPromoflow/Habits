@@ -22,7 +22,7 @@ function hasMindSpaceTarget() {
 }
 function initialPersonalView() {
   const requested = new URL(location.href).searchParams.get('view');
-  return hasMindSpaceTarget() || requested === 'mindspaces' ? 'mindspaces' : ['calendar','habits'].includes(requested) ? requested : 'home';
+  return hasMindSpaceTarget() || requested === 'mindspaces' ? 'mindspaces' : ['calendar','pendings','habits'].includes(requested) ? requested : 'home';
 }
 function updateNotificationBadge() {
   const bell = document.querySelector('[data-action="notifications"]');
@@ -34,7 +34,7 @@ function updateNotificationBadge() {
 function render() {
   document.documentElement.lang = S.language;
   document.body.dataset.theme = S.user?.theme || 'light';
-  document.title = `MyRemarkable Mind · ${t(S.mode === 'admin' ? 'admin_dashboard' : S.view === 'habits' ? 'categories' : S.view === 'categoryWeek' ? 'weekly_plan' : S.view === 'routine' ? 'routine' : S.view)}`;
+  document.title = `MyRemarkable Mind · ${t(S.mode === 'admin' ? 'admin_dashboard' : S.view === 'pendings' ? 'planner_pendings' : S.view === 'habits' ? 'categories' : S.view === 'categoryWeek' ? 'weekly_plan' : S.view === 'routine' ? 'routine' : S.view)}`;
   pageControllers.calendar.unmount();
   $('#app').innerHTML = S.user && !S.setupToken && !S.resetToken ? shell() : authPage();
   mobileDocumentView.sync();
@@ -61,7 +61,7 @@ function shell() {
         (v) =>
           !admin && v === 'sharing' ? sharingSidebar(pending) :
           !admin && v === 'mindspaces' ? pageControllers.home.mindspace.sidebar() :
-          `<button data-view="${v}" class="nav-item ${S.view === v || (v === 'calendar' && ['habits','routine', 'categoryWeek'].includes(S.view)) ? 'active' : ''}" ${S.view === v || (v === 'calendar' && ['habits','routine','categoryWeek'].includes(S.view)) ? 'aria-current="page"' : ''}>${icon({ mindspaces: 'overview', users: 'sharing', requests: 'book', templates: 'habits', statistics: 'progress' }[v] || v)}<span>${t(v)}</span>${v === 'sharing' && pending ? `<span class="nav-count">${pending}</span>` : ''}</button>`
+          `<button data-view="${v}" class="nav-item ${S.view === v || (v === 'calendar' && ['pendings','habits','routine', 'categoryWeek'].includes(S.view)) ? 'active' : ''}" ${S.view === v || (v === 'calendar' && ['pendings','habits','routine','categoryWeek'].includes(S.view)) ? 'aria-current="page"' : ''}>${icon({ mindspaces: 'overview', users: 'sharing', requests: 'book', templates: 'habits', statistics: 'progress' }[v] || v)}<span>${t(v)}</span>${v === 'sharing' && pending ? `<span class="nav-count">${pending}</span>` : ''}</button>`
       )
       .join(''),
     reminderIcon: icon('leaf'),
@@ -80,7 +80,7 @@ function shell() {
     dashboardLabel: t(admin ? 'admin_dashboard' : 'personal_dashboard'),
     breadcrumbIcon: icon('chevron'),
     pageTitle: t(
-      S.view === 'habits' ? 'categories' : S.view === 'categoryWeek' ? 'weekly_plan' : S.view === 'routine' ? 'routine' : S.view
+      S.view === 'pendings' ? 'planner_pendings' : S.view === 'habits' ? 'categories' : S.view === 'categoryWeek' ? 'weekly_plan' : S.view === 'routine' ? 'routine' : S.view
     ),
     languageSwitch: langSwitch(),
     notificationsLabel: esc(notificationLabel()),
@@ -104,15 +104,15 @@ function personalPage() {
       routine: routinePage,
       settings: categoriesPage,
       calendar: calendarPage,
+      pendings: plannerPendingsPage,
       progress: progressPage,
       categories: categoriesPage,
       sharing: sharingPage,
       profile: profilePage,
     }[S.view] || (() => pageControllers.home.mindspace.homeList())
   )();
-  if (!['calendar','habits','categoryWeek','routine'].includes(S.view)) return content;
-  const selected = S.view === 'calendar' ? 'calendar' : 'habits';
-  return `<div class="planner-section-tabs" role="tablist" aria-label="${esc(t('planner_sections'))}">${['calendar','habits'].map(view=>`<button id="planner-section-${view}" role="tab" aria-selected="${view === selected}" aria-controls="planner-section-content" tabindex="${view === selected ? 0 : -1}" data-view="${view}">${icon(view === 'calendar' ? 'calendar' : 'categories')}${t(view === 'calendar' ? 'calendar' : 'categories')}</button>`).join('')}</div><section id="planner-section-content" role="tabpanel" aria-labelledby="planner-section-${selected}">${content}</section>`;
+  if (!['calendar','pendings'].includes(S.view)) return content;
+  return `<div class="planner-section-tabs" role="tablist" aria-label="${esc(t('planner_sections'))}">${['calendar','pendings'].map(view=>`<button id="planner-section-${view}" role="tab" aria-selected="${view === S.view}" aria-controls="planner-section-content" tabindex="${view === S.view ? 0 : -1}" data-view="${view}">${icon(view === 'calendar' ? 'calendar' : 'clock')}${t(view === 'calendar' ? 'calendar' : 'planner_pendings')}</button>`).join('')}</div><section id="planner-section-content" role="tabpanel" aria-labelledby="planner-section-${S.view}">${content}</section>`;
 }
 
 async function navigate(view) {
@@ -139,7 +139,7 @@ async function navigate(view) {
     view !== 'profile'
   )
     view = 'overview';
-  if (S.mode === 'personal' && ['home', 'mindspaces', 'calendar','habits'].includes(view)) {
+  if (S.mode === 'personal' && ['home', 'mindspaces', 'calendar','pendings','habits'].includes(view)) {
     const url = new URL(location.href);
     for (const key of ['view', 'diagram', 'topic', 'item', 'folder', 'space', 'cell', 'card', 'column', 'habit']) url.searchParams.delete(key);
     if (view !== 'home') url.searchParams.set('view', view);

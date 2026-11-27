@@ -11,6 +11,7 @@ final class CalendarController
             'saveCalendarEntry' => $model->save($data),
             'completeCalendarTask' => $model->complete($data),
             'deleteCalendarTask' => $model->delete($data),
+            'saveCalendarOrder' => $model->saveOrder($data),
             default => fail('error_not_found', 404),
         };
     }

@@ -14,3 +14,6 @@
     </div>
   </div>
 </template>
+<template id="view-pendings">
+  <section class="planner-pendings">{{heading}}{{content}}</section>
+</template>

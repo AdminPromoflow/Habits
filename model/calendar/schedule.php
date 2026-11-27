@@ -5,7 +5,9 @@ final class Schedule
 {
     public static function fields(array $d, string $today): array
     {
-        $recurrence = Validate::choice($d['recurrence'] ?? 'weekly', ['once','daily','weekly','monthly','yearly']);
+        $recurrence = Validate::choice($d['recurrence'] ?? 'weekly', ['once','daily','weekly','monthly','yearly','pending']);
+        // Pending is an unscheduled activity, with no placeholder date or repeat rule.
+        if ($recurrence === 'pending') return ['pending', '[]', null, null, null, null];
         $days = Validate::days($recurrence === 'weekly' ? ($d['schedule_days'] ?? [1,2,3,4,5,6,7]) : [1,2,3,4,5,6,7]);
         $start = Validate::date($d['start_date'] ?? $today);
         $end = !empty($d['end_date']) ? Validate::date($d['end_date']) : null;
@@ -52,6 +54,7 @@ final class Schedule
 
     public static function occurs(array $entry, string $date): bool
     {
+        if (($entry['recurrence'] ?? '') === 'pending') return false;
         $start = $entry['start_date'];
         if ($date < max($start, $entry['tracking_start'] ?? $start) || (!empty($entry['end_date']) && $date > $entry['end_date'])) return false;
         $day = new DateTimeImmutable($date);

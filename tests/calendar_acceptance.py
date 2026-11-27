@@ -137,3 +137,24 @@ def test_categories(owner, other, task, check):
     owner.request('deleteMindSpaceItem',dict(id=parent['id'],version=parent['version']))
     after=owner.data()
     check(next(t for t in after['calendar']['tasks'] if t['id']==first)['category_id']==category['id'] and next(c for c in after['categories'] if c['id']==category['id'])['source_folder_id'] is None,'Deleting a folder preserves its category and planned activities')
+    today = owner.data()['today']
+    for kind in ['task', 'habit']:
+        pending = {'kind': kind, 'name': f'Pending {kind}', 'recurrence': 'pending', 'category_choice': 'default'}
+        created = owner.request('saveCalendarEntry', dict(pending, start_date='invalid', end_date='invalid', scheduled_time='25:99', schedule_days=[9], recurrence_rule={'invalid': True}))['id']
+        def saved():
+            data = owner.boot()['data']
+            return next(e for e in (data['calendar']['tasks'] if kind == 'task' else data['habits']) if e['id'] == created)
+        entry = saved()
+        check(entry['recurrence'] == 'pending' and entry['start_date'] is None and entry['end_date'] is None and entry['scheduled_time'] is None and entry['schedule_days'] == [] and not entry['recurrence_rule'], f'Pending {kind} persists without dates, times, weekdays or recurrence rules, even if stale fields are submitted')
+        other.request('saveCalendarEntry', dict(pending, id=created), 404)
+        complete_action = 'completeCalendarTask' if kind == 'task' else 'complete'
+        complete_data = {'id':created, 'date':today, 'completed':True} if kind == 'task' else {'habit_id':created, 'date':today, 'amount':1}
+        owner.request(complete_action, complete_data, 422)
+        owner.request('saveCalendarEntry', {'id':created, 'kind':kind, 'name':f'Renamed pending {kind}'})
+        check(saved()['recurrence'] == 'pending' and saved()['start_date'] is None, f'Editing a pending {kind} without schedule fields does not silently schedule it')
+        scheduled = dict(pending, id=created, recurrence='once' if kind == 'task' else 'weekly', start_date=today, schedule_days=[datetime.date.fromisoformat(today).isoweekday()])
+        owner.request('saveCalendarEntry', scheduled)
+        owner.request(complete_action, complete_data)
+        check(saved()['start_date'] == today and saved()['recurrence'] != 'pending', f'Pending {kind} can be scheduled and completed normally')
+        owner.request('saveCalendarEntry', dict(pending, id=created))
+        check(saved()['start_date'] is None and saved()['recurrence'] == 'pending', f'A scheduled {kind} can return to Pendings without a placeholder date')

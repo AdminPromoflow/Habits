@@ -9,7 +9,33 @@ final class CalendarModel extends BaseModel
         if (!$this->db->one("SELECT version FROM schema_migrations WHERE version='018_daily_planner.sql'")) return ['tasks'=>[], 'completions'=>[]];
         $tasks = $this->db->all('SELECT * FROM calendar_tasks WHERE owner_user_id=? ORDER BY start_date,scheduled_time,id', [$this->uid()]);
         foreach ($tasks as &$task) { $task['schedule_days'] = json_decode($task['schedule_days'], true); $task['recurrence_rule'] = Schedule::rule($task); }
-        return ['tasks'=>$tasks, 'completions'=>$this->db->all('SELECT c.task_id,c.completed_on FROM calendar_task_completions c JOIN calendar_tasks t ON t.id=c.task_id WHERE t.owner_user_id=?', [$this->uid()])];
+        $orders = [];
+        if ($this->db->one("SELECT version FROM schema_migrations WHERE version='023_planner_day_order.sql'")) {
+            foreach ($this->db->all('SELECT planned_on,entry_order FROM calendar_day_orders WHERE user_id=?', [$this->uid()]) as $row) $orders[$row['planned_on']] = json_decode($row['entry_order'], true);
+        }
+        return ['tasks'=>$tasks, 'orders'=>(object) $orders, 'completions'=>$this->db->all('SELECT c.task_id,c.completed_on FROM calendar_task_completions c JOIN calendar_tasks t ON t.id=c.task_id WHERE t.owner_user_id=?', [$this->uid()])];
+    }
+
+    public function saveOrder(array $d): array
+    {
+        $date = Validate::date($d['date'] ?? '');
+        $order = $d['order'] ?? null;
+        if (!is_array($order) || !array_is_list($order) || count($order) > 3000) fail('error_validation');
+        $allowed = [];
+        foreach ($this->db->all('SELECT * FROM calendar_tasks WHERE owner_user_id=?', [$this->uid()]) as $task) {
+            if (Schedule::occurs($task, $date)) $allowed['task:'.$task['id']] = true;
+        }
+        foreach ((new Habits($this->db, $this->user))->list() as $habit) {
+            if ($habit['status'] === 'active' && $habit['permission'] !== 'viewer' && Schedule::occurs($habit, $date)) $allowed['habit:'.$habit['id']] = true;
+        }
+        $seen = [];
+        foreach ($order as $key) {
+            if (!is_string($key) || !preg_match('/^(task|habit):[1-9][0-9]*$/D', $key) || isset($seen[$key])) fail('error_validation');
+            if (!isset($allowed[$key])) fail('error_not_found', 404);
+            $seen[$key] = true;
+        }
+        $this->db->run('INSERT INTO calendar_day_orders(user_id,planned_on,entry_order) VALUES (?,?,?) ON DUPLICATE KEY UPDATE entry_order=VALUES(entry_order)', [$this->uid(), $date, json_encode($order, JSON_THROW_ON_ERROR)]);
+        return ['date'=>$date, 'order'=>$order];
     }
 
     private function task(int $id): array
@@ -42,7 +68,7 @@ final class CalendarModel extends BaseModel
         if ($category) $this->selectedCategory($category);
         $name = Validate::text($d, 'name');
         $description = Validate::text($d, 'description', 5000, false);
-        [$repeat,$days,$start,$end,$time,$rule] = Schedule::fields($d + ['recurrence'=>'once'], $this->today());
+        [$repeat,$days,$start,$end,$time,$rule] = Schedule::fields($d + ['recurrence'=>$old['recurrence'] ?? 'once'], $this->today());
         $values = [$name,$description,$repeat,$days,$time,$start,$end,$rule,$category];
         if ($id) {
             $this->db->run('UPDATE calendar_tasks SET name=?,description=?,recurrence=?,schedule_days=?,scheduled_time=?,start_date=?,end_date=?,recurrence_rule=?,category_id=? WHERE id=? AND owner_user_id=?', [...$values,$id,$this->uid()]);
@@ -86,6 +112,14 @@ final class CalendarModel extends BaseModel
 
     private function source(array $d): ?array
     {
+        if (!empty($d['source_item_id'])) {
+            if (!empty($d['source_diagram_id'])) fail('error_validation');
+            $id = (int) $d['source_item_id'];
+            $key = Validate::text($d, 'source_card_key', 36);
+            $item = $this->db->one("SELECT i.content_json FROM mindspace_items i JOIN mindspaces m ON m.id=i.mindspace_id WHERE i.id=? AND i.kind IN ('kanban','scrum') AND m.owner_user_id=? FOR UPDATE", [$id,$this->uid()]);
+            if (!$item || !in_array($key, array_column(json_decode($item['content_json'], true)['cards'] ?? [], 'id'), true)) fail('error_not_found',404);
+            return ['item'=>$id, 'key'=>$key];
+        }
         if (empty($d['source_diagram_id'])) return null;
         $id = (int) $d['source_diagram_id'];
         $key = Validate::text($d, 'source_node_key', 64);
@@ -95,7 +129,11 @@ final class CalendarModel extends BaseModel
 
     private function attachSource(string $table, int $id, array $source): void
     {
-        $this->db->run("UPDATE $table SET source_diagram_id=?,source_node_key=? WHERE id=? AND owner_user_id=?", [...$source,$id,$this->uid()]);
+        if (isset($source['item'])) {
+            $this->db->run("UPDATE $table SET source_item_id=?,source_card_key=?,source_diagram_id=NULL,source_node_key=NULL WHERE id=? AND owner_user_id=?", [$source['item'],$source['key'],$id,$this->uid()]);
+            return;
+        }
+        $this->db->run("UPDATE $table SET source_diagram_id=?,source_node_key=?,source_item_id=NULL,source_card_key=NULL WHERE id=? AND owner_user_id=?", [...$source,$id,$this->uid()]);
     }
 
     public function complete(array $d): void

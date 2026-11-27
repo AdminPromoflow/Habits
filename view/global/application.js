@@ -342,7 +342,7 @@ async function syncQuietly() {
   refreshInFlight = true;
   try {
     const userId = S.user.id;
-    if ($('#modal').open || ['profile', 'settings'].includes(S.view) || pageControllers.home.isEditing()) {
+    if ($('#modal').open || ['profile', 'settings'].includes(S.view) || pageControllers.home.isEditing() || pageControllers.calendar.isEditing()) {
       const snapshot = JSON.stringify([S.data.notifications, S.data.unread_notifications]);
       const data = await api('notifications');
       if (S.user?.id !== userId || JSON.stringify([S.data.notifications, S.data.unread_notifications]) !== snapshot) return;
@@ -354,7 +354,7 @@ async function syncQuietly() {
     const snapshot = JSON.stringify(S.data);
     const data = await api('data');
     // A request started before typing, saving or switching accounts must not redraw stale data.
-    if (S.user?.id !== userId || pageControllers.home.isEditing() || JSON.stringify(S.data) !== snapshot) return;
+    if (S.user?.id !== userId || pageControllers.home.isEditing() || pageControllers.calendar.isEditing() || JSON.stringify(S.data) !== snapshot) return;
     if (JSON.stringify(data) !== snapshot) {
       S.data = data;
       render();

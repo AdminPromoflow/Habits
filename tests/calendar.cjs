@@ -3,9 +3,31 @@ const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const fs=require('node:fs');
 const context=vm.createContext({Intl,Date,document:{addEventListener(){}}});
-vm.runInContext(fs.readFileSync('view/global/ui.js','utf8')+'\nclass PageController {}\n'+fs.readFileSync('view/calendar/calendar.js','utf8')+'\nthis.testApi={scheduled,plannerEntries,plannerNotePages,plannerNoteTurn,plannerNoteRow,plannerNoteMonth,CalendarPage,plannerCategoryOptions,plannerCategoryFields,S};',context);
+vm.runInContext(fs.readFileSync('view/global/ui.js','utf8')+'\nclass PageController {}\n'+fs.readFileSync('view/calendar/calendar.js','utf8')+'\nthis.testApi={scheduled,plannerEntries,plannerNotePages,plannerNoteTurn,plannerNoteRow,plannerNoteMonth,CalendarPage,plannerCategoryOptions,plannerCategoryFields,plannerPendingEntries,plannerPendingsPage,S};',context);
 const {scheduled,plannerEntries,plannerNotePages,plannerNoteTurn,plannerNoteRow,plannerNoteMonth,CalendarPage,S}=context.testApi;
 const base={id:1,name:'<Task>',start_date:'2024-01-31',end_date:null,schedule_days:[1,3,5],recurrence:'monthly'};
+test('pending activities stay outside every calendar date and appear together by category',()=>{
+  S.data={today:'2024-02-29',categories:[{id:1,name:'Work',color:'#AABBCC'}],habits:[
+    {...base,id:10,name:'Pending habit',recurrence:'pending',start_date:null,schedule_days:[],status:'active',permission:'owner',category_id:1},
+    {...base,id:11,recurrence:'pending',status:'archived',permission:'owner'},
+    {...base,id:12,recurrence:'pending',status:'active',permission:'viewer'},
+  ],completions:[],calendar:{tasks:[
+    {...base,id:2,name:'<Pending task>',recurrence:'pending',start_date:null,schedule_days:[],category_id:1},
+    {...base,id:3,name:'Scheduled task'},
+  ],completions:[]}};
+  for(const date of ['2020-01-01','2024-02-29','2099-12-31']) {
+    assert.equal(scheduled(S.data.calendar.tasks[0],date),false);
+    assert.equal(scheduled(S.data.habits[0],date),false);
+    assert.ok(plannerEntries(date).every(entry=>entry.recurrence!=='pending'));
+  }
+  assert.deepEqual(Array.from(context.testApi.plannerPendingEntries(),entry=>`${entry.kind}:${entry.id}`).sort(),['habit:10','task:2']);
+  context.renderTemplate=(name,values)=>values.content;
+  const html=context.testApi.plannerPendingsPage();
+  assert.match(html,/&lt;Pending task&gt;/);assert.ok(!html.includes('<Pending task>'));
+  assert.match(html,/data-action="planner-edit-habit"/);assert.match(html,/data-action="planner-edit"/);
+  assert.equal((html.match(/class="planner-pending-group"/g)||[]).length,1);
+  assert.ok(!html.includes('Scheduled task'));
+});
 test('calendar recurrence preserves anchors and short-month semantics',()=>{
   for(const [entry,dates] of [
     [base,{'2024-01-30':false,'2024-01-31':true,'2024-02-29':true,'2025-02-28':true,'2024-03-30':false,'2024-03-31':true}],

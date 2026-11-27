@@ -17,6 +17,7 @@ return [
     'saveCalendarEntry' => 'calendar',
     'completeCalendarTask' => 'calendar',
     'deleteCalendarTask' => 'calendar',
+    'saveCalendarOrder' => 'calendar',
     'archiveHabit' => 'habits',
     'deleteHabit' => 'habits',
     'complete' => 'habits',

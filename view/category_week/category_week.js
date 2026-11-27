@@ -37,7 +37,7 @@ function categoryWeekPage() {
   const routines = S.data.routines.filter((r) => Number(r.category_id) === Number(c.id));
   const f = S.filter;
   const tasks = (S.data.calendar?.tasks || []).filter(task=>Number(task.category_id) === Number(c.id) && (!f.search || (task.name+' '+task.description).toLocaleLowerCase().includes(f.search.toLocaleLowerCase())));
-  const taskList = tasks.length ? `<section class="planner-category-tasks"><h2>${t('planner_category_tasks')}</h2>${tasks.map(task=>`<div><p class="field-help">${esc(fmt(task.start_date,{dateStyle:'medium'}))}</p>${plannerEntry({...task,kind:'task'},task.start_date,true)}</div>`).join('')}</section>` : '';
+  const taskList = tasks.length ? `<section class="planner-category-tasks"><h2>${t('planner_category_tasks')}</h2>${tasks.map(task=>`<div><p class="field-help">${esc(task.recurrence === 'pending' ? t('planner_pending') : fmt(task.start_date,{dateStyle:'medium'}))}</p>${plannerEntry({...task,kind:'task'},task.start_date,true)}</div>`).join('')}</section>` : '';
   if (!all.length) return `<button class="text-btn back-btn" data-view="habits">${icon('chevron','flip')}${t('back_categories')}</button>${heading(esc(categoryName(c)),t('planner_categories_intro'),`<button class="btn primary" data-action="planner-add" data-category="${c.id}">${icon('plus')}${t('planner_add')}</button>`)}${taskList || empty('planner_empty','planner_empty_hint')}`;
   const habits = all.filter(
     (h) =>

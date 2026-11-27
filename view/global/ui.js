@@ -138,6 +138,7 @@ function habitCategory(h) {
 }
 
 function scheduled(h, date) {
+  if (h.recurrence === 'pending') return false;
   if (date < (h.tracking_start || h.start_date) || date < h.start_date || (h.end_date && date > h.end_date)) return false;
   const recurrence = h.recurrence || 'weekly';
   if (recurrence === 'once') return date === h.start_date;

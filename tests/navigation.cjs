@@ -22,6 +22,7 @@ test('reload restores a space or document link and keeps Home separate from All 
     assert.equal(fixture(`http://localhost/${query}`).context.initialPersonalView(),'mindspaces');
   }
   assert.equal(fixture('http://localhost/').context.initialPersonalView(),'home');
+  assert.equal(fixture('http://localhost/?view=pendings').context.initialPersonalView(),'pendings');
 });
 
 test('Home waits for pending edits before clearing the document URL and editor',async()=>{
@@ -36,13 +37,19 @@ test('Home waits for pending edits before clearing the document URL and editor',
 });
 
 test('a failed save keeps the current document and URL for every navigation destination',async()=>{
-  for (const destination of ['home','mindspaces','calendar']) {
+  for (const destination of ['home','mindspaces','calendar','pendings']) {
     const f=fixture(), original=f.location.href;
     f.home.mindspace.flush=async()=>false;
     await f.context.navigate(destination);
     assert.equal(f.S.view,'mindspaces'); assert.equal(f.location.href,original);
     assert.deepEqual(f.events,[]);
   }
+});
+
+test('Pendings remains selected after navigation and reload',async()=>{
+  const f=fixture();await f.context.navigate('pendings');
+  assert.equal(f.S.view,'pendings');assert.equal(f.location.href,'http://localhost/?view=pendings');
+  assert.equal(f.context.initialPersonalView(),'pendings');
 });
 
 test('All main spaces returns to the directory and persists the directory on reload',async()=>{

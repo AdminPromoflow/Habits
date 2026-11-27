@@ -51,7 +51,8 @@ class MindSpaceEditors {
       <div class="ms-board">${this.statuses().map(status => {
         const cards = draft.cards.filter(card => card.status === status);
         return `<section class="ms-column" data-ms-column="${esc(status)}" aria-label="${esc(this.columnName(status))}"><header><h3>${esc(this.columnName(status))}</h3><span>${cards.length}</span>${columnReturns.get(status) || ''}</header>
-          ${cards.map(card => `<article class="ms-card" draggable="true" data-ms-card="${card.id}"><button type="button" class="ms-card-title" data-action="ms-card-edit" data-id="${card.id}">${esc(card.title)}</button>
+          ${cards.map(card => `<article class="ms-card" draggable="true" data-ms-card="${card.id}"><div class="ms-card-heading"><button type="button" class="ms-card-title" data-action="ms-card-edit" data-id="${card.id}">${esc(card.title)}</button>
+            <button type="button" class="ms-card-calendar" data-action="ms-card-calendar" data-id="${card.id}" aria-label="${esc(t('diagram_option_calendar') + ': ' + card.title)}" title="${esc(t('diagram_option_calendar'))}" ${this.space.can('edit') ? '' : 'disabled'}>${icon('calendar')}</button></div>
             ${card.description ? `<p>${esc(card.description)}</p>` : ''}${card.points ? `<small>${esc(t('ms_points'))}: ${card.points}</small>` : ''}
             <label class="sr-only" for="ms-card-${card.id}">${esc(t('ms_card_status'))}: ${esc(card.title)}</label><select id="ms-card-${card.id}" data-ms-card-status="${card.id}">${this.statuses().map(value => `<option value="${esc(value)}" ${value === status ? 'selected' : ''}>${esc(this.columnName(value))}</option>`).join('')}</select>${returns.get(card.id) || ''}</article>`).join('')}
           <button type="button" class="ms-add-card" data-action="ms-card-new" data-status="${esc(status)}">${icon('plus')}${esc(t('ms_add_card'))}</button></section>`;
@@ -92,6 +93,18 @@ class MindSpaceEditors {
       if (index < 0) space.draft.cards.push(updated); else space.draft.cards[index] = updated;
       space.changed(); closeModal(); this.refresh(); await space.save();
     }); });
+  }
+  async scheduleCard(id) {
+    const space = this.space, itemId = space.active?.id, generation = space.generation;
+    if (!['kanban','scrum'].includes(space.active?.kind) || !space.can('edit')) return;
+    if (!await space.flush() || space.generation !== generation || space.active?.id !== itemId) return;
+    const card = space.draft.cards.find(card => card.id === id);
+    if (!card) return;
+    const source = S.sharedWorkspace ? {} : {source_item_id:itemId, source_card_key:id};
+    const matching = [...(S.data.calendar?.tasks || []).map(entry => ({...entry,kind:'task'})),
+      ...(S.data.habits || []).filter(habit => habit.permission === 'owner' && habit.status === 'active').map(habit => ({...habit,kind:'habit'}))]
+      .find(entry => source.source_item_id && Number(entry.source_item_id) === itemId && entry.source_card_key === id);
+    return plannerForm(matching || null, {...source, name:card.title, description:card.description || ''});
   }
   moveCard(id, status) {
     const card = this.space.draft?.cards?.find(item => item.id === id);
@@ -624,6 +637,7 @@ class MindSpaceEditors {
     if (action === 'ms-column-new') return this.newColumn();
     if (action === 'ms-card-new') return this.cardForm(null, button.dataset.status);
     if (action === 'ms-card-edit') return this.cardForm(button.dataset.id);
+    if (action === 'ms-card-calendar') return this.scheduleCard(button.dataset.id);
     if (action === 'ms-sprint') return this.sprintForm();
     if (action === 'ms-habits-select') return this.chooseHabits();
     if (action === 'ms-habit-new') return this.newHabit();

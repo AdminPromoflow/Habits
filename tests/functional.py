@@ -276,6 +276,10 @@ try:
  test_mindspace_sharing(ms_owner, ms_other, eve, guest, check)
  from calendar_acceptance import run as test_calendar
  test_calendar(ms_owner, ms_other, guest, check)
+ from calendar_order_acceptance import run as test_calendar_order
+ test_calendar_order(ms_owner, ms_other, guest, check)
+ from card_calendar_acceptance import run as test_card_calendar
+ test_card_calendar(ms_owner, ms_other, guest, check)
  subprocess.run([PHP,'tests/constraints.php'],cwd=ROOT,env=env,check=True)
  (ROOT/'tests/.runtime/environment.json').write_text(json.dumps({'database':DB,'base_url':BASE,'env':{k:v for k,v in env.items() if k.startswith('RUTINA_')}},indent=2))
  check(True,'All tests ran against a dedicated MySQL database, without touching Aleina’s real data')

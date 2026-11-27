@@ -152,6 +152,12 @@
 .ms-column h3 { font: 600 .875rem/1.4 system-ui,sans-serif; margin: 0; }
 .ms-column > header > span:not(.ms-target-return) { color: var(--purple-dark); background: var(--surface); border-radius: 12px; min-width: 22px; text-align: center; font-size: .75rem; }
 .ms-card { padding: 12px; margin-bottom: 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); cursor: grab; }
+.ms-card-heading { display: flex; align-items: flex-start; gap: 6px; }
+.ms-card-heading .ms-card-title { flex: 1; min-width: 0; }
+.ms-card-calendar { display: grid; place-items: center; flex: 0 0 30px; width: 30px; height: 30px; margin: -4px -4px 0 0; padding: 5px; border: 0; border-radius: 6px; background: transparent; color: var(--purple-dark); cursor: pointer; }
+.ms-card-calendar svg { width: 18px; height: 18px; }
+.ms-card-calendar:hover:not(:disabled) { background: var(--lavender-wash); }
+.ms-card-calendar:disabled { opacity: .4; cursor: default; }
 .ms-card-title { display: block; padding: 0; width: 100%; border: 0; background: none; color: var(--ink); text-align: left; font: 600 .875rem/1.5 system-ui,sans-serif; overflow-wrap: anywhere; cursor: pointer; }
 .ms-card p { font-size: .8125rem; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
 .ms-card small { display: block; font-size: .75rem; color: var(--purple-dark); margin-top: 8px; }
