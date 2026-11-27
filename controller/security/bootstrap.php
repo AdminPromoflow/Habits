@@ -10,6 +10,7 @@ spl_autoload_register(static function (string $class): void {
         'Habits' => 'model/habits/habits.php',
         'Schedule' => 'model/calendar/schedule.php',
         'CalendarModel' => 'model/calendar/calendar.php',
+        'PlannerCardSync' => 'model/calendar/card-sync.php',
         'CalendarController' => 'controller/calendar/calendar.php',
         'CategoriesModel' => 'model/categories/categories.php',
         'RoutinesModel' => 'model/routines/routines.php',

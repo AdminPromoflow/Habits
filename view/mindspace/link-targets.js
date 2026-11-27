@@ -3,14 +3,19 @@
 // Shared by the link picker, its tooltip and the destination editor.
 class MindSpaceLinkTargets {
   static type(item) { return {spreadsheet:'cell', kanban:'card', scrum:'card', habits:'habit'}[item?.kind] || null; }
-  static columns(item) {
+  static sprints(item) {
     if (!['kanban','scrum'].includes(item?.kind)) return [];
-    return Array.isArray(item.content?.columns) ? item.content.columns : ['backlog','todo','doing','done'].map(id => ({id, name:t(`ms_status_${id}`)}));
+    const content = item.content || {}, defaults = ['backlog','doing','done'].map(id => ({id, name:t(`ms_status_${id}`)}));
+    return [{...content.sprint, id:'main', columns:(content.columns || defaults).filter(column => column.id !== 'todo')}, ...(content.sprints || [])];
   }
+  static columns(item) {
+    return this.sprints(item).flatMap(sprint => sprint.columns);
+  }
+  static status(card) { return card.status === 'todo' ? 'backlog' : card.status; }
   static statuses(item) { return this.columns(item).map(column => column.id); }
   static types(item) { return this.statuses(item).length ? ['card','column'] : this.type(item) ? [this.type(item)] : []; }
   static choices(item, habits = S.data?.habits || [], type = this.type(item)) {
-    if (type === 'column') return this.columns(item).map(({id, name}) => ({id, label:name}));
+    if (type === 'column') { const sprints = this.sprints(item); return sprints.flatMap((sprint,index) => sprint.columns.map(({id,name}) => ({id,label:sprints.length > 1 ? `${sprint.name || t('ms_sprint_number',{number:index+1})} · ${name}` : name}))); }
     if (['kanban','scrum'].includes(item?.kind)) return (item.content.cards || []).map(card => ({id:card.id, label:card.title}));
     if (item?.kind === 'habits') return habits.filter(habit => habit.permission === 'owner' && item.content.habit_ids.includes(habit.id)).map(habit => ({id:String(habit.id), label:habit.name}));
     return [];
@@ -24,13 +29,13 @@ class MindSpaceLinkTargets {
       const [row, column] = MindSpaceSheet.address(target.id);
       return row < item.content.rows && column < item.content.columns;
     }
-    return this.choices(item, habits, target.type).some(choice => choice.id === target.id);
+    return this.choices(item, habits, target.type).some(choice => choice.id === (target.type === 'column' && target.id === 'todo' ? 'backlog' : target.id));
   }
   static label(item, target) {
     if (!target) return t('ms_link_whole');
     if (!this.valid(item, target)) return t('diagram_link_unavailable');
     if (target.type === 'cell') return `${t('ms_link_cell')} ${target.id}`;
-    return this.choices(item, undefined, target.type).find(choice => choice.id === target.id)?.label || t('diagram_link_unavailable');
+    return this.choices(item, undefined, target.type).find(choice => choice.id === (target.type === 'column' && target.id === 'todo' ? 'backlog' : target.id))?.label || t('diagram_link_unavailable');
   }
   static preview(item) {
     if (item.kind === 'spreadsheet') {
@@ -42,11 +47,11 @@ class MindSpaceLinkTargets {
         }).join('')}</tr>`).join('')}</tbody></table>`;
     }
     if (this.statuses(item).length) {
-      return `<div class="ms-link-board">${this.columns(item).map(({id:status, name}) => {
-        const cards = item.content.cards.filter(card => card.status === status);
+      return this.sprints(item).map((sprint,index) => `${this.sprints(item).length > 1 ? `<h4>${esc(sprint.name || t('ms_sprint_number',{number:index+1}))}</h4>` : ''}<div class="ms-link-board">${sprint.columns.map(({id:status, name}) => {
+        const cards = item.content.cards.filter(card => this.status(card) === status);
         return `<section class="ms-link-column" aria-label="${esc(name)}"><button type="button" class="ms-link-column-select" data-link-type="column" data-link-target="${esc(status)}" aria-pressed="false" aria-label="${esc(`${t('ms_link_column')}: ${name}`)}"><strong>${esc(name)}</strong><span>${cards.length}</span></button>
           <div class="ms-link-choices">${cards.length ? cards.map(card => `<button type="button" data-link-type="card" data-link-target="${esc(card.id)}" aria-pressed="false"><strong>${esc(card.title)}</strong>${card.description ? `<small>${esc(card.description)}</small>` : ''}</button>`).join('') : `<p class="ms-link-column-empty">${esc(t('ms_link_column_empty'))}</p>`}</div></section>`;
-      }).join('')}</div>`;
+      }).join('')}</div>`).join('');
     }
     if (this.type(item)) {
       const choices = this.choices(item);
@@ -65,8 +70,11 @@ class MindSpaceLinkTargets {
     space.linkArrival = marker;
     if (!this.valid({...space.active, content:space.draft}, target)) { toast(t('error_diagram_link_missing'), true); return; }
     const attr = {cell:'data-ms-cell', card:'data-ms-card', column:'data-ms-column', habit:'data-ms-habit'}[type];
-    const element = [...document.querySelectorAll(`#mindspace-panel [${attr}]`)].find(el => el.getAttribute(attr) === target.id);
+    const id = type === 'column' && target.id === 'todo' ? 'backlog' : target.id;
+    const element = [...document.querySelectorAll(`#mindspace-panel [${attr}]`)].find(el => el.getAttribute(attr) === id);
     if (!element) return;
+    const sprint = element.closest?.('[data-ms-sprint]');
+    if (sprint) space.editor.toggleSprint(sprint.dataset.msSprint, false);
     document.querySelectorAll('.ms-link-target').forEach(el => el.classList.remove('ms-link-target'));
     element.classList.add('ms-link-target');
     if (type !== 'cell') element.setAttribute('tabindex', '-1');

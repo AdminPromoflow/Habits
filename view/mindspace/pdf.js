@@ -189,16 +189,18 @@ class MindSpacePDF {
   }
 
   board() {
-    const {content} = this.item, sprint = content.sprint || {};
-    if (sprint.name) this.text(sprint.name, 15);
-    if (sprint.goal) this.text(`${t('ms_sprint_goal')}: ${sprint.goal}`);
-    if (sprint.start || sprint.end) this.text(`${sprint.start || ''} - ${sprint.end || ''}`, 10, 6);
-    for (const column of MindSpaceLinkTargets.columns(this.item)) {
-      this.space(32); this.text(column.name, 14, 3);
-      const cards = content.cards.filter(card => card.status === column.id);
-      if (!cards.length) this.text(t('ms_pdf_empty'), 10, 6);
-      else this.table([[t('name'), t('description'), t('ms_points')]], cards.map(card => [card.title, card.description || '', String(card.points || 0)]), {0:{cellWidth:48}, 2:{cellWidth:20}});
-    }
+    const {content} = this.item;
+    MindSpaceLinkTargets.sprints(this.item).forEach((sprint,index) => {
+      this.space(42); this.text(sprint.name || t('ms_sprint_number',{number:index+1}), 15);
+      if (sprint.goal) this.text(`${t('ms_sprint_goal')}: ${sprint.goal}`);
+      if (sprint.start || sprint.end) this.text(`${sprint.start || ''} - ${sprint.end || ''}`, 10, 6);
+      for (const column of sprint.columns) {
+        this.space(32); this.text(column.name, 14, 3);
+        const cards = content.cards.filter(card => MindSpaceLinkTargets.status(card) === column.id);
+        if (!cards.length) this.text(t('ms_pdf_empty'), 10, 6);
+        else this.table([[t('name'), t('description'), t('ms_points')]], cards.map(card => [card.title, card.description || '', String(card.points || 0)]), {0:{cellWidth:48}, 2:{cellWidth:20}});
+      }
+    });
   }
 
   habits() {

@@ -4,7 +4,7 @@ class MindSpace extends PageController {
   constructor(home) {
     super(['ms-new','ms-new-kind','ms-open','ms-tab-close','ms-folder','ms-rename','ms-move','ms-retry',
       'ms-link-return','ms-link-returns','ms-sidebar-open','ms-sidebar-toggle','ms-sidebar-add','ms-space-open','ms-space-new','ms-entry-menu','ms-space-rename','ms-share','ms-delete','ms-space-delete',
-      'ms-card-new','ms-card-edit','ms-card-calendar','ms-column-new','ms-sprint','ms-habits-select','ms-habit-new','ms-sheet-row','ms-sheet-column','ms-sheet-export','ms-download-pdf','ms-sheet-settings']);
+      'ms-card-new','ms-card-edit','ms-card-calendar','ms-column-new','ms-sprint','ms-sprint-new','ms-sprint-toggle','ms-habits-select','ms-habit-new','ms-sheet-row','ms-sheet-column','ms-sheet-export','ms-download-pdf','ms-sheet-settings']);
     this.home = home;
     this.editor = new MindSpaceEditors(this);
     this.reset();
@@ -771,7 +771,7 @@ class MindSpace extends PageController {
     }
     if (action === 'ms-download-pdf') return MindSpacePDF.download(this, button);
     const right = ['ms-delete','ms-space-delete'].includes(action) ? 'delete' : action === 'ms-share' ? 'share' : action === 'ms-move' ? 'move'
-      : ['ms-new','ms-new-kind','ms-rename','ms-space-rename','ms-card-new','ms-card-edit','ms-card-calendar','ms-column-new','ms-sprint','ms-habits-select','ms-habit-new','ms-sheet-row','ms-sheet-column','ms-sheet-settings'].includes(action) ? 'edit' : null;
+      : ['ms-new','ms-new-kind','ms-rename','ms-space-rename','ms-card-new','ms-card-edit','ms-card-calendar','ms-column-new','ms-sprint','ms-sprint-new','ms-habits-select','ms-habit-new','ms-sheet-row','ms-sheet-column','ms-sheet-settings'].includes(action) ? 'edit' : null;
     if (right && !this.can(right)) throw new Error(t('error_forbidden'));
     if (action === 'ms-share') {
       if (!await this.flush()) return;

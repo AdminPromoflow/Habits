@@ -144,6 +144,7 @@ final class CalendarModel extends BaseModel
         if (!is_bool($d['completed'] ?? null)) fail('error_validation');
         if ($d['completed']) $this->db->run('INSERT IGNORE INTO calendar_task_completions(task_id,completed_on) VALUES (?,?)', [$task['id'],$date]);
         else $this->db->run('DELETE FROM calendar_task_completions WHERE task_id=? AND completed_on=?', [$task['id'],$date]);
+        if ($d['completed']) (new PlannerCardSync($this->db, $this->user))->complete($task);
     }
 
     public function delete(array $d): void

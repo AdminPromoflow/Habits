@@ -147,6 +147,18 @@
 .ms-notes textarea:focus { outline: 1px solid var(--lavender); border-radius: 6px; }
 .ms-board-editor, .ms-habits { padding: 20px; }
 .ms-board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(205px,1fr); gap: 14px; overflow-x: auto; padding-bottom: 12px; }
+.ms-board[hidden] { display:none; }
+.ms-sprint-section + .ms-sprint-section { border-top:1px solid var(--line); padding-top:24px; margin-top:24px; }
+.ms-sprint-summary { min-width:0; flex:1; }
+.ms-sprint-summary p { overflow-wrap:anywhere; }
+.ms-sprint-toggle { display:flex; align-items:center; gap:8px; padding:4px 0; color:var(--ink); text-align:left; font:inherit; cursor:pointer; }
+.ms-sprint-toggle span { overflow-wrap:anywhere; }
+.ms-sprint-toggle .icon { width:18px; height:18px; flex:none; transform:rotate(90deg); }
+.ms-sprint-toggle[aria-expanded="false"] .icon { transform:none; }
+.ms-sprint-actions { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:12px; }
+.ms-sprint-actions .btn { white-space:nowrap; }
+.ms-sprint-toggle:focus-visible { outline:2px solid var(--purple); outline-offset:3px; border-radius:4px; }
+@media(max-width:760px) { .ms-sprint { flex-wrap:wrap; } .ms-sprint-summary { flex-basis:100%; } .ms-sprint-actions { width:100%; } }
 .ms-column { border-radius: 12px; background: var(--lavender-wash); padding: 12px; min-height: 340px; }
 .ms-column > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
 .ms-column h3 { font: 600 .875rem/1.4 system-ui,sans-serif; margin: 0; }
@@ -280,8 +292,4 @@ body[data-theme='dark'] .ms-sheet .ms-month-start > * { border-top-color: hsl(va
 .ms-column > header { position: relative; }
 .ms-column > header:has(.ms-target-return) { padding-right: 32px; }
 .ms-column > header .ms-target-return { right: 0; bottom: 50%; transform: translateY(50%); }
-.ms-board-footer { display: flex; justify-content: flex-end; padding-top: 8px; }
-.ms-add-column { display: grid; place-items: center; width: 38px; height: 38px; padding: 8px; border: 1px solid var(--lavender); border-radius: 50%; background: var(--lavender-wash); color: var(--purple-dark); cursor: pointer; }
-.ms-add-column svg { width: 20px; height: 20px; }
-.ms-add-column:hover, .ms-add-column:focus-visible { background: var(--surface); outline: 2px solid var(--purple); outline-offset: 2px; }
-.ms-add-column:disabled { opacity: .5; cursor: default; }
+.ms-board-footer { display: flex; justify-content: flex-end; padding-top: 20px; }

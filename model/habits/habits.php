@@ -201,6 +201,7 @@ final class Habits extends BaseModel
                 [$h['id'], $this->uid(), $date, $amount, $h['goal'], $note],
             );
         }
+        if ($amount >= (float) $h['goal']) (new PlannerCardSync($this->db, $this->user))->complete($h);
         // No progress values are placed in a shared activity feed.
     }
 }
