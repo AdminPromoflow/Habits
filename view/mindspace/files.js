@@ -225,7 +225,12 @@ class MindSpaceFiles {
     dialog.classList.add('files-reader');
     if (entry.kind === 'image') { host.innerHTML = `<img class="files-image-full" src="${esc(this.url(entry,false,ctx))}" alt="${esc(entry.name)}">`; return; }
     const reader = new FileBookReader(host, this.url(entry,false,ctx));
-    dialog.addEventListener('close', () => reader.destroy(), {once:true});
+    // A queued close from the composer can arrive after this preview opens.
+    const onClose = () => {
+      if (dialog.open && host.isConnected) return;
+      reader.destroy(); dialog.removeEventListener('close', onClose);
+    };
+    dialog.addEventListener('close', onClose);
     await reader.open();
   }
 }
