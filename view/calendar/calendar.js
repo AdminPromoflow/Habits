@@ -249,7 +249,7 @@ function plannerFilterCategories() {
 }
 
 function plannerNoteEntries(date) {
-  return plannerEntries(date).filter(entry => !S.plannerCategory || plannerCategoryKey(entry) === S.plannerCategory);
+  return plannerEntries(date).filter(entry => !S.plannerHiddenCategories.includes(plannerCategoryKey(entry)));
 }
 
 function plannerFlagIcon() {
@@ -258,9 +258,9 @@ function plannerFlagIcon() {
 
 function plannerCategoryFilters() {
   const categories = plannerFilterCategories();
-  if (S.plannerCategory && !categories.some(category => category.key === S.plannerCategory)) { S.plannerCategory = ''; S.plannerPage = 0; }
-  const options = [{key:'',name:t('planner_all_tasks'),color:'#87947A'},...categories];
-  return `<div class="planner-category-filters" role="group" aria-label="${esc(t('planner_filter_category'))}">${options.map(category => `<button type="button" class="planner-category-filter" data-action="planner-filter-category" data-category="${category.key}" style="--planner-color:${category.color}" aria-pressed="${(S.plannerCategory || '') === category.key}" aria-controls="planner-note-entries" title="${esc(category.name)}">${plannerFlagIcon()}<span>${esc(category.name)}</span></button>`).join('')}</div>`;
+  S.plannerHiddenCategories = S.plannerHiddenCategories.filter(key => categories.some(category => category.key === key));
+  const arrow = direction => `<button type="button" class="planner-category-scroll" data-action="planner-categories-${direction}" aria-label="${esc(t(`planner_categories_${direction}`))}" aria-controls="planner-category-filters" hidden disabled>${icon('chevron',direction === 'left' ? 'flip' : '')}</button>`;
+  return `<div class="planner-category-bar">${arrow('left')}<div class="planner-category-filters" id="planner-category-filters" role="group" aria-label="${esc(t('planner_filter_category'))}">${categories.map(category => `<button type="button" class="planner-category-filter" data-action="planner-filter-category" data-category="${category.key}" style="--planner-color:${category.color}" aria-pressed="${!S.plannerHiddenCategories.includes(category.key)}" aria-controls="planner-note-entries" title="${esc(category.name)}">${plannerFlagIcon()}<span>${esc(category.name)}</span></button>`).join('')}</div>${arrow('right')}</div>`;
 }
 
 function plannerEntry(entry, date, compact = false) {
@@ -371,7 +371,10 @@ function plannerPendingsPage() {
 
 class CalendarPage extends PageController {
   constructor() {
-    super(['date-prev','date-next','today','pick-date','calendar-date','planner-calendar-toggle','planner-month-prev','planner-month-next','planner-note-date','planner-note-prev','planner-note-next','planner-filter-category','planner-add','planner-edit','planner-delete','planner-delete-habit','planner-edit-habit','planner-complete']);
+    super(['date-prev','date-next','today','pick-date','calendar-date','planner-calendar-toggle','planner-month-prev','planner-month-next','planner-note-date','planner-note-prev','planner-note-next','planner-filter-category','planner-categories-left','planner-categories-right','planner-add','planner-edit','planner-delete','planner-delete-habit','planner-edit-habit','planner-complete']);
+    document.addEventListener('scroll',event => {
+      if (event.target.matches?.('.planner-category-filters')) this.updateCategoryArrows();
+    }, true);
     document.addEventListener('change',event => {
       if (event.target.id !== 'planner-note-month' || !/^\d{4}-\d{2}$/.test(event.target.value) || !event.target.validity.valid) return;
       S.plannerMonth = event.target.value; render(); $('#planner-note-month')?.focus({preventScroll:true});
@@ -416,6 +419,18 @@ class CalendarPage extends PageController {
   }
 
   isEditing() { return !!this.drag?.started || !!this.savingOrder; }
+
+  updateCategoryArrows() {
+    const bar = $('.planner-category-bar'), filters = $('.planner-category-filters');
+    if (!bar || !filters) return;
+    // Measure against the full bar before reserving room for the arrows.
+    const overflow = filters.scrollWidth > bar.clientWidth + 1;
+    bar.classList.toggle('is-overflowing',overflow);
+    const left = $('[data-action="planner-categories-left"]',bar), right = $('[data-action="planner-categories-right"]',bar);
+    left.hidden = left.disabled = !overflow || filters.scrollLeft <= 1;
+    right.hidden = right.disabled = !overflow || filters.scrollLeft >= filters.scrollWidth - filters.clientWidth - 1;
+    S.plannerCategoryScroll = filters.scrollLeft;
+  }
 
   startDrag(event) {
     if (S.view !== 'calendar' || S.busy || this.savingOrder || event.button !== 0 || event.isPrimary === false) return;
@@ -520,6 +535,7 @@ class CalendarPage extends PageController {
     const note = $('.planner-note[data-mode="note"]');
     if (!note) return;
     const entries = plannerNoteEntries(S.date);
+    const emptyMessage = S.plannerHiddenCategories.length ? t(plannerFilterCategories().some(category => !S.plannerHiddenCategories.includes(category.key)) ? 'planner_category_empty' : 'planner_categories_none') : '';
     const layout = () => {
       if (!note.isConnected) return;
       const lineHeight = $('.planner-note-lines',note).getBoundingClientRect().height / PLANNER_NOTE_LINES;
@@ -527,7 +543,7 @@ class CalendarPage extends PageController {
       this.notePages = plannerNotePages(entries,counts);
       const last = this.notePages.length-1;
       S.plannerPage = S.plannerPage === -1 ? last : Math.min(last,Math.max(0,S.plannerPage || 0));
-      const content = this.notePages[S.plannerPage].map(({entry,lines})=>plannerNoteRow(entry,S.date,lines)).join('') || (S.plannerCategory ? `<p class="planner-note-empty">${esc(t('planner_category_empty'))}</p>` : '');
+      const content = this.notePages[S.plannerPage].map(({entry,lines})=>plannerNoteRow(entry,S.date,lines)).join('') || (emptyMessage ? `<p class="planner-note-empty">${esc(emptyMessage)}</p>` : '');
       const list = $('.planner-note-lines',note);
       if (list.innerHTML !== content) list.innerHTML = content;
       const pageLabel = t('planner_sheet_count',{page:S.plannerPage+1,count:this.notePages.length});
@@ -538,21 +554,35 @@ class CalendarPage extends PageController {
     };
     this.layoutNote = layout;
     layout();
+    const filters = $('.planner-category-filters',note), scroll = S.plannerCategoryScroll;
+    this.updateCategoryArrows();
+    filters.scrollLeft = scroll;
+    this.updateCategoryArrows();
     let width = note.clientWidth;
-    this.noteObserver = new ResizeObserver(() => { if (note.clientWidth !== width) { width = note.clientWidth; layout(); } });
+    this.noteObserver = new ResizeObserver(() => {
+      if (note.clientWidth !== width) { width = note.clientWidth; layout(); }
+      this.updateCategoryArrows();
+    });
     this.noteObserver.observe(note);
+    this.noteObserver.observe(filters);
   }
 
   async handleAction(action, el, id) {
-    if (action === 'planner-filter-category') {
-      const category = el.dataset.category || '';
-      if (category && !plannerFilterCategories().some(item => item.key === category)) return;
-      const scroll = $('.planner-category-filters')?.scrollLeft || 0;
-      S.plannerCategory = category; S.plannerPage = 0;
-      render();
+    if (['planner-categories-left','planner-categories-right'].includes(action)) {
       const filters = $('.planner-category-filters');
-      if (filters) filters.scrollLeft = scroll;
-      $('.planner-category-filter[aria-pressed="true"]')?.focus({preventScroll:true});
+      if (filters) filters.scrollBy({left:(action.endsWith('right') ? 1 : -1) * Math.max(100,filters.clientWidth * .75),
+        behavior:typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'});
+      return;
+    }
+    if (action === 'planner-filter-category') {
+      const category = el.dataset.category;
+      if (!plannerFilterCategories().some(item => item.key === category)) return;
+      S.plannerCategoryScroll = $('.planner-category-filters')?.scrollLeft || 0;
+      S.plannerHiddenCategories = S.plannerHiddenCategories.includes(category)
+        ? S.plannerHiddenCategories.filter(key => key !== category) : [...S.plannerHiddenCategories,category];
+      S.plannerPage = 0;
+      render();
+      $(`.planner-category-filter[data-category="${category}"]`)?.focus({preventScroll:true});
       return;
     }
     if (action === 'planner-add') return plannerForm(null,{start_date:el.dataset.date || S.date,scheduled_time:el.dataset.time || '',category_id:el.dataset.category || null,...(el.dataset.pending === 'true' || S.view === 'pendings' ? {recurrence:'pending'} : {})});

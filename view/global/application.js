@@ -6,7 +6,7 @@ async function bootstrap() {
     S.sharedWorkspace = null; S.ownedWorkspace = null; S.sharePerson = null; S.sharingTab = 'all';
     S.sharingSidebarExpanded = undefined;
     S.progress = null;
-    S.plannerCategory = '';
+    S.plannerHiddenCategories = []; S.plannerCategoryScroll = 0;
   }
   Object.assign(S, {
     user: r.user,

@@ -11,12 +11,22 @@
 .planner-note-title { position:absolute; top:6.5%; left:28%; width:44%; height:14.5%; display:flex; align-items:center; justify-content:center; background:#fffffe; color:#242722; font:400 clamp(38px,10cqw,72px)/1 'Snell Roundhand','Segoe Script','URW Chancery L',cursive; letter-spacing:0; text-align:center; margin:0; }
 .planner-note-title:focus { outline:none; }
 .planner-note[data-mode="note"] .planner-note-title { height:9%; }
-.planner-category-filters { position:absolute; top:15.6%; left:10.4%; right:10.2%; height:5.8%; display:flex; align-items:center; gap:5px; overflow-x:auto; overscroll-behavior-x:contain; scrollbar-width:thin; scrollbar-color:#d5dacd transparent; }
+.planner-category-bar { position:absolute; top:15.6%; left:10.4%; right:10.2%; height:5.8%; display:flex; align-items:center; gap:3px; }
+.planner-category-filters { display:flex; flex:1; min-width:0; align-items:center; gap:5px; overflow-x:auto; overscroll-behavior-x:contain; scrollbar-width:none; }
+.planner-category-filters::-webkit-scrollbar { display:none; }
+.planner-category-scroll { display:none; flex:none; align-items:center; justify-content:center; width:22px; height:28px; padding:2px; border-radius:5px; color:#747e68; }
+.planner-category-bar.is-overflowing .planner-category-scroll { display:flex; }
+.planner-category-scroll[hidden] { visibility:hidden; pointer-events:none; }
+.planner-category-scroll .icon { width:16px; height:16px; }
+.planner-category-scroll:hover { background:#f2f3ef; color:#30382b; }
+.planner-category-scroll:focus-visible { outline:2px solid #747e68; outline-offset:-2px; }
 .planner-category-filter { display:flex; align-items:center; gap:4px; flex:none; max-width:clamp(90px,23cqw,145px); min-height:24px; height:clamp(24px,5.2cqw,32px); padding:2px 7px; border:1px solid transparent; border-radius:6px; color:#74786e; font-size:clamp(10px,1.9cqw,12px); line-height:1.2; }
 .planner-category-filter span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .planner-category-filter svg { flex:none; width:17px; height:19px; color:var(--planner-color); }
 .planner-category-filter:hover { background:#f2f3ef; color:#42483b; }
 .planner-category-filter[aria-pressed="true"] { border-color:color-mix(in srgb,var(--planner-color) 60%,#74786e); background:color-mix(in srgb,var(--planner-color) 15%,#fffffe); color:#30382b; font-weight:600; }
+.planner-category-filter[aria-pressed="false"] { opacity:.55; }
+.planner-category-filter[aria-pressed="false"]:hover, .planner-category-filter[aria-pressed="false"]:focus-visible { opacity:1; }
 .planner-category-filter:focus-visible { outline:2px solid #747e68; outline-offset:-2px; }
 .planner-note-empty { margin:0; padding:0 5px; color:#85877f; font-size:clamp(11px,2.3cqw,14px); line-height:var(--note-rule); }
 .planner-note-back, .planner-note-date, .planner-note-today { position:absolute; top:5.2%; z-index:1; }

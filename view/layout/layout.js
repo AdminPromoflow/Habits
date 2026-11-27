@@ -127,7 +127,7 @@ async function navigate(view) {
     S.sharingTab = 'all'; S.sharePerson = null;
     S.shareFilter = { permission: '', category: '', owner: '', status: '', search: '' };
   }
-  if (view === 'calendar') { S.plannerMode = 'note'; S.plannerPage = 0; S.plannerCategory = ''; S.date = today(); S.month = S.date.slice(0, 7); }
+  if (view === 'calendar') { S.plannerMode = 'note'; S.plannerPage = 0; S.plannerHiddenCategories = []; S.plannerCategoryScroll = 0; S.date = today(); S.month = S.date.slice(0, 7); }
   if (view === 'habits') {
     S.filter = { category: '', routine: '', status: 'active', search: '' };
     S.categoryId = null;
