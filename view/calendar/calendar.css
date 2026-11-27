@@ -155,6 +155,33 @@ body.planner-is-dragging, body.planner-is-dragging * { cursor:grabbing !importan
 .planner-schedule .day-field span { text-transform:capitalize; }
 .planner-date-range { margin:18px 0; padding:0; border:0; min-width:0; }
 .planner-date-range legend { margin-bottom:10px; font-weight:600; color:var(--purple-dark); }
+.planner-picker-field { position:relative; min-width:0; }
+.planner-picker-field > .field > input { padding-right:42px; }
+.planner-picker-field > .field > input::-webkit-calendar-picker-indicator { display:none; }
+.planner-picker-trigger { position:absolute; right:6px; bottom:23px; display:grid; place-items:center; width:32px; height:32px; padding:6px; color:var(--purple-dark); border-radius:6px; }
+.planner-picker-trigger:hover { background:var(--lavender-wash); }
+.planner-picker-trigger .icon { width:18px; height:18px; }
+.planner-picker-panel { position:fixed; z-index:5; box-sizing:border-box; padding:14px; overflow:auto; border:1px solid var(--line); border-radius:12px; background:var(--surface); color:var(--ink); box-shadow:0 8px 30px #34204730; }
+.planner-picker-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:12px; }
+.planner-picker-heading strong { font-size:.8125rem; font-weight:600; }
+.planner-picker-panel .icon-btn { flex:none; width:28px; height:28px; padding:5px; }
+.planner-picker-month { display:grid; grid-template-columns:24px minmax(0,1fr) 64px 24px; align-items:center; gap:4px; }
+.planner-picker-month select, .planner-picker-month input { width:100%; min-height:34px; padding:6px; font-size:.75rem; }
+.planner-picker-month select { padding-right:22px; background-position:right 1px center; }
+.planner-picker-days { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:3px; margin:10px 0; }
+.planner-picker-days > span { text-align:center; padding:3px 0; font-size:.6875rem; color:var(--muted); }
+.planner-picker-days button { min-height:30px; padding:4px; border:1px solid transparent; border-radius:6px; font-size:.8125rem; }
+.planner-picker-days button:hover { background:var(--lavender-wash); }
+.planner-picker-days button[aria-current=date] { border-color:var(--purple); }
+.planner-picker-days button[aria-pressed=true] { background:var(--purple-dark); color:#fff; }
+.planner-picker-days button:disabled { opacity:.3; cursor:default; }
+.planner-picker-panel button:focus-visible { outline:2px solid var(--purple); outline-offset:1px; }
+.planner-picker-clock { display:grid; grid-template-columns:1fr 1fr 1.1fr; gap:8px; }
+.planner-picker-clock label { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.planner-picker-clock label > span { font-size:.75rem; color:var(--muted); }
+.planner-picker-clock select { width:100%; padding:9px 24px 9px 9px; background-position:right 2px center; font-size:.875rem; }
+.planner-picker-footer { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:12px; padding-top:10px; border-top:1px solid var(--line); }
+.planner-picker-footer .text-btn, .planner-picker-footer .btn { font-size:.75rem; padding:7px 10px; }
 /* The quick planner starts with the activity, then two explicit choices. */
 #modal.planner-dialog { width:min(660px,calc(100% - 28px)); }
 .planner-section-tabs { display:flex; gap:24px; border-bottom:1px solid var(--line); margin:0 0 28px; }
