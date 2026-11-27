@@ -221,6 +221,12 @@ Los archivos de aplicación quedan en el proyecto para el despliegue habitual po
 
 Validación final: 385 comprobaciones HTTP, 9 de esquema/código y 45 pruebas JavaScript. En navegador se verificó crear, editar y eliminar metas, crear una meta sin cerrar el formulario de una tarea, asignar dos metas a una actividad, registrar su cumplimiento, guardar una tarjeta Kanban en Done y conservar los aportes al recargar My Progress.
 
+### Reordenar filas de hojas de cálculo — 27 de noviembre de 2026
+
+Los números de fila permiten seleccionar una fila completa y arrastrarla a otra posición. Se muestra el cursor de mano y una línea de inserción; también se admite Alt + Arriba/Abajo. El endpoint `moveSpreadsheetRow` guarda el movimiento con control de versión y permiso de edición. Mueve las celdas, formatos y comprobantes adjuntos, ajusta las referencias de las fórmulas y reconstruye los cálculos de las plantillas. La fila de encabezados de una plantilla permanece fija; en hojas en blanco también se puede mover la primera fila.
+
+Este cambio reutiliza las tablas existentes y no requiere una migración en Hostinger. Los archivos quedan preparados para el despliegue habitual por Git. Validación aislada: 397 comprobaciones HTTP, 9 de esquema, 13 de transformación de filas y 90 pruebas JavaScript. El navegador confirmó el arrastre de la fila 3 a la posición 2, el cursor `grab`, la selección completa y la conservación del nuevo orden al recargar.
+
 ## Referencias oficiales consultadas
 
 - [Crear una base MySQL](https://www.hostinger.com/support/1583542-how-to-create-a-new-mysql-database-in-hostinger/)

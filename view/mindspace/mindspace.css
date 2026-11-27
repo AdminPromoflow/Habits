@@ -202,6 +202,13 @@
 .ms-sheet td.is-selected .ms-sheet-cell::after { content: ''; position: absolute; inset: 0; background: #9071bd26; box-shadow: inset 0 0 0 1px var(--purple); pointer-events: none; z-index: 3; }
 .ms-sheet-scroll.is-selecting, .ms-sheet-scroll.is-selecting input { user-select: none; }
 .ms-sheet-scroll.is-selecting input { cursor: cell; }
+.ms-row-handle { display:block; width:100%; min-width:36px; min-height:32px; height:100%; border:0; padding:6px; background:transparent; color:inherit; font:inherit; cursor:grab; touch-action:none; user-select:none; }
+.ms-row-handle:hover, .ms-row-handle[aria-pressed='true'] { background:var(--lavender); color:var(--ink); }
+.ms-row-handle:focus-visible { outline:2px solid var(--purple); outline-offset:-2px; }
+.ms-sheet-scroll.is-row-dragging, .ms-sheet-scroll.is-row-dragging * { cursor:grabbing !important; user-select:none; }
+.ms-sheet .is-row-moving { opacity:.5; }
+.ms-sheet .is-row-drop-before > * { box-shadow:inset 0 3px var(--purple); }
+.ms-sheet .is-row-drop-after > * { box-shadow:inset 0 -3px var(--purple); }
 .ms-sheet-hint { color: var(--muted); font-size: .75rem; margin: 10px 0 0; }
 .ms-template-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
 .ms-template-card { display: grid; grid-template-columns: 18px minmax(0,1fr); gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; background: var(--surface); }
@@ -240,6 +247,17 @@
   #ms-cell-style-form .form-footer { flex-wrap: wrap; }
 }
 .ms-ledger .ms-sheet-layout { display: grid; grid-template-columns: minmax(0,1fr) 190px; gap: 16px; align-items: start; }
+.ms-invoice-cell { display: flex; align-items: center; justify-content: center; gap: 7px; min-width: 150px; width: 100%; min-height: 36px; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: .75rem; cursor: pointer; }
+.ms-invoice-cell svg { width: 17px; height: 17px; flex-shrink: 0; }
+.ms-invoice-cell.has-invoice { color: var(--purple-dark); font-weight: 600; }
+.ms-invoice-cell:hover, .ms-invoice-cell:focus-visible { background: var(--lavender-wash); outline: 2px solid var(--purple); outline-offset: -2px; }
+.ms-invoice-cell:disabled { cursor: default; opacity: .5; }
+.ms-invoice-context, .ms-invoice-name { overflow-wrap: anywhere; color: var(--muted); }
+.ms-invoice-preview { display: block; max-width: 100%; max-height: 55vh; object-fit: contain; margin: 12px auto; border: 1px solid var(--line); border-radius: 8px; }
+.ms-invoice-preview[hidden] { display: none; }
+.ms-invoice-choices { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0; }
+[data-invoice-live] video { display: block; max-width: 100%; max-height: 45vh; margin: 12px auto; }
+#ms-invoice-form .form-footer { flex-wrap: wrap; }
 .ms-ledger-summary { background: var(--lavender-wash); border: 1px solid var(--line); border-radius: 12px; padding: 18px 16px; position: sticky; top: 12px; }
 .ms-ledger-summary h3 { font-size: 1rem; margin: 0 0 6px; }
 .ms-ledger-summary p { font-size: .75rem; line-height: 1.5; color: var(--muted); margin: 0; }

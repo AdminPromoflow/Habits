@@ -11,7 +11,7 @@ if ($path === '/api.php') {
 }
 if (
     preg_match(
-        '~^/controller/(dashboard|users|habits|calendar|goals|categories|routines|sharing|profile|admin|diagrams|mindspaces)/index\.php$~D',
+        '~^/controller/(dashboard|users|habits|calendar|goals|categories|routines|sharing|profile|admin|diagrams|mindspaces|files)/index\.php$~D',
         $path,
     )
 ) {
@@ -20,7 +20,7 @@ if (
 }
 if (
     preg_match(
-        '~^/(?:assets|view)/(?:[a-zA-Z0-9_-]+/)*[a-zA-Z0-9_.-]+\.(css|js|svg|png|woff2|ttf)$~D',
+        '~^/(?:assets|view)/(?:[a-zA-Z0-9_-]+/)*[a-zA-Z0-9_.-]+\.(css|js|mjs|svg|png|woff2|ttf|pfb|bcmap|wasm|icc)$~D',
         $path,
     ) &&
     is_file(__DIR__ . $path)

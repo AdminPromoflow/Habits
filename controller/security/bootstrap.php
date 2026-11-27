@@ -5,6 +5,9 @@ define('PROJECT_ROOT', dirname(__DIR__, 2));
 
 spl_autoload_register(static function (string $class): void {
     $classes = [
+        'FileLibraryModel' => 'model/files/files.php',
+        'LibraryDownload' => 'model/files/files.php',
+        'FilesController' => 'controller/files/files.php',
         'BaseModel' => 'model/base.php',
         'AccessPolicy' => 'controller/security/access.php',
         'Habits' => 'model/habits/habits.php',
@@ -28,6 +31,7 @@ spl_autoload_register(static function (string $class): void {
         'Mailer' => 'controller/emails/mailer.php',
         'DiagramsModel' => 'model/diagrams/diagrams.php',
         'MindSpacesModel' => 'model/mindspaces/mindspaces.php',
+        'SpreadsheetRows' => 'model/mindspaces/sheet-rows.php',
         'MindSpacesController' => 'controller/mindspaces/mindspaces.php',
         'Request' => 'controller/security/request.php',
         'DashboardController' => 'controller/dashboard/dashboard.php',
@@ -114,9 +118,9 @@ function securityHeaders(): void
     header('X-Frame-Options: DENY');
     header('Referrer-Policy: same-origin');
     header(
-        "Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+        "Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
     );
-    header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
+    header('Permissions-Policy: camera=(self), microphone=(), geolocation=()');
     if (config('secure_cookies')) {
         header('Strict-Transport-Security: max-age=31536000');
     }

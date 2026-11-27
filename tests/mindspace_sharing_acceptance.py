@@ -72,6 +72,18 @@ def run(owner, recipient, outsider, guest, check):
  ledger=action(share,'saveMindSpaceItem',{'id':ledger['id'],'version':ledger['version'],'content':dict(ledger['content'],cells={'D2':'800','E3':'125'})})
  assert item(share,ledger['id'],owner)['content']['cells']['D2']=='800' and ledger['content']['cells']['F3']=='=SUM(D2:D3)-SUM(E2:E3)'
  check(True,'Collaborators with Edit create ledger templates and save transactions in the original shared workspace')
+ from spreadsheet_invoices_acceptance import IMAGE
+ invoice_data={'id':ledger['id'],'version':ledger['version'],'cell':'G2','image':IMAGE,'name':'Shared invoice.png'}
+ ledger=action(share,'saveSpreadsheetInvoice',invoice_data)
+ assert action(share,'getSpreadsheetInvoice',{'id':ledger['id'],'cell':'G2'})['image']==IMAGE
+ recipient.request('getSpreadsheetInvoice',params={'id':ledger['id'],'cell':'G2'},expected=404)
+ action(share,'getSpreadsheetInvoice',{'id':private['id'],'cell':'G2'},expected=404)
+ action(share,'getSpreadsheetInvoice',{'id':ledger['id'],'cell':'G2'},client=outsider,expected=404)
+ change(share)
+ assert action(share,'getSpreadsheetInvoice',{'id':ledger['id'],'cell':'G2'})['image']==IMAGE
+ action(share,'saveSpreadsheetInvoice',dict(invoice_data,version=ledger['version']),expected=403)
+ change(share,edit=True)
+ check(True,'Shared invoice viewing stays in scope; uploading requires Edit and direct owner endpoints remain private')
  action(share,'createMindSpaceItem',{'kind':'notes','name':'Outside','mindspace_id':space['id'],'parent_id':None,'client_key':str(uuid.uuid4())},expected=403)
  check(True,'Edit creates and updates shared content with version conflicts, while move, delete, sharing and outside destinations remain forbidden')
 

@@ -1,6 +1,12 @@
 <?php
 // Public AJAX actions grouped by feature; never resolve a path from user input.
 return [
+    'libraryEntries' => 'files',
+    'libraryFile' => 'files',
+    'createLibraryFolder' => 'files',
+    'uploadLibraryFile' => 'files',
+    'renameLibraryEntry' => 'files',
+    'deleteLibraryEntry' => 'files',
     'bootstrap' => 'dashboard',
     'data' => 'dashboard',
     'timezones' => 'dashboard',
@@ -60,6 +66,9 @@ return [
     'deleteMindSpaceItem' => 'mindspaces',
     'createMindSpaceItem' => 'mindspaces',
     'saveMindSpaceItem' => 'mindspaces',
+    'moveSpreadsheetRow' => 'mindspaces',
+    'getSpreadsheetInvoice' => 'mindspaces',
+    'saveSpreadsheetInvoice' => 'mindspaces',
     'addMindSpaceHabit' => 'mindspaces',
     'moveMindSpaceItem' => 'mindspaces',
     'saveDiagram' => 'diagrams',

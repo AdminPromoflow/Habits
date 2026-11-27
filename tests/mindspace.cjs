@@ -319,6 +319,23 @@ test('ledger renders editable entries, protected balances, month bands and right
   assert.match(html,/class="ms-ledger-summary"/);assert.match(html,/ms_ledger_balance<\/dt><dd>750.00/);
   assert.doesNotMatch(html,/data-ms-cell="D2"[^>]*readonly/);
 });
+test('invoice cells open an attachment action, protect data from text edits and preserve legacy sheets',()=>{
+  const {space}=cellReturnFixture();
+  space.draft={template:'ledger',invoice_column:'G',rows:3,columns:7,cells:{G1:'Invoice',B2:'Supplies',D2:'100',E2:'20'},invoices:{G2:{name:'Receipt.png'}}};
+  Sheet.prepare(space.draft);
+  assert.equal(Sheet.invoiceCell(space.draft,'G2'),true);
+  for(const key of ['G1','G4','F2']) assert.equal(Sheet.invoiceCell(space.draft,key),false);
+  assert.equal(Sheet.locked(space.draft,'G1'),true);assert.equal(Sheet.locked(space.draft,'G2'),true);
+  assert.equal(Sheet.locked({...space.draft,invoice_column:undefined},'G2'),false);
+  const html=space.editor.sheet();
+  assert.match(html,/data-action="ms-sheet-invoice" data-cell="G2"/);
+  assert.match(html,/title="Receipt.png"/);assert.doesNotMatch(html,/data-ms-cell="G2"/);
+  assert.match(html,/data-ms-cell="F2"[^>]*readonly[^>]*value="80.00"/);
+  space.can=()=>false;
+  const viewer=space.editor.sheet();
+  assert.match(viewer,/data-cell="G3"[^>]*disabled/);
+  assert.doesNotMatch(viewer,/data-cell="G2"[^>]*disabled/);
+});
 test('only the linked cell receives a return arrow, with the source tooltip and no duplicate header link',()=>{
   const {space,state}=cellReturnFixture();
   const html=space.editor.sheet();

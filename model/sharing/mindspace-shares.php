@@ -91,6 +91,14 @@ final class MindSpaceShares extends BaseModel
         if ($permissions === null) fail('error_not_found', 404);
         return [$share, $permissions, $this->scope($share)];
     }
+    public function authorizeFileLibrary(int $shareId, int $itemId, ?string $right): void
+    {
+        [$share, $permissions, $scope] = $this->workspaceAccess($shareId, $right !== null);
+        $items = array_column($scope['items'], null, 'id');
+        if (($items[$itemId]['kind'] ?? null) !== 'files') fail('error_not_found', 404);
+        if ($right !== null && !$permissions[$right]) fail('error_forbidden', 403);
+    }
+
     public function catalog(): array
     {
         if (!$this->available()) return ['outgoing' => [], 'incoming' => []];
@@ -221,11 +229,13 @@ final class MindSpaceShares extends BaseModel
         $id = (int) ($data['id'] ?? 0);
         $item = $items[$id] ?? null;
         $right = match ($action) {
+            'getSpreadsheetInvoice' => null,
+            'saveSpreadsheetInvoice', 'moveSpreadsheetRow' => 'edit',
             'saveMindSpaceItem', 'createMindSpaceItem', 'renameMindSpace', 'addMindSpaceHabit', 'saveDiagram', 'saveHabit', 'complete' => 'edit',
             'moveMindSpaceItem' => 'move', 'deleteMindSpaceItem', 'deleteMindSpace', 'deleteDiagram', 'archiveHabit' => 'delete',
             default => fail('error_not_found', 404),
         };
-        if (!$permissions[$right]) fail('error_forbidden', 403);
+        if ($right !== null && !$permissions[$right]) fail('error_forbidden', 403);
         if (in_array($action, ['saveDiagram', 'deleteDiagram'], true)) {
             $item = array_values(array_filter($scope['items'], fn($row) => $row['kind'] === 'diagram' && (int) $row['diagram_id'] === $id))[0] ?? null;
             if (!$item) fail('error_not_found', 404);
@@ -255,7 +265,7 @@ final class MindSpaceShares extends BaseModel
                 if (array_diff($data['content']['habit_ids'], $allowed)) fail('error_forbidden', 403);
             }
         }
-        $method = ['createMindSpaceItem' => 'create', 'saveMindSpaceItem' => 'save', 'moveMindSpaceItem' => 'move', 'renameMindSpace' => 'renameSpace', 'deleteMindSpace' => 'deleteSpace', 'deleteMindSpaceItem' => 'delete', 'addMindSpaceHabit' => 'addHabit'][$action];
+        $method = ['createMindSpaceItem' => 'create', 'saveMindSpaceItem' => 'save', 'moveSpreadsheetRow' => 'moveSheetRow', 'getSpreadsheetInvoice' => 'invoice', 'saveSpreadsheetInvoice' => 'saveInvoice', 'moveMindSpaceItem' => 'move', 'renameMindSpace' => 'renameSpace', 'deleteMindSpace' => 'deleteSpace', 'deleteMindSpaceItem' => 'delete', 'addMindSpaceHabit' => 'addHabit'][$action];
         // Shared board editing does not authorize changing the owner's private goals.
         if (isset($data['content']['cards']) && is_array($data['content']['cards'])) {
             foreach ($data['content']['cards'] as &$card) if (is_array($card)) unset($card['goal_ids']);

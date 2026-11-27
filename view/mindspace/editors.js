@@ -4,6 +4,13 @@ class MindSpaceEditors {
   constructor(space) {
     this.space = space; this.cell = 'A1';
     this.selectedCells = new Set(['A1']); this.selectionAnchor = 'A1';
+    document.addEventListener('pointerdown', event => this.startRowDrag(event));
+    document.addEventListener('pointermove', event => this.dragRow(event));
+    document.addEventListener('pointerup', event => this.endRowDrag(event));
+    document.addEventListener('pointercancel', () => this.cancelRowDrag());
+    document.addEventListener('lostpointercapture', event => { if (this.rowDrag?.pointer === event.pointerId) this.cancelRowDrag(); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape' && this.rowDrag) { event.preventDefault(); this.cancelRowDrag(); } });
+    document.defaultView?.addEventListener('blur', () => this.cancelRowDrag());
     document.addEventListener('pointerdown', event => this.startCellSelection(event));
     document.addEventListener('pointermove', event => this.dragCellSelection(event));
     document.addEventListener('pointerup', event => this.endCellSelection(event));
@@ -29,6 +36,7 @@ class MindSpaceEditors {
   render() {
     const space = this.space, kind = space.active.kind;
     if (kind === 'notes') { this.notes ||= new MindSpaceNotes(space); return this.notes.render(); }
+    if (kind === 'files') { this.files ||= new MindSpaceFiles(space); return this.files.render(); }
     if (kind === 'spreadsheet') return this.sheet();
     if (kind === 'habits') return this.habits();
     return this.board();
@@ -293,6 +301,11 @@ class MindSpaceEditors {
       cell.classList.toggle('is-selected', selected);
       cell.setAttribute('aria-selected', String(selected));
     });
+    document.querySelectorAll('[data-ms-row-handle]').forEach(handle => {
+      const row = handle.dataset.msRowHandle;
+      const selected = this.selectedCells.size === this.space.draft.columns && this.cellRange(`A${row}`,`${MindSpaceSheet.column(this.space.draft.columns-1)}${row}`).every(key => this.selectedCells.has(key));
+      handle.setAttribute('aria-pressed',String(selected));
+    });
     const label = document.querySelector('[data-ms-style-address]');
     if (label) label.textContent = this.selectionLabel();
   }
@@ -300,6 +313,106 @@ class MindSpaceEditors {
     this.keepCellSelection = true;
     try { document.querySelector(`[data-ms-cell="${key}"]`)?.focus({preventScroll:true}); }
     finally { this.keepCellSelection = false; }
+  }
+  selectRow(row) {
+    this.editingCell = null; this.cell = `A${row}`; this.selectionAnchor = this.cell;
+    this.selectedCells = new Set(this.cellRange(this.cell,`${MindSpaceSheet.column(this.space.draft.columns-1)}${row}`));
+    this.syncCellSelection();
+    const address = document.getElementById('ms-cell-address'), formula = document.querySelector('[data-ms-formula]');
+    if (address) address.textContent = this.cell;
+    if (formula) { formula.value = this.space.draft.cells[this.cell] || ''; formula.readOnly = MindSpaceSheet.locked(this.space.draft,this.cell); }
+  }
+  startRowDrag(event) {
+    const handle = event.target.closest?.('[data-ms-row-handle]'), space = this.space;
+    if (!handle?.closest('#mindspace-panel') || event.button !== 0 || event.isPrimary === false || space.active?.kind !== 'spreadsheet' || !space.can('edit') || this.rowSavePromise || space.busy) return;
+    const from = Number(handle.dataset.msRowHandle);
+    this.cancelRowDrag(); this.endCellSelection(); this.selectRow(from);
+    event.preventDefault(); handle.focus({preventScroll:true}); handle.setPointerCapture?.(event.pointerId);
+    this.rowDrag = {handle,from,to:from,pointer:event.pointerId,id:space.active.id,generation:space.generation,
+      startX:event.clientX,startY:event.clientY,x:event.clientX,y:event.clientY,moved:false,scroll:handle.closest('.ms-sheet-scroll')};
+  }
+  dragRow(event) {
+    const drag = this.rowDrag;
+    if (!drag || event.pointerId !== drag.pointer) return;
+    if (this.space.active?.id !== drag.id || this.space.generation !== drag.generation || !this.space.can('edit') || !event.buttons) { this.cancelRowDrag(); return; }
+    drag.x = event.clientX; drag.y = event.clientY;
+    if (!drag.moved && Math.hypot(drag.x-drag.startX,drag.y-drag.startY)<5) return;
+    event.preventDefault();
+    if (!drag.moved) {
+      drag.moved = true; drag.scroll.classList.add('is-row-dragging');
+      drag.handle.closest('tr').classList.add('is-row-moving');
+      this.rowAutoScroll();
+    }
+    this.rowDropTarget();
+  }
+  rowDropTarget() {
+    const drag = this.rowDrag;
+    if (!drag) return;
+    const hit = document.elementFromPoint(drag.x,drag.y), row = hit?.closest?.('[data-ms-sheet-row]');
+    const within = hit?.closest?.('.ms-sheet-scroll') === drag.scroll;
+    let to = within && row ? Number(row.dataset.msSheetRow) : null;
+    if (to === 1 && this.space.draft.template) to = 2;
+    drag.to = to;
+    drag.scroll.querySelectorAll('.is-row-drop-before,.is-row-drop-after').forEach(row => row.classList.remove('is-row-drop-before','is-row-drop-after'));
+    if (to && to !== drag.from) drag.scroll.querySelector(`[data-ms-sheet-row="${to}"]`)?.classList.add(to<drag.from ? 'is-row-drop-before' : 'is-row-drop-after');
+  }
+  rowAutoScroll() {
+    const drag = this.rowDrag;
+    if (!drag?.moved) return;
+    if (!drag.handle.isConnected || this.space.active?.id !== drag.id || this.space.generation !== drag.generation) { this.cancelRowDrag(); return; }
+    const box = drag.scroll.getBoundingClientRect();
+    if (drag.x >= box.left && drag.x <= box.right && drag.y >= box.top && drag.y <= box.bottom) {
+      const step = drag.y < box.top+62 ? -10 : drag.y > box.bottom-32 ? 10 : 0;
+      if (step) { drag.scroll.scrollTop += step; this.rowDropTarget(); }
+    }
+    this.rowScrollFrame = requestAnimationFrame(() => this.rowAutoScroll());
+  }
+  cancelRowDrag() {
+    const drag = this.rowDrag;
+    if (!drag) return;
+    this.rowDrag = null;
+    if (this.rowScrollFrame) cancelAnimationFrame(this.rowScrollFrame);
+    this.rowScrollFrame = null;
+    if (drag.handle.hasPointerCapture?.(drag.pointer)) drag.handle.releasePointerCapture(drag.pointer);
+    drag.scroll.classList.remove('is-row-dragging');
+    drag.scroll.querySelectorAll('.is-row-moving,.is-row-drop-before,.is-row-drop-after').forEach(row => row.classList.remove('is-row-moving','is-row-drop-before','is-row-drop-after'));
+  }
+  endRowDrag(event) {
+    const drag = this.rowDrag;
+    if (!drag || event.pointerId !== drag.pointer) return;
+    if (drag.moved && Number.isFinite(event.clientY)) { drag.x = event.clientX; drag.y = event.clientY; this.rowDropTarget(); }
+    const valid = this.space.active?.id === drag.id && this.space.generation === drag.generation;
+    this.cancelRowDrag();
+    if (valid && drag.moved && drag.to && drag.to !== drag.from) void this.moveSheetRow(drag.from,drag.to);
+  }
+  moveSheetRow(from,to) {
+    const space = this.space;
+    if (this.rowSavePromise || space.busy || space.active?.kind !== 'spreadsheet' || !space.can('edit') || from === to || to < (space.draft.template ? 2 : 1) || to > space.draft.rows) return Promise.resolve(false);
+    const id = space.active.id, generation = space.generation;
+    const scroll = document.querySelector('.ms-sheet-scroll'), top = scroll?.scrollTop || 0, left = scroll?.scrollLeft || 0;
+    const sheet = document.querySelector('.ms-sheet');
+    const run = async () => {
+      space.busy = true;
+      if (sheet) { sheet.inert = true; sheet.setAttribute('aria-busy','true'); }
+      try {
+        if (!await space.flushContent() || space.active?.id !== id || space.generation !== generation) return false;
+        const saved = await space.home.makeRequest('moveSpreadsheetRow',{id,version:space.active.version,from,to});
+        if (space.active?.id !== id || space.generation !== generation) return false;
+        space.active = saved; space.draft = structuredClone(saved.content); space.baseline = JSON.stringify(saved.content); space.upsert(saved);
+        this.selectRow(to); this.refresh();
+        const next = document.querySelector('.ms-sheet-scroll');
+        if (next) { next.scrollTop = top; next.scrollLeft = left; }
+        document.querySelector(`[data-ms-row-handle="${to}"]`)?.focus({preventScroll:true});
+        toast(t('ms_row_moved',{from,to})); return true;
+      } catch (error) { toast(error.message,true); return false; }
+      finally {
+        if (space.generation === generation) space.busy = false;
+        if (sheet) { sheet.inert = false; sheet.removeAttribute('aria-busy'); }
+      }
+    };
+    const pending = run(); this.rowSavePromise = pending;
+    void pending.finally(() => { if (this.rowSavePromise === pending) this.rowSavePromise = null; });
+    return pending;
   }
   startCellSelection(event) {
     const input = event.target.closest?.('[data-ms-cell]');
@@ -422,18 +535,22 @@ class MindSpaceEditors {
   sheet() {
     const sheet = this.space.draft, evaluator = new MindSpaceSheet(sheet);
     if (this.sheetItemId !== this.space.active.id || this.sheetGeneration !== this.space.generation) {
-      this.endCellSelection(); this.cell = 'A1'; this.selectionAnchor = 'A1'; this.selectedCells = new Set(['A1']); this.editingCell = null;
+      this.cancelRowDrag(); this.endCellSelection(); this.cell = 'A1'; this.selectionAnchor = 'A1'; this.selectedCells = new Set(['A1']); this.editingCell = null;
       this.sheetItemId = this.space.active.id; this.sheetGeneration = this.space.generation;
     }
     const returns = this.space.targetReturnLinks(), ledger = sheet.template === 'ledger', bands = this.sheetBands();
     return `<div class="ms-sheet${ledger ? ' ms-ledger' : ''}">
       <div class="ms-sheet-layout"><div class="ms-sheet-main"><div class="ms-formula-bar"><span id="ms-cell-address">${this.cell}</span><span aria-hidden="true">ƒx</span><input data-ms-formula aria-label="${esc(t('ms_formula'))}" maxlength="2000" ${MindSpaceSheet.locked(sheet, this.cell) ? 'readonly' : ''} value="${esc(sheet.cells?.[this.cell] || '')}"></div>
       <div class="ms-sheet-scroll"><table role="grid" aria-multiselectable="true" aria-label="${esc(this.space.active.name)}"><thead><tr><th></th>${Array.from({ length:sheet.columns }, (_,col) => `<th scope="col">${MindSpaceSheet.column(col)}</th>`).join('')}</tr></thead><tbody>
-      ${Array.from({ length:sheet.rows }, (_,row) => `<tr data-ms-sheet-row="${row + 1}" class="${row === 0 && sheet.template ? 'ms-template-header' : bands[row + 1]?.className || ''}" ${bands[row + 1]?.style || ''}><th scope="row">${row + 1}</th>${Array.from({ length:sheet.columns }, (_,col) => {
+      ${Array.from({ length:sheet.rows }, (_,row) => `<tr data-ms-sheet-row="${row + 1}" class="${row === 0 && sheet.template ? 'ms-template-header' : bands[row + 1]?.className || ''}" ${bands[row + 1]?.style || ''}><th scope="row">${this.space.can('edit') && (!sheet.template || row > 0) ? `<button type="button" class="ms-row-handle" data-ms-row-handle="${row+1}" aria-label="${esc(t('ms_move_row',{row:row+1}))}" aria-pressed="${this.selectedCells.size === sheet.columns && this.selectedCells.has(`A${row+1}`)}" title="${esc(t('ms_row_drag_hint'))}">${row+1}</button>` : row+1}</th>${Array.from({ length:sheet.columns }, (_,col) => {
         const key = `${MindSpaceSheet.column(col)}${row + 1}`;
         const back = returns.get(key) || '', locked = MindSpaceSheet.locked(sheet, key), date = MindSpaceSheet.dateCell(sheet, key);
         const error = this.sheetCellError(key, evaluator);
         const format = MindSpaceSheet.format(sheet.cell_styles?.[key]);
+        if (MindSpaceSheet.invoiceCell(sheet, key)) {
+          const invoice = sheet.invoices?.[key], label = t(invoice ? 'ms_invoice_view' : 'ms_invoice_add');
+          return `<td role="gridcell" data-ms-grid-cell="${key}" aria-selected="${this.selectedCells.has(key)}" class="${this.selectedCells.has(key) ? 'is-selected' : ''}"${format.border ? ` style="${esc(format.border)}"` : ''}><div class="ms-sheet-cell${back ? ' has-return' : ''}"><button type="button" class="ms-invoice-cell${invoice ? ' has-invoice' : ''}" data-action="ms-sheet-invoice" data-cell="${key}" aria-label="${key} · ${esc(label)}" aria-haspopup="dialog" title="${esc(invoice?.name || label)}" ${!invoice && !this.space.can('edit') ? 'disabled' : ''}>${icon('image')}<span>${esc(label)}</span></button>${back}</div></td>`;
+        }
         return `<td role="gridcell" data-ms-grid-cell="${key}" aria-selected="${this.selectedCells.has(key)}" class="${this.selectedCells.has(key) ? 'is-selected' : ''}"${format.border ? ` style="${esc(format.border)}"` : ''}><div class="ms-sheet-cell${back ? ' has-return' : ''}"><input data-ms-cell="${key}" aria-label="${key}${sheet.template && row > 0 ? ` · ${esc(sheet.cells[`${MindSpaceSheet.column(col)}1`] || '')}` : ''}" autocomplete="off" spellcheck="false" maxlength="2000" ${locked ? 'readonly' : ''} ${date ? `aria-haspopup="dialog" title="${esc(error || t('select_date'))}"` : ''} ${ledger && row > 0 && [3,4].includes(col) ? 'inputmode="decimal"' : ''} ${error ? `aria-invalid="true"${date ? '' : ` title="${esc(error)}"`}` : ''} ${format.text ? `style="${esc(format.text)}"` : ''} value="${esc(evaluator.display(key))}">${back}</div></td>`;
       }).join('')}</tr>`).join('')}</tbody></table></div>${this.space.can('edit') ? `<div class="ms-sheet-settings"><span>${esc(t('ms_selection'))} <strong data-ms-style-address>${esc(this.selectionLabel())}</strong></span><button type="button" class="btn secondary" data-action="ms-sheet-settings" aria-haspopup="dialog">${icon('settings')}${esc(t('settings'))}</button></div><p class="ms-sheet-hint">${esc(t('ms_selection_hint'))}</p><p class="ms-sheet-hint">${esc(t('ms_clipboard_hint'))}</p>` : ''}<p class="ms-sheet-hint">${esc(t(ledger ? 'ms_ledger_hint' : 'ms_sheet_hint'))}</p>${sheet.template ? `<p class="ms-sheet-hint">${esc(t('ms_template_calculated_hint'))}</p>` : ''}</div>
       ${ledger ? `<aside class="ms-ledger-summary" aria-label="${esc(t('ms_ledger_totals'))}"><h3>${esc(t('ms_ledger_totals'))}</h3><p>${esc(t('ms_ledger_totals_hint'))}</p><dl aria-live="polite" aria-atomic="true" data-ms-ledger-totals>${this.ledgerTotals(evaluator)}</dl><p class="ms-ledger-error" data-ms-ledger-error ${Object.values(evaluator.ledgerSummary()).every(value => typeof value === 'number') ? 'hidden' : ''}>${esc(t('ms_ledger_amount_error'))}</p><span class="ms-ledger-live">${esc(t('ms_ledger_live'))}</span></aside>` : ''}</div></div>`;
@@ -629,6 +746,15 @@ class MindSpaceEditors {
   }
   event(type, event) {
     const input = event.target, space = this.space;
+    const rowHandle = input.closest?.('[data-ms-row-handle]');
+    if (rowHandle?.dataset?.msRowHandle && (type === 'click' || type === 'keydown')) {
+      if (this.rowSavePromise) { event.preventDefault(); return; }
+      const row = Number(rowHandle.dataset.msRowHandle);
+      if (type === 'click' || ['Enter',' '].includes(event.key)) { event.preventDefault(); this.selectRow(row); return; }
+      if (event.altKey && ['ArrowUp','ArrowDown'].includes(event.key)) {
+        event.preventDefault(); void this.moveSheetRow(row,row+(event.key === 'ArrowUp' ? -1 : 1)); return;
+      }
+    }
     if (type === 'change' && input.dataset.msCardStatus) this.moveCard(input.dataset.msCardStatus, input.value);
     if (type === 'change' && input.matches?.('[data-ms-habit-date]')) { S.date = input.value || today(); this.refresh(); }
     const key = input.dataset.msCell;
@@ -718,6 +844,7 @@ class MindSpaceEditors {
     anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   async action(action, button) {
+    if (action === 'ms-sheet-invoice') return MindSpaceInvoice.open(this, button.dataset.cell);
     if (action === 'ms-sheet-settings') return this.cellSettings();
     if (action === 'ms-column-new') return this.newColumn(button.dataset.sprint || 'main');
     if (action === 'ms-sprint-new') return this.newSprint();

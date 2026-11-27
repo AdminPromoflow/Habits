@@ -75,10 +75,14 @@ class MindSpaceSheet {
   }
   static templates = ['ledger', 'budget', 'inventory', 'projects', 'blank'];
   static calculated(sheet) { return ({ledger:'F', budget:'D', inventory:'E'})[sheet.template] || null; }
+  static invoiceCell(sheet, key) {
+    const [row, col] = this.address(key);
+    return sheet.template === 'ledger' && sheet.invoice_column === 'G' && col === 6 && row > 0 && row < sheet.rows;
+  }
   static locked(sheet, key) {
     if (!sheet.template) return false;
-    const [row, col] = this.address(key), width = ({ledger:6, budget:4, inventory:5, projects:6})[sheet.template] || 0;
-    return row === 0 ? col < width : this.column(col) === this.calculated(sheet);
+    const [row, col] = this.address(key), width = ({ledger:sheet.invoice_column === 'G' ? 7 : 6, budget:4, inventory:5, projects:6})[sheet.template] || 0;
+    return row === 0 ? col < width : this.invoiceCell(sheet, key) || this.column(col) === this.calculated(sheet);
   }
   static prepare(sheet) {
     for (let row = 2; row <= sheet.rows; row++) {

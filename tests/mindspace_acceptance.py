@@ -77,13 +77,13 @@ def run(owner, stranger, guest, check):
  check(current(sheet['id'])==sheet, 'Invalid styles and foreign writes cannot alter cells or formatting')
  sheet=save(sheet,dict(sheet['content'],cell_styles={}))
  check(not current(sheet['id'])['content'].get('cell_styles') and sheet['content']['cells']['B1']=='=SUM(A1:A2)', 'Resetting styles preserves cell contents and formulas')
- for template,columns in [('ledger',6),('budget',4),('inventory',5),('projects',6),('blank',10)]:
+ for template,columns in [('ledger',7),('budget',4),('inventory',5),('projects',6),('blank',10)]:
   payload={'kind':'spreadsheet','name':template,'parent_id':root['id'],'client_key':str(uuid.uuid4()),'template':template,'language':'es'}
   created=call('createMindSpaceItem',payload)
   check(call('createMindSpaceItem',payload)['id']==created['id'] and created['content']['columns']==columns, template+' template is created atomically in its folder and retries are idempotent')
   if template=='ledger':
-   check([created['content']['cells'][c+'1'] for c in 'ABCDEF']==['Fecha','Descripción','Categoría','Entrada','Salida','Saldo'], 'Ledger contains all six requested column headers')
-   ledger=save(created,{'rows':32,'columns':6,'cells':{'A1':'Overwrite','A2':'2026-01-31','D2':'1000','E3':'150','F2':'wrong'}})
+   check([created['content']['cells'][c+'1'] for c in 'ABCDEFG']==['Fecha','Descripción','Categoría','Entrada','Salida','Saldo','Comprobante'], 'Ledger includes invoice column G and all six accounting headers')
+   ledger=save(created,{'rows':32,'columns':7,'cells':{'A1':'Overwrite','A2':'2026-01-31','D2':'1000','E3':'150','F2':'wrong'}})
    restored=current(ledger['id'])['content']
    ledger=save(ledger,dict(restored,cell_styles={'F2':{'bold':True,'borders':'bottom'}}))
    restored=current(ledger['id'])['content']

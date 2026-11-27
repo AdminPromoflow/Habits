@@ -56,7 +56,7 @@ function mountSharedWorkspace() {
   if (!sharedCan('edit')) {
     panel?.querySelectorAll('textarea,input').forEach(input => { input.readOnly = true; });
     panel?.querySelectorAll('[id^="diagram-interaction-hint"]').forEach(hint => { hint.textContent = t('ms_no_edit_hint'); });
-    panel?.querySelectorAll('select,[data-action^="ms-card"],[data-action="ms-column-new"],[data-action="ms-sprint"],[data-action="ms-sheet-row"],[data-action="ms-sheet-column"],[data-action="ms-habit-new"],[data-action="ms-habits-select"],[data-action="toggle-habit"],.diagram-controls,.diagram-task-checkbox').forEach(control => { if ('disabled' in control) control.disabled = true; else control.hidden = true; });
+    panel?.querySelectorAll('select:not([data-files-sort]),[data-action^="ms-card"],[data-action="ms-column-new"],[data-action="ms-sprint"],[data-action="ms-sheet-row"],[data-action="ms-sheet-column"],[data-action="ms-habit-new"],[data-action="ms-habits-select"],[data-action="toggle-habit"],.diagram-controls,.diagram-task-checkbox').forEach(control => { if ('disabled' in control) control.disabled = true; else control.hidden = true; });
     panel?.querySelectorAll('[draggable="true"]').forEach(control => { control.draggable = false; });
   }
   if (!sharedCan('move')) document.querySelectorAll('[data-ms-draggable]').forEach(control => { control.draggable = false; });

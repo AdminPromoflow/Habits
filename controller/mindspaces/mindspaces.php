@@ -15,6 +15,9 @@ final class MindSpacesController
             'deleteMindSpaceItem' => $model->delete($data),
             'createMindSpaceItem' => $model->create($data),
             'saveMindSpaceItem' => $model->save($data),
+            'moveSpreadsheetRow' => $model->moveSheetRow($data),
+            'getSpreadsheetInvoice' => $model->invoice($data),
+            'saveSpreadsheetInvoice' => $model->saveInvoice($data),
             'addMindSpaceHabit' => $model->addHabit($data),
             'moveMindSpaceItem' => $model->move($data),
         };

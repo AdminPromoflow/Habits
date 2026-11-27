@@ -267,9 +267,13 @@ try:
   try:urllib.request.urlopen(BASE+'/'+path);raise AssertionError('Private path exposed: '+path)
   except urllib.error.HTTPError as e:check(e.code==404,'HTTP denies '+path)
  from mindspace_acceptance import run as test_mindspace
+ from spreadsheet_invoices_acceptance import run as test_invoices
  ms_owner=Client();ms_owner.register('mindspace@example.test','MindSpace tester')
  ms_other=Client();ms_other.register('mindspace-other@example.test','Other MindSpace tester')
  test_mindspace(ms_owner, ms_other, guest, check)
+ test_invoices(ms_owner, ms_other, guest, check)
+ from file_library_acceptance import run as test_file_library
+ test_file_library(ms_owner, ms_other, guest, check, BASE)
  from item_links_acceptance import run as test_item_links
  test_item_links(ms_owner, ms_other, guest, check)
  from mindspace_sharing_acceptance import run as test_mindspace_sharing
@@ -284,6 +288,8 @@ try:
  test_card_completion(ms_owner, ms_other, guest, check)
  from goals_acceptance import run as test_goals
  test_goals(ms_owner, ms_other, guest, check)
+ from sheet_rows_acceptance import run as test_sheet_rows
+ test_sheet_rows(ms_owner, ms_other, guest, check)
  subprocess.run([PHP,'tests/constraints.php'],cwd=ROOT,env=env,check=True)
  (ROOT/'tests/.runtime/environment.json').write_text(json.dumps({'database':DB,'base_url':BASE,'env':{k:v for k,v in env.items() if k.startswith('RUTINA_')}},indent=2))
  check(True,'All tests ran against a dedicated MySQL database, without touching Aleina’s real data')

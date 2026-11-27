@@ -4,7 +4,7 @@ declare(strict_types=1);
 /** Shared HTTP, CSRF, authentication and JSON boundary for every AJAX endpoint. */
 final class Request
 {
-    private const READ_ACTIONS = ['bootstrap', 'data', 'group', 'admin', 'timezones', 'diagrams', 'mindspace', 'sharedMindSpace', 'notifications'];
+    private const READ_ACTIONS = ['libraryEntries', 'libraryFile', 'bootstrap', 'data', 'group', 'admin', 'timezones', 'diagrams', 'mindspace', 'sharedMindSpace', 'notifications', 'getSpreadsheetInvoice'];
     private const PUBLIC_ACTIONS = [
         'bootstrap',
         'login',
@@ -36,11 +36,12 @@ final class Request
             if (!$module || ($expectedModule !== null && $module !== $expectedModule)) {
                 fail('error_not_found', 404);
             }
-            if (($method === 'GET') !== in_array($action, self::READ_ACTIONS, true)) {
+            // Invoice reads also accept a CSRF-protected POST for scoped editors.
+            if ($action !== 'getSpreadsheetInvoice' && ($method === 'GET') !== in_array($action, self::READ_ACTIONS, true)) {
                 fail('error_method', 405);
             }
 
-            $data = $method === 'POST' ? self::body(in_array($action, ['saveDiagram','saveMindSpaceItem','sharedMindSpaceAction'], true) ? 3145728 : 100000) : $_GET;
+            $data = $action === 'uploadLibraryFile' ? self::uploadBody() : ($method === 'POST' ? self::body(in_array($action, ['saveDiagram','saveMindSpaceItem','saveSpreadsheetInvoice','sharedMindSpaceAction'], true) ? 3145728 : 100000) : $_GET);
             $db = database();
             $auth = new Auth($db);
             $user = in_array($action, self::PUBLIC_ACTIONS, true)
@@ -61,6 +62,7 @@ final class Request
             }
 
             $controllers = [
+                'files' => FilesController::class,
                 'dashboard' => DashboardController::class,
                 'users' => AuthController::class,
                 'habits' => HabitsController::class,
@@ -82,6 +84,7 @@ final class Request
                 $method === 'POST' && $module !== 'users'
                     ? $db->transaction($operation)
                     : $operation();
+            if ($result instanceof LibraryDownload) { $result->send(); return; }
             echo json_encode(
                 ['ok' => true, 'result' => $result],
                 JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE,
@@ -104,6 +107,15 @@ final class Request
             error_log('MyRemarkable Mind: ' . $error);
             self::error('error_server', 500);
         }
+    }
+
+    private static function uploadBody(): array
+    {
+        $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+        if (!is_string($token) || !hash_equals($_SESSION['csrf'], $token)) fail('error_csrf', 419);
+        if (!str_starts_with(strtolower($_SERVER['CONTENT_TYPE'] ?? ''), 'multipart/form-data;')) fail('error_validation', 415);
+        if ((int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > FileLibraryModel::uploadLimit() + 65536 || !$_POST) fail('files_too_large', 413);
+        return $_POST;
     }
 
     private static function body(int $limit = 100000): array

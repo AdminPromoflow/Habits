@@ -246,7 +246,7 @@ final class MindSpacesModel extends BaseModel
     public function create(array $data): array
     {
         $space = $this->space(true, $data['mindspace_id'] ?? null);
-        $kind = Validate::choice($data['kind'] ?? '', ['folder','diagram','spreadsheet','kanban','scrum','habits','notes']);
+        $kind = Validate::choice($data['kind'] ?? '', ['folder','diagram','spreadsheet','kanban','scrum','habits','notes','files']);
         $kind = self::boardKind($kind);
         $name = Validate::text($data, 'name', 120);
         $key = Validate::text($data, 'client_key', 36);
@@ -266,7 +266,7 @@ final class MindSpacesModel extends BaseModel
             return self::response($this->item((int) $diagram['mindspace_item_id']));
         }
         $content = match ($kind) {
-            'folder' => new stdClass(),
+            'folder', 'files' => new stdClass(),
             'notes' => ['text' => '', 'font' => 'edwardian', 'pages' => [['text' => '', 'date' => null, 'manual' => true]]],
             'spreadsheet' => self::newSheet($data),
             'habits' => ['habit_ids' => []],
@@ -296,6 +296,35 @@ final class MindSpacesModel extends BaseModel
         return self::response($this->item((int) $item['id']));
     }
 
+    public function moveSheetRow(array $data): array
+    {
+        $item = $this->item((int) ($data['id'] ?? 0), true);
+        if ((int) ($data['version'] ?? 0) !== (int) $item['version']) fail('error_mindspace_conflict',409);
+        if ($item['kind'] !== 'spreadsheet' || !is_int($data['from'] ?? null) || !is_int($data['to'] ?? null)) fail('error_validation');
+        $old = json_decode($item['content_json'],true,32,JSON_THROW_ON_ERROR);
+        $from = $data['from']; $to = $data['to'];
+        $moved = SpreadsheetRows::move($old,$from,$to);
+        if ($from === $to) return self::response($item);
+        // Reuse validation and rebuild template formulas (running balances etc.).
+        $content = $this->content('spreadsheet',$moved,$moved);
+        if (!empty($old['invoices'])) {
+            $invoices = $this->db->all('SELECT cell_key FROM spreadsheet_invoices WHERE item_id=? FOR UPDATE', [$item['id']]);
+            $keys = [];
+            foreach ($invoices as $invoice) {
+                $key = $invoice['cell_key']; $next = SpreadsheetRows::key($key,$from,$to);
+                if ($key !== $next) $keys[$key] = $next;
+            }
+            // Temporary keys avoid primary-key collisions when two attached rows
+            // trade places. Request wraps this and the sheet update in one transaction.
+            foreach ($keys as $key=>$next) $this->db->run('UPDATE spreadsheet_invoices SET cell_key=? WHERE item_id=? AND cell_key=?', ['@'.substr($key,1),$item['id'],$key]);
+            foreach ($keys as $key=>$next) $this->db->run('UPDATE spreadsheet_invoices SET cell_key=? WHERE item_id=? AND cell_key=?', [$next,$item['id'],'@'.substr($key,1)]);
+        }
+        $json = json_encode($content,JSON_THROW_ON_ERROR);
+        if (strlen($json)>1000000) fail('error_validation');
+        $this->db->run('UPDATE mindspace_items SET content_json=?,version=version+1,updated_at=UTC_TIMESTAMP() WHERE id=?', [$json,$item['id']]);
+        return self::response($this->item((int) $item['id']));
+    }
+
     private static function text(mixed $value, int $max): string
     {
         if (!is_string($value) || mb_strlen($value) > $max) fail('error_validation');
@@ -307,8 +336,9 @@ final class MindSpacesModel extends BaseModel
         $template = Validate::choice($data['template'] ?? 'blank', ['blank', 'ledger', 'budget', 'inventory', 'projects']);
         if ($template === 'blank') return ['rows' => 30, 'columns' => 10, 'cells' => new stdClass()];
         $language = Validate::choice($data['language'] ?? 'en', ['en', 'es']);
-        $sheet = ['rows' => 31, 'columns' => match ($template) { 'budget' => 4, 'inventory' => 5, default => 6 },
+        $sheet = ['rows' => 31, 'columns' => match ($template) { 'ledger' => 7, 'budget' => 4, 'inventory' => 5, default => 6 },
             'template' => $template, 'template_language' => $language, 'cells' => []];
+        if ($template === 'ledger') $sheet['invoice_column'] = 'G';
         if ($template === 'budget') {
             $categories = $language === 'es' ? ['Vivienda', 'Alimentación', 'Transporte', 'Servicios', 'Salud', 'Ocio', 'Otros']
                 : ['Housing', 'Groceries', 'Transport', 'Utilities', 'Health', 'Leisure', 'Other'];
@@ -326,6 +356,7 @@ final class MindSpacesModel extends BaseModel
             'inventory' => $spanish ? ['Producto', 'Código', 'Cantidad', 'Costo unitario', 'Valor total'] : ['Item', 'SKU', 'Quantity', 'Unit cost', 'Stock value'],
             'projects' => $spanish ? ['Tarea', 'Responsable', 'Estado', 'Inicio', 'Vencimiento', 'Notas'] : ['Task', 'Owner', 'Status', 'Start date', 'Due date', 'Notes'],
         };
+        if ($template === 'ledger' && ($sheet['invoice_column'] ?? null) === 'G') $headers[] = $spanish ? 'Comprobante' : 'Invoice';
         if ($sheet['rows'] < 2 || $sheet['columns'] < count($headers)) fail('error_validation');
         $cells = (array) $sheet['cells'];
         foreach ($headers as $i => $header) $cells[chr(65 + $i) . '1'] = $header;
@@ -395,7 +426,7 @@ final class MindSpacesModel extends BaseModel
     private function content(string $kind, mixed $data, array $existing = []): array
     {
         if (!is_array($data)) fail('error_validation');
-        if ($kind === 'folder') return [];
+        if (in_array($kind, ['folder','files'], true)) return [];
         if ($kind === 'notes') return self::noteContent($data);
         if ($kind === 'spreadsheet') {
             $rows = $data['rows'] ?? null; $columns = $data['columns'] ?? null; $cells = $data['cells'] ?? null;
@@ -406,6 +437,7 @@ final class MindSpacesModel extends BaseModel
                 $col = 0; foreach (str_split($m[1]) as $letter) $col = $col * 26 + ord($letter) - 64;
                 if ($col > $columns || (int) $m[2] > $rows) fail('error_validation');
                 $value = self::text($value, 2000);
+                if (($existing['invoice_column'] ?? null) === 'G' && $col === 7 && (int) $m[2] > 1 && $value !== '') fail('error_validation');
                 if ($value !== '') $clean[$key] = $value;
             }
             $sheet = ['rows' => $rows, 'columns' => $columns, 'cells' => (object) $clean];
@@ -416,6 +448,15 @@ final class MindSpacesModel extends BaseModel
             if ($template === 'blank') return $sheet;
             $sheet['template'] = $template;
             $sheet['template_language'] = $existing['template_language'];
+            if (($existing['invoice_column'] ?? null) === 'G') {
+                $sheet['invoice_column'] = 'G';
+                // Only the dedicated invoice action may change attachments. Older
+                // clients and ordinary cell edits cannot erase or forge them.
+                foreach ($existing['invoices'] ?? [] as $key => $invoice) {
+                    if ((int) substr($key, 1) > $rows) fail('error_validation');
+                    $sheet['invoices'][$key] = $invoice;
+                }
+            }
             return self::sheetTemplate($sheet);
         }
         if ($kind === 'habits') {
@@ -490,6 +531,51 @@ final class MindSpacesModel extends BaseModel
             $cursor = $folder['parent_id'] === null ? null : (int) $folder['parent_id'];
         }
         return $parent;
+    }
+
+    private function invoiceCell(array $item, array $data): array
+    {
+        $content = json_decode($item['content_json'], true, 32, JSON_THROW_ON_ERROR);
+        $key = $data['cell'] ?? null;
+        if ($item['kind'] !== 'spreadsheet' || ($content['template'] ?? null) !== 'ledger'
+            || ($content['invoice_column'] ?? null) !== 'G' || !is_string($key)
+            || !preg_match('/^G([1-9][0-9]{0,2})$/D', $key, $match)
+            || (int) $match[1] < 2 || (int) $match[1] > $content['rows']) fail('error_validation');
+        return [$content, $key];
+    }
+
+    public function invoice(array $data): array
+    {
+        $item = $this->item((int) ($data['id'] ?? 0));
+        [$content, $key] = $this->invoiceCell($item, $data);
+        $invoice = $this->db->one('SELECT image_data FROM spreadsheet_invoices WHERE item_id=? AND cell_key=?', [$item['id'], $key]);
+        if (!$invoice || !isset($content['invoices'][$key])) fail('error_not_found', 404);
+        return ['image' => $invoice['image_data'], 'name' => $content['invoices'][$key]['name']];
+    }
+
+    public function saveInvoice(array $data): array
+    {
+        $item = $this->item((int) ($data['id'] ?? 0), true);
+        if ((int) ($data['version'] ?? 0) !== (int) $item['version']) fail('error_mindspace_conflict', 409);
+        [$content, $key] = $this->invoiceCell($item, $data);
+        if (!array_key_exists('image', $data)) fail('error_validation');
+        $image = $data['image'];
+        if ($image === null) {
+            $this->db->run('DELETE FROM spreadsheet_invoices WHERE item_id=? AND cell_key=?', [$item['id'], $key]);
+            unset($content['invoices'][$key]);
+            if (empty($content['invoices'])) unset($content['invoices']);
+        } else {
+            if (!is_string($image) || strlen($image) > 1400000 || !preg_match('~^data:image/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$~D', $image, $parts)) fail('ms_invoice_invalid');
+            $bytes = base64_decode($parts[2], true);
+            $size = $bytes === false ? false : @getimagesizefromstring($bytes);
+            if ($bytes === false || strlen($bytes) > 1048576 || !$size || $size['mime'] !== 'image/' . $parts[1]
+                || $size[0] > 2400 || $size[1] > 2400) fail('ms_invoice_invalid');
+            $name = Validate::text($data, 'name', 190);
+            $this->db->run('INSERT INTO spreadsheet_invoices(item_id,cell_key,image_data) VALUES (?,?,?) ON DUPLICATE KEY UPDATE image_data=VALUES(image_data)', [$item['id'], $key, $image]);
+            $content['invoices'][$key] = ['name' => $name];
+        }
+        $this->db->run('UPDATE mindspace_items SET content_json=?,version=version+1,updated_at=UTC_TIMESTAMP() WHERE id=?', [json_encode($content, JSON_THROW_ON_ERROR), $item['id']]);
+        return self::response($this->item((int) $item['id']));
     }
 
     public function move(array $data): array

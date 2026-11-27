@@ -17,8 +17,8 @@ class AjaxRequest {
         S.ownedWorkspace = sharedOwnCatalog(data);
         return {...data, ...result.workspace};
       }
-      if (['saveMindSpaceItem','createMindSpaceItem','renameMindSpace','addMindSpaceHabit','moveMindSpaceItem','deleteMindSpaceItem','deleteMindSpace','saveDiagram','deleteDiagram','saveHabit','archiveHabit','complete'].includes(action)) {
-        return this.makeRequest('sharedMindSpaceAction', {share_id:shared.id, action, data:body}, {}, false);
+      if (['saveMindSpaceItem','moveSpreadsheetRow','getSpreadsheetInvoice','saveSpreadsheetInvoice','createMindSpaceItem','renameMindSpace','addMindSpaceHabit','moveMindSpaceItem','deleteMindSpaceItem','deleteMindSpace','saveDiagram','deleteDiagram','saveHabit','archiveHabit','complete'].includes(action)) {
+        return this.makeRequest('sharedMindSpaceAction', {share_id:shared.id, action, data:body ?? params}, {}, false);
       }
     }
     const module = requestRoutes[action];

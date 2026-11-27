@@ -4,7 +4,7 @@ class MindSpace extends PageController {
   constructor(home) {
     super(['ms-new','ms-new-kind','ms-open','ms-tab-close','ms-folder','ms-rename','ms-move','ms-retry',
       'ms-link-return','ms-link-returns','ms-sidebar-open','ms-sidebar-toggle','ms-sidebar-add','ms-space-open','ms-space-new','ms-entry-menu','ms-space-rename','ms-share','ms-delete','ms-space-delete',
-      'ms-card-new','ms-card-edit','ms-card-calendar','ms-column-new','ms-sprint','ms-sprint-new','ms-sprint-delete','ms-sprint-toggle','ms-habits-select','ms-habit-new','ms-sheet-row','ms-sheet-column','ms-sheet-export','ms-download-pdf','ms-sheet-settings']);
+      'ms-card-new','ms-card-edit','ms-card-calendar','ms-column-new','ms-sprint','ms-sprint-new','ms-sprint-delete','ms-sprint-toggle','ms-habits-select','ms-habit-new','ms-sheet-row','ms-sheet-column','ms-sheet-export','ms-download-pdf','ms-sheet-settings','ms-sheet-invoice']);
     this.home = home;
     this.editor = new MindSpaceEditors(this);
     this.reset();
@@ -67,6 +67,7 @@ class MindSpace extends PageController {
   }
 
   reset() {
+    this.editor?.cancelRowDrag?.();
     this.closeMenu();
     clearTimeout(this.timer);
     this.generation = (this.generation || 0) + 1;
@@ -89,7 +90,7 @@ class MindSpace extends PageController {
   }
   spaceName(spaceId = this.spaceId()) { return this.spaces().find(space => space.id === spaceId)?.name || 'MindSpace'; }
   items(spaceId = this.spaceId()) { return this.allItems().filter(item => (item.mindspace_id || S.data?.mindspace?.id) === spaceId); }
-  kindIcon(kind) { return icon({ folder:'folder', diagram:'branch', spreadsheet:'table', kanban:'overview', scrum:'overview', habits:'habits', notes:'book' }[kind] || 'book'); }
+  kindIcon(kind) { return icon({ folder:'folder', diagram:'branch', spreadsheet:'table', kanban:'overview', scrum:'overview', habits:'habits', notes:'book', files:'folder' }[kind] || 'book'); }
   kindLabel(kind) { return t(`ms_kind_${kind}`); }
   folderId() { return this.active?.kind === 'folder' ? this.active.id : this.active?.parent_id || null; }
   isDiagram() { return this.enabled() && this.active?.kind === 'diagram'; }
@@ -380,7 +381,7 @@ class MindSpace extends PageController {
       spaceHeading:`<h1 tabindex="-1" ${this.contextAttributes('space', this.spaceId())} ${this.spaces().some(space => space.id === this.spaceId() && this.can('edit', space)) ? `data-ms-title="space" title="${esc(t('ms_title_edit_hint'))}"` : ''}>${esc(this.spaceName())}</h1>`,
       itemHeading:`<h2 id="mindspace-item-name" tabindex="-1" ${this.contextAttributes(this.active ? 'item' : 'space', this.active?.id || this.spaceId())} ${this.active && this.can('edit') ? `data-ms-title="item" title="${esc(t('ms_title_edit_hint'))}"` : ''}>${esc(this.active?.name || t('ms_files'))}</h2>`,
       actions:this.active ? `${this.can('edit') ? `<button type="button" class="text-btn" data-action="ms-rename">${esc(t('ms_rename'))}</button>` : ''}${this.can('move') ? `<button type="button" class="text-btn" data-action="ms-move">${esc(t('ms_move'))}</button>` : ''}` : '', content,
-      download:this.active && this.active.kind !== 'folder' ? `<footer class="mindspace-item-footer"><button type="button" class="btn secondary" data-action="ms-download-pdf">${esc(t('ms_download_pdf'))}</button></footer>` : '',
+      download:this.active && !['folder','files'].includes(this.active.kind) ? `<footer class="mindspace-item-footer"><button type="button" class="btn secondary" data-action="ms-download-pdf">${esc(t('ms_download_pdf'))}</button></footer>` : '',
     });
   }
 
@@ -440,6 +441,7 @@ class MindSpace extends PageController {
     this.status();
     if (this.active?.kind === 'notes') this.editor.notes?.mount();
     else this.editor.notes?.observer?.disconnect();
+    if (this.active?.kind === 'files') this.editor.files?.mount();
     MindSpaceLinkTargets.arrive(this);
     document.querySelector('#mindspace-tabs [aria-selected="true"]')?.scrollIntoView({ block:'nearest', inline:'nearest' });
   }
@@ -498,6 +500,7 @@ class MindSpace extends PageController {
 
   async flushContent() { return this.isDiagram() ? this.home.finishBeforeSwitch() : await this.save(); }
   async flush() {
+    if (this.editor.rowSavePromise && !await this.editor.rowSavePromise) return false;
     if ((this.titleEdit || this.titleSave) && !await this.finishTitleEditing()) return false;
     return this.flushContent();
   }
@@ -541,7 +544,7 @@ class MindSpace extends PageController {
     finally { button.disabled = false; this.busy = false; }
   }
 
-  kinds() { return ['folder','diagram','spreadsheet','kanban','habits','notes']; }
+  kinds() { return ['folder','diagram','spreadsheet','kanban','habits','notes','files']; }
   creationContext(button) {
     return {spaceId:Number(button.dataset.space) || this.spaceId(), parent:button.dataset.parent !== undefined ? Number(button.dataset.parent) || null : this.folderId()};
   }
