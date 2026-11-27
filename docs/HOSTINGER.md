@@ -103,6 +103,12 @@ En la revisión posterior del aviso de que la hora no cambiaba, Hostinger todav�
 
 La hoja de **Mi día a día** muestra ahora el intervalo horario en pequeño a la derecha de cada actividad. Al pasar el mouse, enfocar con el teclado o tocarlo, aparece un detalle de dos líneas con las fechas y horas de inicio y fin. Los datos opcionales sin definir se indican explícitamente; un pequeño reloj permite consultar las fechas de actividades sin horas. Escape cierra el detalle. Se comprobaron tareas, hábitos, hover sin foco y navegación por teclado; pasaron las 31 pruebas JavaScript del calendario y la navegación. Este ajuste solo modifica código y traducciones, no requiere otra migración y queda para publicar mediante Git.
 
+### Selectores de fecha y hora — 27 de noviembre de 2026
+
+Los cuatro campos de Inicio/Fin del formulario compartido por tareas y hábitos abren selectores propios. El calendario se cierra al elegir un día, incluso al volver a elegir el día guardado. Permite cambiar mes/año, respeta la fecha mínima de fin y admite flechas y Enter. La ventanita de hora ofrece hora, minutos y AM/PM; **Usar hora** confirma y cierra. Los campos opcionales pueden borrarse individualmente, y Escape cierra el selector sin cerrar la actividad. No requiere migración; el código queda para publicar mediante Git.
+
+Se probaron en la base aislada los dos calendarios, febrero de 2028, fechas finales anteriores deshabilitadas, selección por teclado, los selectores de hábitos y tareas, y guardado/recarga de `12 PM` como `12:00` y `12 AM` como `00:00`. Pasaron las 32 pruebas JavaScript de calendario/navegación; después del ajuste del cambio de año se repitieron las nueve del calendario y la comprobación en navegador.
+
 ### Pendientes, calendario de tarjetas y orden diario — 26 de noviembre de 2026
 
 El aviso «The database is unavailable» al guardar una actividad pendiente correspondía a un esquema desactualizado: producción solo tenía las migraciones 001–020. Se descargó primero una copia SQL completa desde phpMyAdmin (`u348170507_habits.sql`, 72.837 bytes, en Descargas; contiene datos privados y no se incorpora al repositorio). Después se aplicaron las tres migraciones pendientes y se registraron sus checksums:

@@ -155,6 +155,9 @@ function bindPlannerPickers(form) {
   form.addEventListener('change',event => {
     if (active?.type === 'date' && event.target.matches('[data-picker-month],[data-picker-year]')) changeMonth(Number($('[data-picker-year]',active.panel).value),Number($('[data-picker-month]',active.panel).value));
   },options);
+  form.addEventListener('input',event => {
+    if (active?.type === 'date' && event.target.matches('[data-picker-year]') && /^\d{4}$/.test(event.target.value)) changeMonth(Number(event.target.value),Number($('[data-picker-month]',active.panel).value));
+  },options);
   form.addEventListener('keydown',event => {
     if (active && event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(true); return; }
     const input = event.target.closest('[data-planner-picker] > label > input');
