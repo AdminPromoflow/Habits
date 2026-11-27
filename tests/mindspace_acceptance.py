@@ -98,9 +98,11 @@ def run(owner, stranger, guest, check):
  check(True, 'Template selection and language are validated by the API')
  for kind in ['kanban','scrum']:
   board=create(kind,kind,root['id'])
-  assert board['kind']=='kanban' and [c['name'] for c in board['content']['columns']]==['Pending','To Do','In Progress','Done']
+  assert board['kind']=='kanban' and [c['name'] for c in board['content']['columns']]==['Pending','In Progress','Done']
   content={'cards':[{'id':str(uuid.uuid4()),'title':'Planificar','description':'Primera tarea','status':'todo','points':3}], 'columns':board['content']['columns'], 'sprint':{'name':'Sprint 1','goal':'Entregar','start':'2026-11-24','end':'2026-11-30'}}
-  board=save(board,content); content['cards'][0]['status']='done'; board=save(board,content)
+  board=save(board,content)
+  check(board['content']['cards'][0]['status']=='backlog', 'Legacy To Do cards move to Pending without being deleted')
+  content['cards'][0]['status']='done'; board=save(board,content)
   check(current(board['id'])['content']==content, kind+' cards, status changes and sprint details persist')
  custom={'id':str(uuid.uuid4()),'name':'Review'}
  content['columns']=content['columns']+[custom]
@@ -115,11 +117,25 @@ def run(owner, stranger, guest, check):
  invalid_columns=[None,[],content['columns'][1:],content['columns']+[custom],content['columns']+[{'id':str(uuid.uuid4()),'name':'review'}],
   content['columns']+[{'id':'not-a-uuid','name':'Invalid'}],content['columns']+[{'id':str(uuid.uuid4()),'name':' '}],
   content['columns']+[{'id':str(uuid.uuid4()),'name':'x'*81}],content['columns']+[{'id':str(uuid.uuid4()),'name':'pending'}],
-  content['columns']+[{'id':str(uuid.uuid4()),'name':f'Extra {i}'} for i in range(46)]]
+  content['columns']+[{'id':str(uuid.uuid4()),'name':f'Extra {i}'} for i in range(47)]]
  for columns in invalid_columns:
   call('saveMindSpaceItem',{'id':board['id'],'version':board['version'],'content':dict(content,columns=columns)},422)
  call('saveMindSpaceItem',{'id':board['id'],'version':board['version'],'content':dict(content,cards=[dict(content['cards'][0],status=str(uuid.uuid4()))])},422)
  check(current(board['id'])==board, 'Invalid columns, unknown card states, stale writes and other users cannot corrupt a board')
+ sprint={'id':str(uuid.uuid4()),'name':'Sprint 2','goal':'Review delivery','start':'2026-12-01','end':'2026-12-10',
+  'columns':[{'id':str(uuid.uuid4()),'name':name} for name in ['Pending','In Progress','Done','Review']]}
+ content['sprints']=[sprint]
+ content['cards'][0]['status']=sprint['columns'][3]['id']
+ board=save(board,content)
+ check(current(board['id'])['content']==content, 'Multiple sprint metadata, independent columns and moved cards survive reload')
+ linked=owner.request('saveDiagram',{'client_key':str(uuid.uuid4()),'name':'Sprint column link','nodes':[{'id':'root','parent_id':None,'text':'Review sprint 2','link':{'item_id':board['id'],'target':{'type':'column','id':sprint['columns'][3]['id']}}}]},module='diagrams')
+ check(linked['nodes'][0]['link']['target']['id']==sprint['columns'][3]['id'], 'Diagram links can target a column in a later sprint')
+ board=save(board,{'cards':content['cards'],'sprint':content['sprint']})
+ check(board['content']['sprints']==[sprint] and board['content']['columns']==content['columns'], 'Older clients cannot erase extra sprints or their columns by omitting them')
+ for sprints in [None,[sprint,sprint],[dict(sprint,id='invalid')],[dict(sprint,end='2026-01-01')],
+  [dict(sprint,columns=sprint['columns'][:2])],[dict(sprint,columns=sprint['columns'][:3]+[custom])]]:
+  call('saveMindSpaceItem',{'id':board['id'],'version':board['version'],'content':dict(content,sprints=sprints)},422)
+ check(current(board['id'])==board, 'Invalid sprint IDs, duplicate columns across sprints and reversed dates cannot overwrite the board')
  alias_key=str(uuid.uuid4())
  alias=call('createMindSpaceItem',{'kind':'scrum','name':'Unified retry','client_key':alias_key})
  alias_retry=call('createMindSpaceItem',{'kind':'kanban','name':'Unified retry','client_key':alias_key})

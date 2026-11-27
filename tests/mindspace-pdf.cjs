@@ -95,6 +95,17 @@ test('habit exports use the chosen date and only accessible selected habits', ()
   artifact(pdf, 'habits');
 });
 
+test('board PDFs include every sprint and group each card under its own column',()=>{
+  const {PDF}=setup(),item={name:'Several sprints',kind:'kanban',content:{sprint:{name:'First sprint'},cards:[
+    {title:'Legacy task',status:'todo',description:''},{title:'Second task',status:'second-review',description:'Keep the details'}
+  ],sprints:[{id:'second',name:'Second sprint',goal:'Review everything',columns:[{id:'second-review',name:'Review'}]}]}};
+  const pdf=new PDF(item,'Space'),text=capture(pdf);pdf.board();const all=text.join(' ');
+  assert.ok(all.indexOf('First sprint')<all.indexOf('Legacy task'));
+  assert.ok(all.indexOf('Second sprint')<all.indexOf('Second task'));
+  assert.equal(text.filter(line=>line==='Legacy task').length,1);assert.equal(text.filter(line=>line==='Second task').length,1);
+  assert.match(all,/Keep the details/);artifact(pdf,'multiple-sprints');
+});
+
 test('failed saves and navigation during preparation prevent exporting the wrong document', async () => {
   const {PDF} = setup(); PDF.libraries=async()=>{};
   const button={textContent:'Download PDF',disabled:false,setAttribute(){},removeAttribute(){}};

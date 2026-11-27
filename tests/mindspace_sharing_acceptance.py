@@ -121,7 +121,7 @@ def run(owner, recipient, outsider, guest, check):
  whole=invite('space',space['id'],permissions=all_rights); accept(whole)
  workspace=preview(whole)['workspace']
  assert next(row for row in workspace['mindspace']['items'] if row['id']==sheet['id'])['content']['cells']=={}
- assert len(next(row for row in workspace['mindspace']['items'] if row['id']==board['id'])['content']['columns'])==4
+ assert len(next(row for row in workspace['mindspace']['items'] if row['id']==board['id'])['content']['columns'])==3
  assert workspace['diagrams'][0]['id']==diagram['diagram_id']
  saved_diagram=action(whole,'saveDiagram',{'id':diagram['diagram_id'],'version':diagram['diagram_version'],'name':'Shared map edited'})
  assert next(row for row in owner.data()['diagrams'] if row['id']==diagram['diagram_id'])['name']=='Shared map edited'

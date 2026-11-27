@@ -98,11 +98,11 @@ test('board previews group cards under their status and keep empty columns selec
     {id:'pending',title:'Pending card',status:'todo'},{id:'finished',title:'Finished card',status:'done'}]}};
   const html=LinkTargets.preview(board);
   const columns=[...html.matchAll(/<section class="ms-link-column"[^>]*>(.*?)<\/section>/gs)].map(match=>match[1]);
-  assert.equal(columns.length,4);
-  assert.match(columns[0],/data-link-type="column" data-link-target="backlog"/);assert.match(columns[0],/ms_link_column_empty/);
-  assert.match(columns[1],/Pending card/);assert.doesNotMatch(columns[1],/Working card|Finished card/);
-  assert.match(columns[2],/Working card/);assert.match(columns[2],/&lt;script>/);assert.doesNotMatch(columns[2],/<script>/);
-  assert.match(columns[3],/Finished card/);
+  assert.equal(columns.length,3);
+  assert.match(columns[0],/data-link-type="column" data-link-target="backlog"/);
+  assert.match(columns[0],/Pending card/);assert.doesNotMatch(columns[0],/Working card|Finished card/);
+  assert.match(columns[1],/Working card/);assert.match(columns[1],/&lt;script>/);assert.doesNotMatch(columns[1],/<script>/);
+  assert.match(columns[2],/Finished card/);
   for(const id of ['backlog','todo','doing','done']) assert.equal(LinkTargets.valid(board,{type:'column',id}),true);
   assert.equal(LinkTargets.valid({...board,kind:'kanban'},{type:'column',id:'backlog'}),true);
   assert.equal(LinkTargets.valid(board,{type:'column',id:'In progress'}),false);
@@ -383,12 +383,12 @@ test('column links focus the column and keep their return arrow separate from it
   space.active.kind='scrum';space.draft={cards:[{id:'card',title:'Task',status:'todo'}],sprint:{}};
   state.data.diagrams[0].nodes[0].link.target={type:'column',id:'todo'};
   state.data.diagrams[0].nodes.push({id:'card-source',text:'Card source',link:{item_id:3,target:{type:'card',id:'card'}}});
-  const html=space.editor.board(),header=html.match(/data-ms-column="todo"[^]*?<header>(.*?)<\/header>/s)[1];
-  assert.match(header,/data-target-type="column" data-target-id="todo"/);
+  const html=space.editor.board(),header=html.match(/data-ms-column="backlog"[^]*?<header>(.*?)<\/header>/s)[1];
+  assert.match(header,/data-target-type="column" data-target-id="backlog"/);
   assert.doesNotMatch(header,/Card source/);
   assert.match(space.targetReturnLinks().get('card'),/data-target-type="card"/);
   let focused=0,scrolled=0,tabindex;const classes=new Set();
-  const column={getAttribute:()=> 'todo',setAttribute:(key,value)=>{tabindex=value;},classList:{add:key=>classes.add(key)},scrollIntoView:()=>scrolled++,focus:()=>focused++};
+  const column={getAttribute:()=> 'backlog',setAttribute:(key,value)=>{tabindex=value;},classList:{add:key=>classes.add(key)},scrollIntoView:()=>scrolled++,focus:()=>focused++};
   context.document.querySelectorAll=selector=>selector.includes('data-ms-column')?[column]:[];
   const Targets=vm.runInContext('MindSpaceLinkTargets;',context);Targets.arrive(space);
   assert.equal(focused,1);assert.equal(scrolled,1);assert.equal(tabindex,'-1');assert.equal(classes.has('ms-link-target'),true);
@@ -396,11 +396,11 @@ test('column links focus the column and keep their return arrow separate from it
   assert.equal(new URL(location.assigned).searchParams.has('column'),false);
 });
 
-test('creation offers one unified board and both legacy board kinds use four default columns',()=>{
+test('creation offers one unified board and both legacy board kinds use three default columns',()=>{
   const {space}=setup();
   assert.equal(space.kinds().filter(kind=>['kanban','scrum'].includes(kind)).join(','),'kanban');
   for(const kind of ['kanban','scrum']) {
-    assert.equal(LinkTargets.statuses({kind,content:{cards:[]}}).join(','),'backlog,todo,doing,done');
+    assert.equal(LinkTargets.statuses({kind,content:{cards:[]}}).join(','),'backlog,doing,done');
   }
 });
 test('custom columns appear in the editor, card moves, link previews and return arrows',()=>{
@@ -419,7 +419,7 @@ test('custom columns appear in the editor, card moves, link previews and return 
   const item={...space.active,content:space.draft};
   assert.equal(LinkTargets.label(item,{type:'column',id}),'Review');
   assert.match(LinkTargets.preview(item),/Review/);assert.match(LinkTargets.preview(item),/Check the work/);
-  assert.equal(LinkTargets.valid({...item,content:{...item.content,columns:item.content.columns.slice(0,4)}},{type:'column',id}),false);
+  assert.equal(LinkTargets.valid({...item,content:{...item.content,columns:item.content.columns.slice(0,3)}},{type:'column',id}),false);
 });
 test('adding a column saves its name and stable ID and rejects a duplicate name',async()=>{
   const {space,context,home}=cellReturnFixture();
@@ -436,10 +436,65 @@ test('adding a column saves its name and stable ID and rejects a duplicate name'
   home.makeRequest=async(action,data)=>{sent=data;return {...space.active,content:data.content,version:space.active.version+1};};
   await space.editor.newColumn();assert.equal(modal.title,'ms_add_column');
   form.submit({preventDefault(){}});await pending;
-  assert.equal(sent.content.columns.length,5);assert.equal(sent.content.columns[4].name,'Review');
-  assert.equal(sent.content.columns[4].id,'12345678-1234-1234-1234-123456789abc');assert.equal(closed,true);assert.equal(space.dirty(),false);
+  assert.equal(sent.content.columns.length,4);assert.equal(sent.content.columns[3].name,'Review');
+  assert.equal(sent.content.columns[3].id,'12345678-1234-1234-1234-123456789abc');assert.equal(closed,true);assert.equal(space.dirty(),false);
   value=' review ';await space.editor.newColumn();form.submit({preventDefault(){}});
-  await assert.rejects(pending,/ms_column_exists/);assert.equal(space.draft.columns.length,5);
+  await assert.rejects(pending,/ms_column_exists/);assert.equal(space.draft.columns.length,4);
+});
+
+test('New appends independent sprints, preserves old cards and saves unique column IDs',async()=>{
+  const {space,context,home}=cellReturnFixture();
+  space.active.kind='kanban';space.draft={cards:[{id:'card',title:'Keep me',status:'todo',points:2}],sprint:{name:'Original'}};
+  space.baseline=JSON.stringify(space.draft);
+  let sequence=0;
+  context.crypto={randomUUID:()=>`10000000-0000-4000-8000-${String(++sequence).padStart(12,'0')}`};
+  context.document.querySelector=()=>null;space.editor.refresh=()=>{};
+  home.makeRequest=async(action,data)=>({...space.active,content:data.content,version:space.active.version+1});
+  await space.editor.newSprint();await space.editor.newSprint();
+  assert.equal(space.draft.sprints.length,2);assert.equal(space.draft.sprint.name,'Original');
+  assert.equal(space.draft.cards[0].title,'Keep me');
+  assert.equal(new Set(space.editor.columns().map(column=>column.id)).size,9);
+  assert.equal(space.draft.sprints[0].columns.length,3);
+  const destination=space.draft.sprints[1].columns[1].id;
+  space.editor.moveCard('card',destination);
+  const html=space.editor.board();
+  assert.equal((html.match(/data-ms-card="card"/g)||[]).length,1);
+  assert.equal((html.match(/class="ms-sprint-section"/g)||[]).length,3);
+  assert.match(html,new RegExp(`data-ms-column="${destination}"[^]*?Keep me`));
+  const item={...space.active,content:space.draft};
+  assert.equal(LinkTargets.valid(item,{type:'column',id:destination}),true);
+  assert.equal(LinkTargets.valid(item,{type:'card',id:'card'}),true);
+  assert.match(LinkTargets.preview(item),/Keep me/);
+  space.can=()=>false;
+  assert.doesNotMatch(space.editor.board(),/data-action="ms-sprint-new"|data-action="ms-column-new"/);
+  await space.editor.newSprint();assert.equal(space.draft.sprints.length,2);
+});
+
+test('sprints remember collapse separately and opening a linked card expands its own sprint',()=>{
+  const {space,context,location}=cellReturnFixture();
+  const id='10000000-0000-4000-8000-000000000001',columnId='10000000-0000-4000-8000-000000000002';
+  space.active.kind='kanban';space.draft={cards:[{id:'card',title:'Linked',status:columnId}],sprint:{},sprints:[{id,name:'Second',columns:[{id:columnId,name:'Pending'}]}]};
+  context.document.querySelector=()=>null;
+  space.editor.toggleSprint(id,true);
+  assert.match(space.editor.board(),new RegExp(`id="ms-sprint-content-${id}" hidden`));
+  assert.doesNotMatch(space.editor.board(),/id="ms-sprint-content-main" hidden/);
+  space.editor.collapsedBoards=new Map();
+  assert.match(space.editor.board(),new RegExp(`id="ms-sprint-content-${id}" hidden`));
+  let focused=0;
+  const target={getAttribute:()=> 'card',closest:()=>({dataset:{msSprint:id}}),classList:{add(){}},setAttribute(){},scrollIntoView(){},focus(){focused++;}};
+  context.document.querySelectorAll=selector=>selector.includes('data-ms-card')?[target]:[];
+  location.href='http://localhost/?item=3&card=card';
+  vm.runInContext('MindSpaceLinkTargets',context).arrive(space);
+  assert.equal(focused,1);assert.equal(space.editor.collapseState().values[id],false);
+});
+
+test('legacy To Do and Pending backlinks share one return chooser after merging their columns',()=>{
+  const {space,state}=cellReturnFixture();
+  space.active.kind='kanban';space.draft={cards:[],sprint:{}};
+  state.data.diagrams[0].nodes[0].link.target={type:'column',id:'todo'};
+  state.data.diagrams[0].nodes.push({id:'other-source',text:'Other source',link:{item_id:space.active.id,target:{type:'column',id:'backlog'}}});
+  const returns=space.targetReturnLinks('column');
+  assert.equal(returns.size,1);assert.match(returns.get('backlog'),/data-action="ms-link-returns"/);
 });
 
 function multiple(url='http://localhost/?space=200&folder=0') {

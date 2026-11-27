@@ -89,6 +89,22 @@ El modelo documentado desde las migraciones está en [database-model](database-m
 
 Para esta instalación, verificar siempre la base publicada desde Hostinger/phpMyAdmin en Chrome al revisar cambios o incidencias; las pruebas locales no sustituyen esa comprobación. Utilizar consultas de solo lectura para revisar migraciones, columnas y datos, y comprobar también la carga real del sitio.
 
+### Pendientes, calendario de tarjetas y orden diario — 26 de noviembre de 2026
+
+El aviso «The database is unavailable» al guardar una actividad pendiente correspondía a un esquema desactualizado: producción solo tenía las migraciones 001–020. Se descargó primero una copia SQL completa desde phpMyAdmin (`u348170507_habits.sql`, 72.837 bytes, en Descargas; contiene datos privados y no se incorpora al repositorio). Después se aplicaron las tres migraciones pendientes y se registraron sus checksums:
+
+| Migración | Cambio | SHA-256 |
+| --- | --- | --- |
+| `021_planner_pending.sql` | Recurrencia `pending` y fecha inicial anulable en hábitos y tareas. | `60a7b92dc13815cbbb7df2d0fc0caf4c6bf26a82daebc489a1a263e337ac3170` |
+| `022_card_calendar.sql` | Vínculo de hábitos y tareas con el tablero y la tarjeta de origen. | `22848c3066726cd77bde65b68d1cec18b5ca4cd5b81fb9f2e21e36cc778e589f` |
+| `023_planner_day_order.sql` | Tabla `calendar_day_orders` para conservar el orden por usuario y día. | `e2fc8acdf96ae87eafe0bd1c3f81ebd3f86cbb2d9d76673fc2b73170985217ef` |
+
+Las consultas posteriores confirmaron las columnas, la tabla nueva y la coincidencia exacta de los tres hashes. Los conteos inmediatamente antes y después de las migraciones fueron iguales: 46 hábitos, 0 tareas, 17 diagramas, 56 nodos y 25 elementos. La cuenta siguió utilizándose durante la revisión; otra consulta confirmó dos tareas pendientes con fecha nula y vínculos válidos a tarjetas, y un orden diario con JSON válido. La recarga final de la agenda recuperó tres tareas pendientes.
+
+En Chrome se abrió el calendario de una tarjeta Scrum existente y se guardó su actividad pendiente sin cambiar sus valores. Se confirmó «Saved to My day to day», la reapertura de la misma actividad y su presencia en **Pendings**, bajo la categoría de la carpeta. También se comprobó la hoja diaria y que el clic derecho sobre el tablero ofrece **New / Rename / Share / Delete** tanto en la barra lateral como en el listado principal, igual que los tres puntos; el diagrama del listado abrió esas mismas opciones.
+
+Durante la primera comprobación, el guardado cerró el formulario pero la actualización posterior recibió un HTTP 404 en `controller/dashboard/index.php?action=data`. La navegación directa a ese endpoint respondió `ok: true`; después de recargar la aplicación, el guardado y la actualización terminaron correctamente. No se determinó la causa de ese 404 transitorio. No se crearon actividades de prueba ni se desplegaron archivos de aplicación desde esta revisión; la publicación del código continúa mediante Git desde la terminal de la usuaria.
+
 ### Hoja diaria de tareas — 25 de noviembre de 2026
 
 Las flechas globales se centraron horizontalmente en `main` (o en el documento ampliado) mediante `.builds/mrm-scroll-center-20261125.zip`, con dos archivos y SHA-256 `329ec41f171f55e70f88aaed14c3795303fddc999ce204b4ec8930dbeadf0322`. Se comprobó localmente que ambas coinciden con el centro del contenido en vista normal y pantalla completa. Chrome confirmó la posición centrada tras publicar y recargar en Hostinger. Evidencia: `tests/.runtime/scroll-centered-hostinger.png`.

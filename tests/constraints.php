@@ -26,7 +26,7 @@ try {
         $db->run('UPDATE mindspace_items SET kind=?,content_json=? WHERE id=?',[$kind,json_encode($legacy),$item['id']]);
         $read=array_values(array_filter($model->get()['items'],fn($row)=>$row['id']===$item['id']))[0];
         if($read['kind']!=='kanban'||$read['content']['cards']!==$legacy['cards']||$read['content']['sprint']!==$legacy['sprint']
-            ||array_column($read['content']['columns'],'name')!==['Pending','To Do','In Progress','Done']) throw new RuntimeException('Legacy board lost content.');
+            ||array_column($read['content']['columns'],'name')!==['Pending','In Progress','Done']) throw new RuntimeException('Legacy board lost content.');
         $model->validateLink(['item_id'=>$item['id'],'target'=>['type'=>'column','id'=>'backlog']]);
         $saved=$model->save(['id'=>$item['id'],'version'=>$item['version'],'content'=>$legacy]);
         if($saved['content']!=$read['content']||$db->one('SELECT kind FROM mindspace_items WHERE id=?',[$item['id']])['kind']!=='kanban') throw new RuntimeException('Legacy save did not preserve the unified board.');

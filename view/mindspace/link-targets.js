@@ -6,12 +6,13 @@ class MindSpaceLinkTargets {
   static sprints(item) {
     if (!['kanban','scrum'].includes(item?.kind)) return [];
     const content = item.content || {}, defaults = ['backlog','doing','done'].map(id => ({id, name:t(`ms_status_${id}`)}));
-    return [{...content.sprint, id:'main', columns:(content.columns || defaults).filter(column => column.id !== 'todo')}, ...(content.sprints || [])];
+    return [{...content.sprint, id:'main', columns:(Array.isArray(content.columns) ? content.columns : defaults).filter(column => column.id !== 'todo')}, ...(Array.isArray(content.sprints) ? content.sprints : [])];
   }
   static columns(item) {
     return this.sprints(item).flatMap(sprint => sprint.columns);
   }
   static status(card) { return card.status === 'todo' ? 'backlog' : card.status; }
+  static targetId(target) { return target?.type === 'column' && target.id === 'todo' ? 'backlog' : target?.id; }
   static statuses(item) { return this.columns(item).map(column => column.id); }
   static types(item) { return this.statuses(item).length ? ['card','column'] : this.type(item) ? [this.type(item)] : []; }
   static choices(item, habits = S.data?.habits || [], type = this.type(item)) {

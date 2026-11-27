@@ -398,8 +398,9 @@ class MindSpace extends PageController {
     for (const source of this.linkSources()) {
       const target = source.node.link.target;
       if (!target || target.type !== type || !MindSpaceLinkTargets.valid({...this.active, content:this.draft}, target)) continue;
-      if (!grouped.has(target.id)) grouped.set(target.id, []);
-      grouped.get(target.id).push(source);
+      const id = MindSpaceLinkTargets.targetId(target);
+      if (!grouped.has(id)) grouped.set(id, []);
+      grouped.get(id).push(source);
     }
     return new Map([...grouped].map(([id, sources]) => {
       const details = sources.map(({diagram, node}) => ({diagram:diagram.name, topic:node.text || t('diagram_link_untitled')}));
@@ -413,7 +414,7 @@ class MindSpace extends PageController {
   }
   chooseLinkReturn(button) {
     const type = button.dataset.targetType, id = button.dataset.targetId;
-    const sources = this.linkSources().filter(({node}) => node.link.target?.type === type && node.link.target.id === id);
+    const sources = this.linkSources().filter(({node}) => node.link.target?.type === type && MindSpaceLinkTargets.targetId(node.link.target) === MindSpaceLinkTargets.targetId({type,id}));
     if (!sources.length) throw new Error(t('error_diagram_link_missing'));
     openModal('diagram_link_returns', `<div class="diagram-return-list">${sources.map(({diagram, node}) =>
       `<button type="button" class="btn secondary" data-action="ms-link-return" data-diagram="${diagram.id}" data-node="${esc(node.id)}" data-target-type="${esc(type)}" data-target-id="${esc(id)}">
@@ -426,7 +427,7 @@ class MindSpace extends PageController {
     if (generation !== this.generation) return;
     const diagram = diagrams.find(entry => entry.id === Number(button.dataset.diagram));
     const source = diagram?.nodes.find(node => node.id === button.dataset.node && node.link?.item_id === id);
-    if (!source || (button.dataset.targetType && (source.link.target?.type !== button.dataset.targetType || source.link.target.id !== button.dataset.targetId))) throw new Error(t('error_diagram_link_missing'));
+    if (!source || (button.dataset.targetType && (source.link.target?.type !== button.dataset.targetType || MindSpaceLinkTargets.targetId(source.link.target) !== MindSpaceLinkTargets.targetId({type:button.dataset.targetType,id:button.dataset.targetId})))) throw new Error(t('error_diagram_link_missing'));
     const item = this.allItems().find(entry => entry.diagram_id === diagram.id);
     if (!item) throw new Error(t('error_diagram_link_missing'));
     S.data.diagrams = diagrams;
