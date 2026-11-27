@@ -91,6 +91,33 @@ El modelo documentado desde las migraciones está en [database-model](database-m
 
 Para esta instalación, verificar siempre la base publicada desde Hostinger/phpMyAdmin en Chrome al revisar cambios o incidencias; las pruebas locales no sustituyen esa comprobación. Utilizar consultas de solo lectura para revisar migraciones, columnas y datos, y comprobar también la carga real del sitio.
 
+### Auditoría de todos los chats del proyecto — 27 de noviembre de 2026
+
+Se revisaron los mensajes y resultados de **21 chats**: los 20 asociados a MyRemarkableMind y el chat original de creación en Habits. Se contrastaron las solicitudes vigentes con el código actual, sin reactivar diseños sustituidos posteriormente (horario semanal, filtro All, columna To Do o pantalla completa automática).
+
+**Despliegue confirmado:** hPanel → GIT mostró **Completed**, raíz `public_html/MyRemarkableMind`, rama `main`, repositorio `AdminPromoflow/MyRemarkableMind` y commit `5dffdd0d93fcf1a034a75e0d5bbcd661f06121de`, idéntico al HEAD local al terminar la revisión. El remoto local todavía usa la dirección `AdminPromoflow/Habits`; esa diferencia de nombre no produjo una diferencia de commit. El último commit solo añadió/actualizó bytecode de pruebas; los archivos de aplicación corresponden a la versión que se probó. No se publicó código desde esta auditoría.
+
+**Archivos públicos:** se descargaron y compararon por SHA-256 los 69 archivos versionados de JavaScript, CSS, imágenes, fuentes y bibliotecas públicas. Coincidieron exactamente 68, incluido todo el JavaScript, CSS y las fuentes. La única diferencia fue `assets/planner/notepaper.png`: ambas copias miden 902 × 1272, pero tienen distinta compresión/metadatos y 293 canales de color difieren como máximo en 1 nivel de 255. La hoja publicada conserva el diseño; no se sustituyó la imagen.
+
+**Base de datos:** phpMyAdmin confirmó las **25 migraciones (001–025)**, con todos los checksums exactos. Se comparó además la estructura real contra una instalación aislada creada con esas migraciones: **33 tablas, 254 columnas y 64 relaciones** coincidentes. La firma de columnas incluye tabla, nombre, tipo de dato, nulabilidad y longitud máxima de texto; la firma de relaciones incluye las columnas de origen y destino. No quedaron migraciones pendientes ni fue necesario modificar datos de producción.
+
+| Cambios revisados | Evidencia |
+| --- | --- |
+| Home, espacios, carpetas, pestañas persistentes, títulos editables y menús de tres puntos/clic derecho | Código publicado idéntico y pruebas de navegación/MindSpace. |
+| Diagramas: nodos, imágenes, etiquetas, casillas, conexiones, estilos, enlaces, zoom, guías, reordenación y deshacer | Código publicado idéntico y pruebas del editor, geometría, permisos y persistencia. |
+| Hojas de cálculo: plantillas, fechas, selección múltiple, estilos, copiar/pegar y limpieza de celdas | Código publicado idéntico, pruebas de hoja y documento existente cargado en producción. |
+| Kanban–Scrum: Pending/In Progress/Done, columnas propias, varios sprints, edición/eliminación y calendario de tarjetas | Tablero real con dos sprints, calendarios y formulario Edit sprint verificados sin guardar cambios. Sincronización de cumplimientos probada en la base aislada. |
+| My Day Today: hoja diaria, categorías, colores, filtros persistentes, orden por día y Pendings | Código publicado idéntico, filtros actuales visibles y pruebas del planificador. |
+| Inicio/fin de tareas y hábitos, fechas, horas AM/PM y metas asociadas | Formulario publicado revisado; selector de hora y cierre automático del calendario al elegir el día comprobados. |
+| My Goals y contribuciones en My Progress | Metas existentes, formulario de nueva meta y sección de avance presentes en producción; asociaciones, permisos y guardado probados en la base aislada. |
+| Gráficas por día, semana, mes y año | Cuatro pestañas y gráfica por categoría visibles en producción; cálculos y curvas comprobados por pruebas. |
+| Notas con hojas, fechas, tipografías y PDF | Nota existente con Edwardian y paginación cargada; descarga real de `New note (1).pdf`, 401.742 bytes y cabecera PDF válida. |
+| Compartir, participantes, invitaciones y permisos independientes | All / Shared with me / Shared by me / Invitations presentes; permisos y aislamiento comprobados en las pruebas. No se enviaron invitaciones. |
+
+Pasaron **465 pruebas JavaScript**, **385 comprobaciones HTTP** y **9 verificaciones de esquema/código**. Las pruebas de escritura, eliminación y permisos utilizaron una base MySQL aislada; en producción se comprobaron estructura, despliegue, carga y controles sin crear actividades de prueba ni cambiar contenido. Se cerró la pestaña de auditoría, conservando la pestaña original de la usuaria.
+
+Chats incluidos: «Agregar menú contextual al clic derecho», «Convertir MindSpace en pestañas», «Filtrar tareas por categoría», «Convert My Day to weekly schedule», «Añadir gráficas por periodo», «Iguala el formato de My Day Today», «Añadir agenda de hábitos y tareas», «Mostrar iconos al pulsar Enter», «Add New submenu to menu», «Add sibling reorder guides», «Simplifica Home y el slider», «Elimina la sección de Excel», «Mejorar menú de espacios y folders», «Ajusta conectores en diagramas listing», «Añadir descarga de PDF por elemento», «Corrige el error», «Permite crear varios diagramas», «Actualiza el panel de hábitos», «Activa controles del cuadrito», «Agregar checklist de progreso» y «Crear plataforma Mi Rutina 3.0».
+
 ### Inicio y fin de actividades — 26 de noviembre de 2026
 
 El formulario compartido por tareas y hábitos muestra **Inicio** (fecha y hora) y **Fin** (fecha y hora). La fecha y la hora finales son opcionales e independientes; la hora inicial sigue siendo opcional. Las tareas de una sola fecha conservan ahora su fecha de fin al guardar, sin convertirse en actividades repetitivas. Los hábitos mantienen su límite de repetición y los pendientes se guardan sin fechas ni horas.
