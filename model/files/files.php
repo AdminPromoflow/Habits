@@ -16,7 +16,7 @@ final class FileLibraryModel extends BaseModel
         return max(0, min(self::MAX_FILE, $bytes(ini_get('upload_max_filesize')), $bytes(ini_get('post_max_size')) - 65536));
     }
 
-    private function access(array $data, ?string $right = null): int
+    private function libraryAccess(array $data, ?string $right = null): int
     {
         $id = (int) ($data['id'] ?? 0);
         if (!empty($data['share_id'])) {
@@ -75,13 +75,13 @@ final class FileLibraryModel extends BaseModel
 
     public function listing(array $data): array
     {
-        $item = $this->access($data);
+        $item = $this->libraryAccess($data);
         return ['entries' => $this->db->all('SELECT ' . self::FIELDS . ' FROM library_entries WHERE item_id=? ORDER BY created_at DESC,id DESC', [$item]), 'upload_limit' => self::uploadLimit()];
     }
 
     public function folder(array $data): array
     {
-        $item = $this->access($data, 'edit');
+        $item = $this->libraryAccess($data, 'edit');
         $name = $this->name($data); $key = $this->key($data);
         $parent = $this->parent($item, $data['parent_id'] ?? null);
         $prior = $this->db->one('SELECT id,kind FROM library_entries WHERE item_id=? AND client_key=?', [$item, $key]);
@@ -93,7 +93,7 @@ final class FileLibraryModel extends BaseModel
 
     public function upload(array $data, array $file): array
     {
-        $item = $this->access($data, 'edit');
+        $item = $this->libraryAccess($data, 'edit');
         $name = $this->name($data); $key = $this->key($data);
         $parent = $this->parent($item, $data['parent_id'] ?? null);
         $prior = $this->db->one('SELECT id,kind FROM library_entries WHERE item_id=? AND client_key=?', [$item, $key]);
@@ -132,7 +132,7 @@ final class FileLibraryModel extends BaseModel
 
     public function rename(array $data): array
     {
-        $item = $this->access($data, 'edit');
+        $item = $this->libraryAccess($data, 'edit');
         $entry = $this->entry($item, (int) ($data['entry_id'] ?? 0));
         $this->db->run('UPDATE library_entries SET name=? WHERE id=?', [$this->name($data), $entry['id']]);
         return $this->entry($item, (int) $entry['id']);
@@ -140,7 +140,7 @@ final class FileLibraryModel extends BaseModel
 
     public function delete(array $data): array
     {
-        $item = $this->access($data, 'delete');
+        $item = $this->libraryAccess($data, 'delete');
         $entry = $this->entry($item, (int) ($data['entry_id'] ?? 0));
         $this->db->run('DELETE FROM library_entries WHERE id=?', [$entry['id']]);
         return ['id' => $entry['id']];
@@ -148,7 +148,7 @@ final class FileLibraryModel extends BaseModel
 
     public function download(array $data): LibraryDownload
     {
-        $item = $this->access($data);
+        $item = $this->libraryAccess($data);
         $entry = $this->entry($item, (int) ($data['entry_id'] ?? 0));
         if ($entry['kind'] === 'folder') fail('error_not_found', 404);
         return new LibraryDownload($this->db, $entry, !empty($data['download']));

@@ -254,7 +254,7 @@
 .ms-invoice-cell:disabled { cursor: default; opacity: .5; }
 .ms-invoice-context, .ms-invoice-name { overflow-wrap: anywhere; color: var(--muted); }
 .ms-invoice-preview { display: block; max-width: 100%; max-height: 55vh; object-fit: contain; margin: 12px auto; border: 1px solid var(--line); border-radius: 8px; }
-.ms-invoice-preview[hidden] { display: none; }
+.ms-invoice-preview[hidden], [data-invoice-download][hidden] { display: none; }
 .ms-invoice-choices { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0; }
 [data-invoice-live] video { display: block; max-width: 100%; max-height: 45vh; margin: 12px auto; }
 #ms-invoice-form .form-footer { flex-wrap: wrap; }

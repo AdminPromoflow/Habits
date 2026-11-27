@@ -59,6 +59,14 @@ Los enlaces duran 30 minutos y solo pueden usarse una vez. Pedir un enlace no ca
 
 ## Git y despliegues
 
+### Comprobantes en Accounting ledger — 27 de noviembre de 2026
+
+Las hojas nuevas creadas con la plantilla Accounting ledger incluyen la columna G, «Invoice / Comprobante». Cada celda de datos abre las opciones de tomar una foto o elegir una imagen, con vista previa, descarga, reemplazo y retirada. Las fotos se optimizan en el navegador (hasta 2400 px y 1 MB por imagen guardada). Se acepta una imagen de origen de hasta 20 MB que el navegador pueda decodificar. Las hojas anteriores conservan sus columnas y contenido.
+
+La migración `026_spreadsheet_invoices.sql` añade una tabla privada por documento y celda. Los listados y el guardado de celdas transportan solo los nombres; las imágenes se solicitan al abrir el comprobante. Se aplicó en **u348170507_habits** desde phpMyAdmin y se verificaron las tres columnas, la relación con borrado en cascada y el checksum `8df1053e5b66b57382396145bb51fa7ee40189561459d9b6873d5f19fb3b5dd9`. La operación agregó la tabla vacía y el registro de migración, sin modificar los documentos existentes. El código de aplicación queda local para su publicación habitual mediante Git.
+
+Validación: 397 comprobaciones HTTP y nueve comprobaciones de esquema en un MySQL temporal aislado; pruebas JavaScript del editor, selección, fechas, permisos y formulario de imágenes. Se comprobaron los permisos de lectura/edición, conflictos de versión, persistencia, reemplazo, eliminación por fila y traslado de las imágenes al reordenar filas. En Chrome local se abrió un comprobante guardado, se seleccionó un PNG ficticio, se optimizó a JPG y se guardó en G3. La cámara se abre solo por acción explícita del usuario; en móviles se solicita la cámara trasera mediante el selector del dispositivo, y en escritorio se usa la cámara del navegador. No se capturaron imágenes de la cámara real durante las pruebas.
+
 Desde el 25 de noviembre de 2026, la usuaria publica los cambios desde su terminal mediante Git. Dejar las modificaciones en el proyecto local, sin crear paquetes ZIP, carpetas de builds ni subir archivos de aplicación a Hostinger. Revisar e indicar si cada cambio requiere migraciones de base de datos. El ajuste de posición y centrado de las flechas de desplazamiento solo modifica CSS y no requiere cambios de base de datos.
 
 Confirmado el 26 de noviembre de 2026: cuando una modificación requiera cambios de base de datos, aplicarlos también en Hostinger y verificar el resultado. Cuando solo cambie el código, dejarlo preparado para que la usuaria lo publique mediante Git. La selección de categorías de My Day Today se conserva en el navegador por cuenta e instalación; no requiere migración.
