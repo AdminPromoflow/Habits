@@ -184,6 +184,14 @@ La migración 007 se aplicó mediante Chrome/phpMyAdmin el 23 de noviembre de 20
 7. Excluye `/MyRemarkableMind/`, `/MyRemarkableMind/api.php` y `/MyRemarkableMind/controller/` del almacenamiento en caché de páginas/CDN. Las respuestas privadas envían `Cache-Control: no-store, private`.
 8. Conserva copias de seguridad de MySQL. Para futuras actualizaciones, respalda primero y ejecuta `php bin/migrate.php`; no vuelvas a importar una copia inicial encima de datos existentes.
 
+### Metas personales — 27 de noviembre de 2026
+
+Aplicada `025_personal_goals.sql` en la base local `mi_rutina` y en Hostinger `u348170507_habits`, con SHA-256 `b7d2db2c51b0706ecf0cbeb5ed4192f8a562a2ca22c7f9bf789a53db1b02f1c1`. Crea `goals`, `goal_tasks`, `goal_habits` y `goal_cards`; todas las asociaciones se eliminan en cascada al borrar la meta, sin borrar las actividades. Se ejecutó únicamente esta migración y su registro, sin semillas ni reimportación de datos. Los conteos de Hostinger permanecieron en 48 hábitos y 4 tareas; los locales, en 40 hábitos y 0 tareas.
+
+El código añade My Goals / Mis metas, selección múltiple de metas en tareas, hábitos y tarjetas propias de Kanban, y una sección en My Progress con el total de metas, las tareas cumplidas y sus fechas. El avance distingue las actividades con al menos un cumplimiento de la cantidad de aportes recurrentes. Las tarjetas vinculadas a actividades programadas se cuentan por el historial de la actividad, sin duplicarlas. El usuario puede marcar una meta como lograda. Las metas y sus asociaciones son privadas y no se incluyen en el contenido compartido del tablero.
+
+Los archivos de aplicación quedan en el proyecto para el despliegue habitual por Git de la usuaria. Debe incluirse `.htaccess`, que permite el nuevo endpoint `controller/goals/index.php`, además de las nuevas carpetas `controller/goals`, `model/goals` y `view/goals`. No se subió código mediante el administrador de archivos. La verificación visual se realizó en una base aislada con datos de prueba.
+
 ## Referencias oficiales consultadas
 
 - [Crear una base MySQL](https://www.hostinger.com/support/1583542-how-to-create-a-new-mysql-database-in-hostinger/)

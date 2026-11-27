@@ -23,12 +23,12 @@
           <div class="progress-category-list">{{categories}}</div>
         </section>
       </div>
+      {{goals}}
       <section class="card progress-detail" id="progress-detail" aria-live="polite" aria-atomic="false">
         <div class="progress-detail-heading"><div><span class="progress-eyebrow">{{detailEyebrow}}</span><h2>{{detailTitle}}</h2></div><strong>{{detailCount}}</strong></div>
         {{detail}}
       </section>
       <p class="progress-explanation">{{explanation}}</p>
-      {{goals}}
     </div>
   </div>
 </template>

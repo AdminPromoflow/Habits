@@ -11,7 +11,7 @@ if ($path === '/api.php') {
 }
 if (
     preg_match(
-        '~^/controller/(dashboard|users|habits|calendar|categories|routines|sharing|profile|admin|diagrams|mindspaces)/index\.php$~D',
+        '~^/controller/(dashboard|users|habits|calendar|goals|categories|routines|sharing|profile|admin|diagrams|mindspaces)/index\.php$~D',
         $path,
     )
 ) {

@@ -53,10 +53,13 @@ function goalsReport(range = null, data = S.data) {
   });
 }
 
+function goalContributionsLabel(count) { return t(count === 1 ? 'goals_contribution_one' : 'goals_contributions_count',{count}); }
+function goalAchievedLabel(count) { return t(count === 1 ? 'goals_achieved_one' : 'goals_achieved_count',{count}); }
+
 function goalActivityList(activities, completedOnly = false) {
   const shown = activities.filter(activity => !completedOnly || activity.count).sort((a,b) => b.count-a.count || a.entry.name.localeCompare(b.entry.name));
   if (!shown.length) return `<p class="muted">${t(completedOnly ? 'goals_no_contributions' : 'goals_no_tasks')}</p>`;
-  return `<ul class="goal-activity-list">${shown.map(activity => `<li>${icon(activity.count ? 'check' : 'clock')}<div><strong>${esc(activity.entry.name)}</strong><span>${t(activity.entry.kind === 'card' ? 'goals_board_card' : 'planner_'+activity.entry.kind)} · ${t('goals_contributions_count',{count:activity.count})}</span>${activity.dates.length ? `<details><summary>${t('goals_completion_dates')}</summary><p>${activity.dates.map(date => esc(fmt(date,{dateStyle:'medium'}))).join(' · ')}</p></details>` : ''}</div></li>`).join('')}</ul>`;
+  return `<ul class="goal-activity-list">${shown.map(activity => `<li>${icon(activity.count ? 'check' : 'clock')}<div><strong>${esc(activity.entry.name)}</strong><span>${t(activity.entry.kind === 'card' ? 'goals_board_card' : 'planner_'+activity.entry.kind)} · ${goalContributionsLabel(activity.count)}</span>${activity.dates.length ? `<details><summary>${t('goals_completion_dates')}</summary><p>${activity.dates.map(date => esc(fmt(date,{dateStyle:'medium'}))).join(' · ')}</p></details>` : ''}</div></li>`).join('')}</ul>`;
 }
 
 function goalCard(goal, progress = false) {
@@ -64,7 +67,7 @@ function goalCard(goal, progress = false) {
     <div class="goal-card-heading"><div><span class="goal-status ${goal.status === 'completed' ? 'is-complete' : ''}">${t(goal.status === 'completed' ? 'goals_achieved' : 'goals_active')}</span><h3>${esc(goal.name)}</h3></div>${!progress ? `<button class="icon-btn" data-action="goal-edit" data-id="${goal.id}" aria-label="${esc(t('edit')+': '+goal.name)}">${icon('edit')}</button>` : ''}</div>
     ${!progress && goal.description ? `<p class="preserve-lines">${esc(goal.description)}</p>` : ''}
     ${!progress && goal.target_date ? `<p class="goal-target">${icon('calendar')}${t('goals_target')}: ${esc(fmt(goal.target_date,{dateStyle:'medium'}))}</p>` : ''}
-    <div class="goal-counts"><strong>${goal.completed}<span> / ${goal.total}</span></strong><span>${t('goals_tasks_contributed')}</span><b>${t('goals_contributions_count',{count:goal.contributions})}</b></div>
+    <div class="goal-counts"><strong>${goal.completed}<span> / ${goal.total}</span></strong><span>${t('goals_tasks_contributed')}</span><b>${goalContributionsLabel(goal.contributions)}</b></div>
     <div class="goal-track" role="meter" aria-label="${esc(t('goals_tasks_contributed'))}" aria-valuemin="0" aria-valuemax="${goal.total || 1}" aria-valuenow="${goal.completed}"><i style="width:${goal.percent}%"></i></div>
     <details class="goal-activities" ${progress ? 'open' : ''}><summary>${t(progress ? 'goals_completed_tasks' : 'goals_linked_tasks')}</summary>${goalActivityList(goal.activities,progress)}</details>
   </article>`;
@@ -73,14 +76,14 @@ function goalCard(goal, progress = false) {
 function goalsProgressSection(range) {
   const goals = goalsReport(range);
   return `<section class="goals-progress" aria-labelledby="goals-progress-heading"><div class="goals-section-heading"><div><h2 id="goals-progress-heading">${t('goals_progress_heading')}</h2><p>${t('goals_progress_hint')}</p></div><button class="btn secondary" data-view="goals">${t('goals_manage')}</button></div>
-    <div class="goal-summary"><strong>${goals.length}</strong><span>${t('goals_total')}</span><span>${t('goals_achieved_count',{count:goals.filter(goal => goal.status === 'completed').length})}</span></div>
+    <div class="goal-summary"><strong>${goals.length}</strong><span>${t('goals_total')}</span><span>${goalAchievedLabel(goals.filter(goal => goal.status === 'completed').length)}</span></div>
     <div class="goals-grid">${goals.map(goal => goalCard(goal,true)).join('') || `<p class="muted">${t('goals_empty_hint')}</p>`}</div></section>`;
 }
 
 function goalsPage() {
   const goals = goalsReport();
   return `${heading(t('goals'),t('goals_intro'),button('goals_new','goal-new','primary'))}
-    <div class="goal-summary"><strong>${goals.length}</strong><span>${t('goals_total')}</span><span>${t('goals_achieved_count',{count:goals.filter(goal => goal.status === 'completed').length})}</span></div>
+    <div class="goal-summary"><strong>${goals.length}</strong><span>${t('goals_total')}</span><span>${goalAchievedLabel(goals.filter(goal => goal.status === 'completed').length)}</span></div>
     <p class="goals-method">${t('goals_method')}</p>
     <div class="goals-grid">${goals.map(goal => goalCard(goal)).join('') || `<div class="card goal-empty">${icon('goals')}<h2>${t('goals_empty')}</h2><p>${t('goals_empty_hint')}</p>${button('goals_new','goal-new','primary')}</div>`}</div>`;
 }
@@ -90,7 +93,14 @@ function goalForm(goal = null) {
 }
 
 class GoalsPage extends PageController {
-  constructor() { super(['goal-new','goal-edit','goal-delete','goal-quick-create']); }
+  constructor() {
+    super(['goal-new','goal-edit','goal-delete','goal-quick-create']);
+    document.addEventListener('keydown',event => {
+      if (event.key !== 'Enter' || !event.target.matches?.('[data-goal-name]')) return;
+      event.preventDefault();
+      event.target.closest('[data-goal-picker]').querySelector('[data-action="goal-quick-create"]').click();
+    });
+  }
   async handleAction(action,el,id) {
     if (action === 'goal-new') return goalForm();
     const goal = S.data.goals?.items.find(goal => Number(goal.id) === id);
@@ -100,7 +110,8 @@ class GoalsPage extends PageController {
       const picker = el.closest('[data-goal-picker]'), input = $('[data-goal-name]',picker), error = $('[data-goal-error]',picker);
       error.textContent = '';
       if (!input.value.trim()) { error.textContent = t('error_validation'); input.focus(); return; }
-      el.disabled = true;
+      const submit = el.closest('form')?.querySelector('[type=submit]');
+      el.disabled = true; if (submit) submit.disabled = true;
       try {
         const result = await api('saveGoal',{name:input.value.trim(),description:'',status:'active'});
         const goal = {...result,name:input.value.trim(),description:'',status:'active',target_date:null};
@@ -110,7 +121,7 @@ class GoalsPage extends PageController {
         input.value = ''; $('.goal-quick-create',picker).open = false;
         options.lastElementChild.querySelector('input').focus(); toast(t('saved'));
       } catch (failure) { error.textContent = failure.message; }
-      finally { el.disabled = false; }
+      finally { el.disabled = false; if (submit) submit.disabled = false; }
     }
   }
 }

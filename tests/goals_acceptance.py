@@ -5,10 +5,10 @@ import uuid
 
 def run(owner, other, guest, check):
     today = owner.data()['today']
-    guest.request('saveGoal', {'name': 'Private'}, 401)
-    owner.request('saveGoal', {'name': 'Private'}, 419, csrf=False)
+    guest.request('saveGoal', {'name': 'Private'}, 401, module='goals')
+    owner.request('saveGoal', {'name': 'Private'}, 419, csrf=False, module='goals')
     owner.request('saveGoal', {'name': '   '}, 422)
-    first = owner.request('saveGoal', {'name': 'Exercise regularly', 'description': 'Five exercises', 'target_date': today})['id']
+    first = owner.request('saveGoal', {'name': 'Exercise regularly', 'description': 'Five exercises', 'target_date': today}, module='goals')['id']
     second = owner.request('saveGoal', {'name': 'Feel stronger'})['id']
     foreign = other.request('saveGoal', {'name': 'Private other goal'})['id']
     check({g['id'] for g in owner.data()['goals']['items']} == {first, second}, 'Goal reads are private; create validates name, login and CSRF')
@@ -42,6 +42,15 @@ def run(owner, other, guest, check):
     content = dict(board['content'], cards=[dict(id=key, title='Five exercises on board', description='', status='backlog', points=1, goal_ids=[first])])
     board = owner.request('saveMindSpaceItem', dict(id=board['id'], version=board['version'], content=content))
     check('goal_ids' not in board['content']['cards'][0], 'Private goal assignments are stored outside shared board content')
+
+    owner.request('shareMindSpace', dict(target='item', id=board['id'], email=other.boot()['user']['email'], permissions={'edit': True}))
+    share = next(row for row in other.data()['mindspace_shares']['incoming'] if row['item_id'] == board['id'])
+    other.request('respondMindSpaceShare', dict(id=share['id'], status='accepted'))
+    forged = copy.deepcopy(board['content']); forged['cards'][0]['goal_ids'] = []
+    board = other.request('sharedMindSpaceAction', dict(share_id=share['id'], action='saveMindSpaceItem', data=dict(id=board['id'], version=board['version'], content=forged)))
+    check(any(link['goal_id'] == first and link['kind'] == 'card' and link['item_id'] == board['id'] for link in owner.data()['goals']['links']), 'Shared board editors cannot erase the owner’s private goal associations')
+    shared = other.request('sharedMindSpace', params={'id': share['id']})
+    check('goals' not in shared['workspace'], 'Shared workspaces do not expose private goals')
 
     def current_board():
         return next(item for item in owner.data()['mindspace']['items'] if item['id'] == board['id'])

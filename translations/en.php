@@ -901,4 +901,6 @@ return [
     'goals_progress_heading' => 'Progress toward my goals',
     'goals_progress_hint' => 'All your goals, with completed tasks and contributions for the selected period and category. A card linked to a scheduled activity is counted only once.',
     'goals_manage' => 'Manage goals',
+    'goals_contribution_one' => '1 contribution',
+    'goals_achieved_one' => '1 achieved',
 ];

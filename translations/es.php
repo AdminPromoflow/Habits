@@ -901,4 +901,6 @@ return [
     'goals_progress_heading' => 'Avance de mis metas',
     'goals_progress_hint' => 'Todas tus metas, con las tareas cumplidas y sus aportes en el período y categoría seleccionados. Una tarjeta vinculada a una actividad programada se cuenta una sola vez.',
     'goals_manage' => 'Gestionar metas',
+    'goals_contribution_one' => '1 aporte',
+    'goals_achieved_one' => '1 lograda',
 ];
