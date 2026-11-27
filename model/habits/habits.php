@@ -133,6 +133,7 @@ final class Habits extends BaseModel
             $id = $this->db->id();
         }
         (new SharingModel($this->db, $this->user))->syncCollaborators();
+        (new GoalsModel($this->db, $this->user))->saveActivity('habit', $id, $d);
         return $id;
     }
 

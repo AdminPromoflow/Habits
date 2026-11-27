@@ -38,6 +38,7 @@ const t = (key, params = {}) => {
   return v;
 };
 const ICONS = {
+  goals: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12ZM12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z',
   home: 'M3 10 12 3l9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z',
   habits: 'M9 6h11M9 12h11M9 18h11M3 6l1 1 2-2M3 12l1 1 2-2M3 18l1 1 2-2',
   calendar: 'M4 5h16v16H4zM4 9h16M8 3v4M16 3v4M8 13h1M15 13h1M8 17h1M15 17h1',

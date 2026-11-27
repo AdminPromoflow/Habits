@@ -265,6 +265,7 @@ function plannerForm(entry = null, defaults = {}) {
     ${field('name','planner_kind','text',value.name || '',{required:true,maxlength:190})}
     <fieldset class="planner-kind"><legend>${t('planner_activity_type')}</legend><div>${['habit','task'].map(v=>`<label><input type="radio" name="kind" value="${v}" ${v === kind ? 'checked' : ''} ${entry ? 'disabled' : ''}><span>${icon(v === 'habit' ? 'habits' : 'calendar')}<strong>${t('planner_'+v)}</strong><small>${t('planner_'+v+'_hint')}</small></span></label>`).join('')}</div></fieldset>
     ${plannerCategoryFields(value,!!entry)}
+    ${goalPicker({...value,kind})}
     ${plannerPendingField(value)}
     ${plannerScheduleFields(value,entry && kind === 'habit' && entry.recurrence === 'once' ? null : kind)}
     <details class="planner-description" ${value.description ? 'open' : ''}><summary>${t('planner_optional_description')}</summary>${textarea('description','description',value.description || '')}</details>
@@ -291,6 +292,7 @@ function plannerForm(entry = null, defaults = {}) {
     const fields=new FormData(form), data=Object.fromEntries(fields);
     data.kind=entry?.kind || data.kind;
     data.schedule_days=fields.getAll('schedule_days').map(Number);
+    data.goal_ids=fields.getAll('goal_ids').map(Number);
     data.recurrence_rule=JSON.parse(data.recurrence_rule);
     if (entry?.kind === 'habit') for (const key of ['routine_id','goal','unit','section']) data[key]=entry[key];
     // Existing activities keep their link even if the original node or card was removed.

@@ -14,6 +14,8 @@ return [
     'logout' => 'users',
     'language' => 'users',
     'saveHabit' => 'habits',
+    'saveGoal' => 'goals',
+    'deleteGoal' => 'goals',
     'saveCalendarEntry' => 'calendar',
     'completeCalendarTask' => 'calendar',
     'deleteCalendarTask' => 'calendar',

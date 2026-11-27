@@ -291,6 +291,7 @@ final class MindSpacesModel extends BaseModel
         }
         if (strlen($content) > 1000000) fail('error_validation');
         $this->db->run('UPDATE mindspace_items SET name=?,kind=?,content_json=?,version=version+1,updated_at=UTC_TIMESTAMP() WHERE id=?', [$name, self::boardKind($item['kind']), $content, $item['id']]);
+        if (in_array($item['kind'], ['kanban','scrum'], true)) (new GoalsModel($this->db, $this->user))->syncBoard((int) $item['id'], $data['content']['cards'] ?? [], json_decode($content,true));
         if ($item['kind'] === 'folder') $this->db->run('UPDATE habit_categories SET name=? WHERE source_folder_id=? AND owner_user_id=?', [mb_substr($name,0,100),$item['id'],$this->uid()]);
         return self::response($this->item((int) $item['id']));
     }

@@ -256,6 +256,11 @@ final class MindSpaceShares extends BaseModel
             }
         }
         $method = ['createMindSpaceItem' => 'create', 'saveMindSpaceItem' => 'save', 'moveMindSpaceItem' => 'move', 'renameMindSpace' => 'renameSpace', 'deleteMindSpace' => 'deleteSpace', 'deleteMindSpaceItem' => 'delete', 'addMindSpaceHabit' => 'addHabit'][$action];
+        // Shared board editing does not authorize changing the owner's private goals.
+        if (isset($data['content']['cards']) && is_array($data['content']['cards'])) {
+            foreach ($data['content']['cards'] as &$card) if (is_array($card)) unset($card['goal_ids']);
+            unset($card);
+        }
         return (new MindSpacesModel($this->db, $scope['owner']))->{$method}($data);
     }
     private function destination(mixed $parent, array $share, array $items): void

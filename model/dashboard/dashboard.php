@@ -28,6 +28,7 @@ final class DashboardModel extends BaseModel
             'diagrams' => (new DiagramsModel($this->db, $this->user))->list(),
             'today' => $this->today(),
             'habits' => $habits,
+            'goals' => (new GoalsModel($this->db, $this->user))->data(),
             'calendar' => (new CalendarModel($this->db, $this->user))->data(),
             'completions' => $completions,
             'categories' => $this->db->all(

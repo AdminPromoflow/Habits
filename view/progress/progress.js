@@ -214,6 +214,7 @@ function progressPage() {
     detailTitle: selected ? esc(selected.title + (detailCategory ? ' · ' + detailCategory.name : '')) : t('progress_task_detail'), detailEyebrow: t('progress_task_detail'),
     detailCount: detail?.total ? `${detail.completed} / ${detail.total} · ${detail.percent}%` : '—',
     detail: progressDetail(detail), explanation: t('progress_counting_hint'),
+    goals: goalsProgressSection({...report,category:state.category}),
   });
 }
 

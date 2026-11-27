@@ -127,6 +127,7 @@ const pageControllers = {
   routines: new RoutinesPage(),
   calendar: new CalendarPage(),
   progress: new ProgressPage(),
+  goals: new GoalsPage(),
   sharing: new SharingPage(),
   profile: new ProfilePage(),
   admin: new AdminPage(),
@@ -242,6 +243,7 @@ document.addEventListener('submit', async (event) => {
       throw new Error(t('password_mismatch'));
     delete d.confirm_password;
     if (d.recurrence_rule !== undefined) d.recurrence_rule = JSON.parse(d.recurrence_rule);
+    if ($('[data-goal-picker]',form)) d.goal_ids = values.getAll('goal_ids').map(Number);
     if (['saveHabit', 'saveTemplate'].includes(action))
       d.schedule_days = values.getAll('schedule_days').map(Number);
     for (const name of [

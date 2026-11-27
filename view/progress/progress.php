@@ -28,6 +28,7 @@
         {{detail}}
       </section>
       <p class="progress-explanation">{{explanation}}</p>
+      {{goals}}
     </div>
   </div>
 </template>

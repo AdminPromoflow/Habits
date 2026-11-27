@@ -1,4 +1,4 @@
-const personalNav = ['home', 'mindspaces', 'calendar', 'progress', 'sharing', 'settings', 'profile'];
+const personalNav = ['home', 'mindspaces', 'calendar', 'goals', 'progress', 'sharing', 'settings', 'profile'];
 const adminNav = [
   'overview',
   'users',
@@ -22,7 +22,7 @@ function hasMindSpaceTarget() {
 }
 function initialPersonalView() {
   const requested = new URL(location.href).searchParams.get('view');
-  return hasMindSpaceTarget() || requested === 'mindspaces' ? 'mindspaces' : ['calendar','pendings','habits'].includes(requested) ? requested : 'home';
+  return hasMindSpaceTarget() || requested === 'mindspaces' ? 'mindspaces' : ['calendar','pendings','habits','goals','progress'].includes(requested) ? requested : 'home';
 }
 function updateNotificationBadge() {
   const bell = document.querySelector('[data-action="notifications"]');
@@ -106,6 +106,7 @@ function personalPage() {
       calendar: calendarPage,
       pendings: plannerPendingsPage,
       progress: progressPage,
+      goals: goalsPage,
       categories: categoriesPage,
       sharing: sharingPage,
       profile: profilePage,
@@ -139,7 +140,7 @@ async function navigate(view) {
     view !== 'profile'
   )
     view = 'overview';
-  if (S.mode === 'personal' && ['home', 'mindspaces', 'calendar','pendings','habits'].includes(view)) {
+  if (S.mode === 'personal' && ['home', 'mindspaces', 'calendar','pendings','habits','goals','progress'].includes(view)) {
     const url = new URL(location.href);
     for (const key of ['view', 'diagram', 'topic', 'item', 'folder', 'space', 'cell', 'card', 'column', 'habit']) url.searchParams.delete(key);
     if (view !== 'home') url.searchParams.set('view', view);

@@ -65,6 +65,7 @@ final class Request
                 'users' => AuthController::class,
                 'habits' => HabitsController::class,
                 'calendar' => CalendarController::class,
+                'goals' => GoalsController::class,
                 'categories' => CategoriesController::class,
                 'routines' => RoutinesController::class,
                 'sharing' => SharingController::class,
