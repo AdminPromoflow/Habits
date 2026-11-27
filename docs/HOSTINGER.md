@@ -59,6 +59,14 @@ Los enlaces duran 30 minutos y solo pueden usarse una vez. Pedir un enlace no ca
 
 ## Git y despliegues
 
+### Bibliotecas de Archivos — 27 de noviembre de 2026
+
+Se aplicó **027_file_libraries.sql** en `u348170507_habits` desde phpMyAdmin después de confirmar que no estaban la migración ni las tablas nuevas. Añade `files` a los tipos de MindSpace y crea `library_entries` (9 columnas) y `library_file_chunks` (3 columnas), con tres relaciones de borrado en cascada. Se verificó el checksum `c385e48ed1d150d7c6649bc6d4ffa5cfda24d5a7bd647bfb644c2ab9169a1430` en `schema_migrations`.
+
+La aplicación publicada mostraba «The database is unavailable» al crear My files porque faltaba este esquema. Se reintentó el formulario abierto en Safari y se creó correctamente el ítem 68, dentro del espacio 186 y la carpeta 67. El conteo pasó de 38 a 39 documentos, con una biblioteca de archivos; la pantalla muestra Upload files, Create PDF, New folder y orden por fecha. No se modificaron los documentos anteriores.
+
+Validación local: 403 comprobaciones HTTP, 72 pruebas de MindSpace/PDF/fechas, cuatro pruebas específicas de carga multipart/orden/navegación y ocho comprobaciones de errores de base de datos. En navegador se verificaron carpetas, carga múltiple de imágenes y PDF, generación de PDFs con orientación mixta, persistencia, descarga y apertura automática con páginas enfrentadas. Los datos de prueba se usaron en una base temporal aislada. El MySQL de XAMPP estaba detenido; las pruebas no cambiaron la base local real. El código sigue el flujo de publicación habitual de la usuaria mediante Git.
+
 ### Comprobantes en Accounting ledger — 27 de noviembre de 2026
 
 Las hojas nuevas creadas con la plantilla Accounting ledger incluyen la columna G, «Invoice / Comprobante». Cada celda de datos abre las opciones de tomar una foto o elegir una imagen, con vista previa, descarga, reemplazo y retirada. Las fotos se optimizan en el navegador (hasta 2400 px y 1 MB por imagen guardada). Se acepta una imagen de origen de hasta 20 MB que el navegador pueda decodificar. Las hojas anteriores conservan sus columnas y contenido.
