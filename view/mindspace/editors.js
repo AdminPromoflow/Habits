@@ -77,7 +77,7 @@ class MindSpaceEditors {
             ${card.description ? `<p>${esc(card.description)}</p>` : ''}${card.points ? `<small>${esc(t('ms_points'))}: ${card.points}</small>` : ''}
             <label class="sr-only" for="ms-card-${card.id}">${esc(t('ms_card_status'))}: ${esc(card.title)}</label><select id="ms-card-${card.id}" data-ms-card-status="${card.id}">${this.statuses().map(value => `<option value="${esc(value)}" ${value === status ? 'selected' : ''}>${esc(this.columnName(value))}</option>`).join('')}</select>${returns.get(card.id) || ''}</article>`).join('')}
           ${editable ? `<button type="button" class="ms-add-card" data-action="ms-card-new" data-status="${esc(status)}">${icon('plus')}${esc(t('ms_add_card'))}</button>` : ''}</section>`;
-      }).join('')}</div></section>`).join('')}<div class="ms-board-footer">${editable ? `<button type="button" class="btn secondary" data-action="ms-sprint-new" aria-label="${esc(t('ms_add_sprint'))}" title="${esc(t('ms_add_sprint'))}" ${sprints.length >= 50 ? 'disabled' : ''}>${icon('plus')}${esc(t('ms_new_sprint'))}</button>` : ''}</div></div>`;
+      }).join('')}</div></section>`).join('') || `<p class="ms-empty">${esc(t('ms_sprints_empty'))}</p>`}<div class="ms-board-footer">${editable ? `<button type="button" class="btn secondary" data-action="ms-sprint-new" aria-label="${esc(t('ms_add_sprint'))}" title="${esc(t('ms_add_sprint'))}" ${sprints.length >= 50 ? 'disabled' : ''}>${icon('plus')}${esc(t('ms_new_sprint'))}</button>` : ''}</div></div>`;
   }
   async newColumn(sprintId = 'main') {
     const space = this.space;
@@ -159,13 +159,14 @@ class MindSpaceEditors {
   }
   async sprintForm(sprintId = 'main') {
     const space = this.space;
+    if (!space.can('edit')) return;
     if (!await space.flush()) return;
     const sprint = this.sprints().find(sprint => sprint.id === sprintId);
     if (!sprint) return;
     openModal('ms_edit_sprint', `<form id="ms-sprint-form"><label class="field"><span>${esc(t('name'))}</span><input name="name" maxlength="120" value="${esc(sprint.name)}"></label>
       <label class="field"><span>${esc(t('ms_sprint_goal'))}</span><textarea name="goal" maxlength="5000">${esc(sprint.goal)}</textarea></label>
       <div class="form-grid"><label class="field"><span>${esc(t('start_date'))}</span><input type="date" name="start" value="${esc(sprint.start || '')}"></label>
-      <label class="field"><span>${esc(t('end_date'))}</span><input type="date" name="end" value="${esc(sprint.end || '')}"></label></div>${formFooter()}</form>`);
+      <label class="field"><span>${esc(t('end_date'))}</span><input type="date" name="end" value="${esc(sprint.end || '')}"></label></div>${formFooter('save', `<button type="button" class="text-btn danger" data-action="ms-sprint-delete" data-sprint="${sprintId}">${esc(t('ms_delete_sprint'))}</button>`)}</form>`);
     const form = document.getElementById('ms-sprint-form');
     form.addEventListener('submit', event => { event.preventDefault(); void space.submit(form, async values => {
       const start = values.get('start') || null, end = values.get('end') || null;
@@ -174,6 +175,37 @@ class MindSpaceEditors {
       if (sprintId === 'main') space.draft.sprint = details;
       else Object.assign(space.draft.sprints.find(sprint => sprint.id === sprintId), details);
       space.changed(); closeModal(); this.refresh(); await space.save();
+    }); });
+  }
+
+  async deleteSprintForm(sprintId) {
+    const space = this.space, generation = space.generation;
+    if (!space.can('edit') || !await space.flush() || generation !== space.generation) return;
+    const sprints = this.sprints(), index = sprints.findIndex(sprint => sprint.id === sprintId);
+    if (index < 0) return;
+    const sprint = sprints[index], columns = new Set(sprint.columns.map(column => column.id));
+    const count = space.draft.cards.filter(card => columns.has(MindSpaceLinkTargets.status(card))).length;
+    const name = sprint.name || t('ms_sprint_number', {number:index+1});
+    openModal('ms_delete_sprint', `<form id="ms-sprint-delete-form"><p>${esc(t('ms_delete_sprint_confirm', {name, count}))}</p>${formFooter('delete')}</form>`);
+    const form = document.getElementById('ms-sprint-delete-form');
+    form.addEventListener('submit', event => { event.preventDefault(); void space.submit(form, async () => {
+      if (!space.can('edit') || generation !== space.generation) return;
+      if (!await space.flush()) throw new Error(space.error || t('ms_unsaved'));
+      if (generation !== space.generation || !this.sprints().some(sprint => sprint.id === sprintId)) return;
+      const before = space.draft, next = JSON.parse(JSON.stringify(before));
+      next.cards = next.cards.filter(card => !columns.has(MindSpaceLinkTargets.status(card)));
+      if (sprintId === 'main') { next.sprint = null; next.columns = []; }
+      else next.sprints = next.sprints.filter(sprint => sprint.id !== sprintId);
+      space.draft = next;
+      if (!await space.save()) {
+        if (generation === space.generation) { space.draft = before; space.status(); }
+        throw new Error(space.error || t('ms_unsaved'));
+      }
+      const state = this.collapseState();
+      delete state.values[sprintId];
+      try { localStorage.setItem(state.key, JSON.stringify(state.values)); } catch {}
+      closeModal(); this.refresh();
+      document.querySelector('[data-action="ms-sprint-new"]')?.focus({preventScroll:true});
     }); });
   }
 
@@ -690,6 +722,7 @@ class MindSpaceEditors {
     if (action === 'ms-card-edit') return this.cardForm(button.dataset.id);
     if (action === 'ms-card-calendar') return this.scheduleCard(button.dataset.id);
     if (action === 'ms-sprint') return this.sprintForm(button.dataset.sprint || 'main');
+    if (action === 'ms-sprint-delete') return this.deleteSprintForm(button.dataset.sprint);
     if (action === 'ms-habits-select') return this.chooseHabits();
     if (action === 'ms-habit-new') return this.newHabit();
     if (action === 'ms-sheet-export') return this.exportSheet();

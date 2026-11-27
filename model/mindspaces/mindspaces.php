@@ -49,7 +49,7 @@ final class MindSpacesModel extends BaseModel
 
     private static function boardSprints(mixed $sprints): array
     {
-        if (!is_array($sprints) || !array_is_list($sprints) || count($sprints) > 49) fail('error_validation');
+        if (!is_array($sprints) || !array_is_list($sprints) || count($sprints) > 50) fail('error_validation');
         $clean = []; $seen = [];
         foreach ($sprints as $sprint) {
             if (!is_array($sprint)) fail('error_validation');
@@ -428,8 +428,18 @@ final class MindSpacesModel extends BaseModel
         $cards = $data['cards'] ?? null;
         if (!is_array($cards) || !array_is_list($cards) || count($cards) > 300) fail('error_validation');
         // Clients that omit columns must not erase columns added in a newer editor.
-        $columns = self::boardColumns(array_key_exists('columns', $data) ? $data['columns'] : ($existing['columns'] ?? self::defaultColumns()));
+        // An explicit null removes the original sprint without changing the IDs
+        // of remaining sprints, their columns or links to them.
+        $primary = array_key_exists('sprint', $data) ? $data['sprint'] : (array_key_exists('sprint', $existing) ? $existing['sprint'] : []);
+        $columns = array_key_exists('columns', $data) ? $data['columns'] : ($existing['columns'] ?? self::defaultColumns());
+        if ($primary === null) {
+            if ($columns !== []) fail('error_validation');
+        } else {
+            $columns = self::boardColumns($columns);
+            $primary = self::sprintDetails($primary);
+        }
         $sprints = self::boardSprints(array_key_exists('sprints', $data) ? $data['sprints'] : ($existing['sprints'] ?? []));
+        if (count($sprints) + ($primary === null ? 0 : 1) > 50) fail('error_validation');
         $statuses = array_column($columns, 'id');
         foreach ($sprints as $sprint) $statuses = [...$statuses, ...array_column($sprint['columns'], 'id')];
         if (count(array_unique($statuses)) !== count($statuses)) fail('error_validation');
@@ -444,7 +454,7 @@ final class MindSpacesModel extends BaseModel
             $clean[] = ['id' => $id, 'title' => Validate::text($card, 'title', 190), 'description' => self::text($card['description'] ?? '', 5000),
                 'status' => Validate::choice(($card['status'] ?? '') === 'todo' ? 'backlog' : ($card['status'] ?? ''), $statuses), 'points' => $points];
         }
-        return ['cards' => $clean, 'columns' => $columns, 'sprint' => self::sprintDetails($data['sprint'] ?? $existing['sprint'] ?? []), ...($sprints ? ['sprints' => $sprints] : [])];
+        return ['cards' => $clean, 'columns' => $columns, 'sprint' => $primary, ...($sprints ? ['sprints' => $sprints] : [])];
     }
 
     public function addHabit(array $data): array

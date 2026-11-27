@@ -136,6 +136,18 @@ def run(owner, stranger, guest, check):
   [dict(sprint,columns=sprint['columns'][:2])],[dict(sprint,columns=sprint['columns'][:3]+[custom])]]:
   call('saveMindSpaceItem',{'id':board['id'],'version':board['version'],'content':dict(content,sprints=sprints)},422)
  check(current(board['id'])==board, 'Invalid sprint IDs, duplicate columns across sprints and reversed dates cannot overwrite the board')
+ without_primary=dict(content,sprint=None,columns=[])
+ board=save(board,without_primary)
+ check(current(board['id'])['content']==without_primary, 'Deleting the first sprint preserves other sprint, column and card IDs')
+ board=save(board,{'cards':without_primary['cards']})
+ check(board['content']==without_primary, 'Clients omitting sprint details do not recreate a deleted first sprint')
+ for invalid in [dict(without_primary,columns=content['columns']),dict(without_primary,cards=[dict(content['cards'][0],status='backlog')])]:
+  call('saveMindSpaceItem',{'id':board['id'],'version':board['version'],'content':invalid},422)
+ check(current(board['id'])['content']==without_primary, 'Deleted sprints cannot leave orphaned columns or cards')
+ board=save(board,dict(without_primary,cards=[],sprints=[]))
+ check(current(board['id'])['content']=={'cards':[],'columns':[],'sprint':None}, 'Deleting the last sprint persists an empty board')
+ board=save(board,dict(board['content'],sprints=[sprint]))
+ check(current(board['id'])['content']['sprints']==[sprint] and board['content']['sprint'] is None, 'An empty board accepts a new independent sprint')
  alias_key=str(uuid.uuid4())
  alias=call('createMindSpaceItem',{'kind':'scrum','name':'Unified retry','client_key':alias_key})
  alias_retry=call('createMindSpaceItem',{'kind':'kanban','name':'Unified retry','client_key':alias_key})

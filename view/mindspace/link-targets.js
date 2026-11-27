@@ -6,7 +6,8 @@ class MindSpaceLinkTargets {
   static sprints(item) {
     if (!['kanban','scrum'].includes(item?.kind)) return [];
     const content = item.content || {}, defaults = ['backlog','doing','done'].map(id => ({id, name:t(`ms_status_${id}`)}));
-    return [{...content.sprint, id:'main', columns:(Array.isArray(content.columns) ? content.columns : defaults).filter(column => column.id !== 'todo')}, ...(Array.isArray(content.sprints) ? content.sprints : [])];
+    const primary = content.sprint === null ? [] : [{...content.sprint, id:'main', columns:(Array.isArray(content.columns) ? content.columns : defaults).filter(column => column.id !== 'todo')}];
+    return [...primary, ...(Array.isArray(content.sprints) ? content.sprints : [])];
   }
   static columns(item) {
     return this.sprints(item).flatMap(sprint => sprint.columns);

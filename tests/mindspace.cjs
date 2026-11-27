@@ -488,6 +488,74 @@ test('sprints remember collapse separately and opening a linked card expands its
   assert.equal(focused,1);assert.equal(space.editor.collapseState().values[id],false);
 });
 
+function sprintDeletionFixture() {
+  const fixture=cellReturnFixture(),{space,context,home}=fixture;
+  space.active.kind='kanban';
+  space.draft={sprint:{name:'First'},columns:[...LinkTargets.columns({kind:'kanban'}),{id:'review',name:'Review'}],
+    sprints:[{id:'second',name:'Second',columns:[{id:'pending-2',name:'Pending'},{id:'doing-2',name:'In Progress'},{id:'done-2',name:'Done'}]}],
+    cards:[{id:'legacy',title:'First card',status:'todo'},{id:'custom',title:'Review card',status:'review'},{id:'keep',title:'Second card',status:'pending-2'}]};
+  space.baseline=JSON.stringify(space.draft);
+  const form={addEventListener(type,handler){this[type]=handler;}};
+  context.document.getElementById=id=>['ms-sprint-form','ms-sprint-delete-form'].includes(id)?form:null;
+  context.document.querySelector=()=>null;space.editor.refresh=()=>{};
+  context.openModal=(title,html)=>{fixture.modal={title,html};};
+  context.closeModal=()=>{fixture.closed=true;};
+  context.formFooter=(label,other='')=>other;
+  context.t=(key,values={})=>key+JSON.stringify(values);
+  space.submit=(form,task)=>fixture.pending=task();
+  home.makeRequest=async(action,data)=>({...space.active,content:data.content,version:space.active.version+1});
+  fixture.confirm=async()=>{form.submit({preventDefault(){}});await fixture.pending;};
+  return fixture;
+}
+
+test('Edit sprint offers deletion; confirmation alone changes nothing and removing the first preserves other sprint IDs and links',async()=>{
+  const fixture=sprintDeletionFixture(),{space}=fixture;
+  await space.editor.sprintForm('main');
+  assert.match(fixture.modal.html,/data-action="ms-sprint-delete" data-sprint="main"/);
+  await space.editor.deleteSprintForm('main');
+  assert.equal(fixture.modal.title,'ms_delete_sprint');
+  assert.match(fixture.modal.html,/"name":"First","count":2/);
+  assert.equal(space.dirty(),false);assert.equal(space.draft.cards.length,3);
+  const remaining=JSON.stringify(space.draft.sprints[0]);
+  await fixture.confirm();
+  assert.equal(space.draft.sprint,null);assert.equal(space.draft.columns.length,0);
+  assert.equal(space.draft.cards.map(card=>card.id).join(','),'keep');
+  assert.equal(JSON.stringify(space.draft.sprints[0]),remaining);
+  assert.equal(space.editor.sprints().map(sprint=>sprint.id).join(','),'second');
+  assert.equal(LinkTargets.valid({...space.active,content:space.draft},{type:'column',id:'pending-2'}),true);
+  assert.equal(LinkTargets.valid({...space.active,content:space.draft},{type:'column',id:'todo'}),false);
+  assert.equal(fixture.closed,true);assert.equal(space.dirty(),false);
+});
+
+test('deleting an extra and then the last sprint leaves an empty board that accepts New',async()=>{
+  const fixture=sprintDeletionFixture(),{space,context}=fixture;
+  await space.editor.deleteSprintForm('second');await fixture.confirm();
+  assert.equal(space.draft.cards.map(card=>card.id).join(','),'legacy,custom');
+  assert.equal(space.draft.sprints.length,0);assert.equal(space.draft.sprint.name,'First');
+  await space.editor.deleteSprintForm('main');await fixture.confirm();
+  assert.equal(space.editor.sprints().length,0);assert.equal(space.draft.cards.length,0);
+  assert.match(space.editor.board(),/ms_sprints_empty/);assert.match(space.editor.board(),/data-action="ms-sprint-new"/);
+  assert.doesNotMatch(space.editor.board(),/data-ms-sprint=/);
+  let sequence=0;context.crypto={randomUUID:()=>`new-${++sequence}`};
+  await space.editor.newSprint();
+  assert.equal(space.editor.sprints().length,1);assert.equal(space.editor.columns().length,3);
+  assert.equal(space.draft.sprint,null);assert.equal(space.dirty(),false);
+});
+
+test('failed sprint deletion retains its cards and allows retry; read-only boards cannot delete',async()=>{
+  const fixture=sprintDeletionFixture(),{space,home}=fixture;
+  const before=JSON.stringify(space.draft),save=home.makeRequest;
+  await space.editor.deleteSprintForm('second');
+  home.makeRequest=async()=>{throw new Error('Save failed');};
+  await assert.rejects(fixture.confirm(),/Save failed/);
+  assert.equal(JSON.stringify(space.draft),before);assert.equal(fixture.closed,undefined);
+  home.makeRequest=save;await fixture.confirm();
+  assert.equal(space.draft.sprints.length,0);assert.equal(fixture.closed,true);
+  fixture.modal=null;space.can=()=>false;
+  await space.editor.sprintForm('main');await space.editor.deleteSprintForm('main');
+  assert.equal(fixture.modal,null);assert.equal(space.draft.sprint.name,'First');
+});
+
 test('legacy To Do and Pending backlinks share one return chooser after merging their columns',()=>{
   const {space,state}=cellReturnFixture();
   space.active.kind='kanban';space.draft={cards:[],sprint:{}};
