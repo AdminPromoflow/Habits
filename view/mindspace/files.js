@@ -102,7 +102,7 @@ class MindSpaceFiles {
   async upload(file, name, ctx, parent, key) {
     if (file.size > this.limit) throw new Error(t('files_too_large'));
     const form = new FormData();
-    for (const [key,value] of Object.entries({...ctx, parent_id:parent || '', name, client_key:key})) form.append(key, value);
+    for (const [field,value] of Object.entries({...ctx, parent_id:parent || '', name, client_key:key})) form.append(field, value);
     form.append('file', file, name);
     let response;
     try { response = await fetch('controller/files/index.php?action=uploadLibraryFile', {method:'POST',credentials:'same-origin',headers:{'X-CSRF-Token':S.csrf},body:form}); }

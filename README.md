@@ -188,6 +188,18 @@ La escala permanece en 0–100%. Cada punto usa `completadas / programadas × 10
 
 Las fechas futuras se excluyen. Los períodos sin actividades interrumpen la línea, en lugar de convertirse en 0%; un único dato se muestra como punto aislado. Cada repetición de tarea o hábito cuenta una vez, y un hábito solo se completa al alcanzar su meta. Los hábitos archivados solo aportan días con registros, porque no se conserva una fecha de archivo; los cambios de programación se reflejan según la configuración actual. Se mantienen la zona horaria y los permisos del progreso personal. No requiere migraciones ni dependencias nuevas. Pruebas: `node --test tests/progress.cjs tests/calendar.cjs`.
 
+## Archivos: carpetas, imágenes y PDFs
+
+**Añadir → Archivos** crea una biblioteca como los demás documentos de MindSpace. Dentro se pueden crear carpetas y subcarpetas, subir varias imágenes JPG, PNG, WebP o GIF y PDFs, renombrarlos, descargarlos y eliminarlos con confirmación. La fecha corresponde a la carga: por defecto aparecen primero los más recientes, con un selector para ver los más antiguos. Renombrar no cambia esa fecha.
+
+**Crear PDF** permite añadir varias imágenes o tomar fotos sucesivas desde el dispositivo, ordenar las páginas y quitar alguna antes de guardar. Cada imagen ocupa una página A4 con orientación automática, manteniendo sus proporciones. El PDF queda guardado en la carpeta abierta. Se admiten hasta 50 páginas; las fotos se ajustan a 2.200 píxeles para reducir el peso. El acceso a la cámara depende del dispositivo y del navegador; también se pueden seleccionar fotos existentes.
+
+Al abrir un PDF aparece un libro digital con páginas enfrentadas en pantallas amplias y una página en pantallas pequeñas. Incluye cambio de vista, zoom, ajuste, salto a una página y navegación con botones, teclado o deslizamiento táctil. Los PDFs protegidos con contraseña se pueden descargar para abrirlos fuera de la aplicación. PDF.js y jsPDF se sirven desde la instalación, sin enviar los documentos a un visor externo.
+
+Requiere **027_file_libraries.sql** mediante `php bin/migrate.php`. Los metadatos y bytes se guardan en MySQL, separados del catálogo de MindSpace. Las cargas son atómicas y sus reintentos no duplican archivos. Descargar requiere una sesión y acceso al ítem; en espacios compartidos, cargar y renombrar requieren Edit, y eliminar requiere Delete. Eliminar una carpeta o biblioteca borra también sus archivos. La biblioteca admite 1.000 elementos y 500 MB; cada archivo tiene un máximo de 20 MB o el límite inferior configurado en PHP, mostrado en pantalla. Para admitir 20 MB, configura `upload_max_filesize=20M` y `post_max_size=24M` en el servidor. Las copias de seguridad deben incluir las tablas `library_entries` y `library_file_chunks`.
+
+Pruebas de HTTP y permisos: `tests/file_library_acceptance.py`, incluida en `tests/functional.py`.
+
 ## Actualizar una instalación existente
 
 Los cambios de esta entrega están guardados localmente y no se publican automáticamente. Tras copiar manualmente el proyecto al servidor, ejecuta con PHP 8.2 o superior:
