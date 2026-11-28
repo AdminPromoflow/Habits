@@ -8,6 +8,16 @@ PHP 8.2 o posterior con `pdo_mysql`, `mbstring`, `json` y `session`; MySQL 8.0.1
 
 La sesión de hPanel revisada el 23 de noviembre de 2026 corresponde a **aleinarossui.com**. El repositorio MyRemarkableMind está conectado a `public_html/MyRemarkableMind`. La instalación conserva la base **u348170507_habits**, con usuario **u348170507_habits**. Estos nombres no son contraseñas. El archivo `config/local.php` de desarrollo contiene credenciales del MySQL local y no debe copiarse a producción.
 
+## Importancia y urgencia de las actividades
+
+La migración `028_activity_priority.sql` agrega `importance`, `urgency` y `priority_scale` a hábitos, tareas y metas, y la escala personal a `user_settings`. Las tarjetas conservan estos campos en su contenido JSON. Una tarjeta y su actividad programada sincronizan sus puntuaciones; las actualizaciones de clientes anteriores conservan los valores existentes.
+
+Aplicada y verificada el 27 de noviembre de 2026 tanto en `mi_rutina` local como en `u348170507_habits` de Hostinger. Checksum: `a4935a78f7df2ec172e437a0022d0249f1e00bead2e19c08447978db078f9672`. Se verificaron las diez columnas nuevas y se conservaron los conteos de hábitos, tareas y metas: local `40 / 0 / 0`; Hostinger `53 / 9 / 6`. Se ejecutó únicamente esta migración y su registro, sin reinsertar categorías ni plantillas.
+
+El código se publica mediante Git. Después de publicarlo, comprobar en Ajustes las escalas 1–5, 1–10 (predeterminada), 1–100, 1–1000, personalizada y 0–1 (no/sí). Al cambiar la escala se adaptan las puntuaciones mostradas sin borrar las valoraciones guardadas. En Mi día a día y Pendientes, la bandera roja significa urgente y la verde importante; el texto accesible y la ayuda muestran su puntuación. Las dos opciones son independientes.
+
+Validación: `node --test tests/activity-priority.cjs tests/calendar.cjs tests/calendar-order.cjs tests/card-calendar.cjs tests/goals.cjs tests/progress.cjs tests/mindspace.cjs tests/diagrams.cjs` y `tests/functional.py` sobre una base aislada. La comprobación visual incluyó guardado, recarga, conversión 7/10 → 70/100, modo binario, escala personalizada, las dos banderas junto a la hora y banderas independientes en pendientes.
+
 ## Conexión de producción
 
 Crea directamente en el servidor `public_html/MyRemarkableMind/config/local.php` (se excluye de Git):
