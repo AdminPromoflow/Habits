@@ -1,6 +1,7 @@
 function categoriesPage() {
   const available = (S.data.category_catalog || []).filter((c) => !Number(c.selected));
   return renderTemplate('categories', {
+    prioritySettings: activityPrioritySettings(),
     heading: heading(
       t('settings'),
       t('category_settings_intro'),
@@ -79,6 +80,13 @@ class CategoriesPage extends PageController {
       'join-category',
       'leave-category',
     ]);
+    document.addEventListener('change', event => {
+      if (!event.target.matches?.('[data-priority-scale-preset]')) return;
+      const form = event.target.closest('form'), custom = event.target.value === 'custom';
+      form.querySelector('[data-priority-custom]').hidden = !custom;
+      const input = form.querySelector('[name=priority_scale]');
+      if (custom) input.focus(); else input.value = event.target.value;
+    });
   }
 
   async handleAction(action, el, id) {

@@ -132,6 +132,9 @@ final class Habits extends BaseModel
             );
             $id = $this->db->id();
         }
+        $priority = new ActivityPriority($this->db, $this->user);
+        $priority->save('habits', $id, $d, $old ?? []);
+        $priority->syncActivity('habits', $id, $d, !$old);
         (new SharingModel($this->db, $this->user))->syncCollaborators();
         (new GoalsModel($this->db, $this->user))->saveActivity('habit', $id, $d);
         return $id;

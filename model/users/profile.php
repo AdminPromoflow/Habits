@@ -11,12 +11,13 @@ final class ProfileModel extends BaseModel
             DateTimeZone::listIdentifiers(),
         );
         $theme = Validate::choice($d['theme'] ?? $this->user['theme'], ['light', 'dark']);
+        $scale = ActivityPriority::scale($d['priority_scale'] ?? $this->user['priority_scale'] ?? 10);
         $notifications = array_key_exists('notifications_enabled', $d)
             ? (int) (bool) $d['notifications_enabled']
             : (int) $this->user['notifications_enabled'];
         $this->db->run(
-            'UPDATE user_settings SET language=?,timezone=?,theme=?,notifications_enabled=? WHERE user_id=?',
-            [$language, $timezone, $theme, $notifications, $this->uid()],
+            'UPDATE user_settings SET language=?,timezone=?,theme=?,notifications_enabled=?,priority_scale=? WHERE user_id=?',
+            [$language, $timezone, $theme, $notifications, $scale, $this->uid()],
         );
         if (isset($d['name'])) {
             $this->db->run('UPDATE users SET name=? WHERE id=?', [

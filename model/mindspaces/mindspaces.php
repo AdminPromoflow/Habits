@@ -292,6 +292,7 @@ final class MindSpacesModel extends BaseModel
         if (strlen($content) > 1000000) fail('error_validation');
         $this->db->run('UPDATE mindspace_items SET name=?,kind=?,content_json=?,version=version+1,updated_at=UTC_TIMESTAMP() WHERE id=?', [$name, self::boardKind($item['kind']), $content, $item['id']]);
         if (in_array($item['kind'], ['kanban','scrum'], true)) (new GoalsModel($this->db, $this->user))->syncBoard((int) $item['id'], $data['content']['cards'] ?? [], json_decode($content,true));
+        if (in_array($item['kind'], ['kanban','scrum'], true)) (new ActivityPriority($this->db, $this->user))->syncBoard((int) $item['id'], json_decode($content,true)['cards']);
         if ($item['kind'] === 'folder') $this->db->run('UPDATE habit_categories SET name=? WHERE source_folder_id=? AND owner_user_id=?', [mb_substr($name,0,100),$item['id'],$this->uid()]);
         return self::response($this->item((int) $item['id']));
     }
@@ -486,6 +487,7 @@ final class MindSpacesModel extends BaseModel
         foreach ($sprints as $sprint) $statuses = [...$statuses, ...array_column($sprint['columns'], 'id')];
         if (count(array_unique($statuses)) !== count($statuses)) fail('error_validation');
         $clean = []; $seen = [];
+        $previousCards = array_column($existing['cards'] ?? [], null, 'id');
         foreach ($cards as $card) {
             if (!is_array($card)) fail('error_validation');
             $id = self::text($card['id'] ?? '', 36);
@@ -493,8 +495,10 @@ final class MindSpacesModel extends BaseModel
             $seen[$id] = true;
             $points = $card['points'] ?? 0;
             if (!is_int($points) || $points < 0 || $points > 999) fail('error_validation');
+            $hasPriority = array_intersect_key($card + ($previousCards[$id] ?? []), array_flip(['importance','urgency','priority_scale']));
             $clean[] = ['id' => $id, 'title' => Validate::text($card, 'title', 190), 'description' => self::text($card['description'] ?? '', 5000),
-                'status' => Validate::choice(($card['status'] ?? '') === 'todo' ? 'backlog' : ($card['status'] ?? ''), $statuses), 'points' => $points];
+                'status' => Validate::choice(($card['status'] ?? '') === 'todo' ? 'backlog' : ($card['status'] ?? ''), $statuses), 'points' => $points,
+                ...($hasPriority ? ActivityPriority::fields($card, $previousCards[$id] ?? [], (int) ($this->user['priority_scale'] ?? 10)) : [])];
         }
         return ['cards' => $clean, 'columns' => $columns, 'sprint' => $primary, ...($sprints ? ['sprints' => $sprints] : [])];
     }

@@ -135,10 +135,12 @@ class MindSpaceEditors {
     openModal(id ? 'ms_edit_card' : 'ms_add_card', `<form id="ms-card-form"><label class="field"><span>${esc(t('name'))}</span><input name="title" required maxlength="190" value="${esc(card.title)}"></label>
       <label class="field"><span>${esc(t('description'))}</span><textarea name="description" maxlength="5000">${esc(card.description)}</textarea></label>
       <div class="form-grid"><label class="field"><span>${esc(t('ms_card_status'))}</span><select name="status">${this.statuses().map(value => `<option value="${esc(value)}" ${value === card.status ? 'selected' : ''}>${esc(this.columnName(value))}</option>`).join('')}</select></label>
-      <label class="field"><span>${esc(t('ms_points'))}</span><input type="number" name="points" value="${card.points}" min="0" max="999" step="1"></label></div>${!S.sharedWorkspace ? goalPicker({kind:'card',item_id:space.active.id,card_key:card.id}) : ''}${formFooter()}</form>`);
+      <label class="field"><span>${esc(t('ms_points'))}</span><input type="number" name="points" value="${card.points}" min="0" max="999" step="1"></label></div>${!S.sharedWorkspace ? goalPicker({kind:'card',item_id:space.active.id,card_key:card.id}) : ''}${activityPriorityFields(card)}${formFooter()}</form>`);
     const form = document.getElementById('ms-card-form');
+    bindActivityPriority(form);
     form.addEventListener('submit', event => { event.preventDefault(); void space.submit(form, async values => {
       const updated = { ...card, title:String(values.get('title')).trim(), description:String(values.get('description')), status:String(values.get('status')), points:Number(values.get('points') || 0) };
+      Object.assign(updated,activityPriorityData(form));
       if (!S.sharedWorkspace) updated.goal_ids = values.getAll('goal_ids').map(Number);
       const index = space.draft.cards.findIndex(item => item.id === card.id);
       if (index < 0) space.draft.cards.push(updated); else space.draft.cards[index] = updated;
@@ -158,7 +160,7 @@ class MindSpaceEditors {
     const matching = [...(S.data.calendar?.tasks || []).map(entry => ({...entry,kind:'task'})),
       ...(S.data.habits || []).filter(habit => habit.permission === 'owner' && habit.status === 'active').map(habit => ({...habit,kind:'habit'}))]
       .find(entry => source.source_item_id && Number(entry.source_item_id) === itemId && entry.source_card_key === id);
-    return plannerForm(matching || null, {...source, name:card.title, description:card.description || ''});
+    return plannerForm(matching || null, {...source, name:card.title, description:card.description || '', ...Object.fromEntries(['importance','urgency','priority_scale'].filter(key => key in card).map(key => [key,card[key]]))});
   }
   moveCard(id, status) {
     if (!this.space.can('edit')) return;

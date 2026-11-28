@@ -282,6 +282,7 @@ function plannerForm(entry = null, defaults = {}) {
     <fieldset class="planner-kind"><legend>${t('planner_activity_type')}</legend><div>${['habit','task'].map(v=>`<label><input type="radio" name="kind" value="${v}" ${v === kind ? 'checked' : ''} ${entry ? 'disabled' : ''}><span>${icon(v === 'habit' ? 'habits' : 'calendar')}<strong>${t('planner_'+v)}</strong><small>${t('planner_'+v+'_hint')}</small></span></label>`).join('')}</div></fieldset>
     ${plannerCategoryFields(value,!!entry)}
     ${goalPicker({...value,kind})}
+    ${activityPriorityFields(value)}
     ${plannerPendingField(value)}
     ${plannerScheduleFields(value,entry && kind === 'habit' && entry.recurrence === 'once' ? null : kind)}
     <details class="planner-description" ${value.description ? 'open' : ''}><summary>${t('planner_optional_description')}</summary>${textarea('description','description',value.description || '')}</details>
@@ -290,6 +291,7 @@ function plannerForm(entry = null, defaults = {}) {
   </form>`,true);
   $('#modal').classList.add('planner-dialog');
   const form = $('#planner-form');
+  bindActivityPriority(form);
   bindPlannerSchedule(form);
   const syncCategory = () => {
     const isNew = $('[name=category_choice]',form).value === 'new';
@@ -306,6 +308,7 @@ function plannerForm(entry = null, defaults = {}) {
     if (submit.disabled) return;
     errorBox.textContent=''; submit.disabled=true;
     const fields=new FormData(form), data=Object.fromEntries(fields);
+    Object.assign(data,activityPriorityData(form));
     data.kind=entry?.kind || data.kind;
     data.schedule_days=fields.getAll('schedule_days').map(Number);
     data.goal_ids=fields.getAll('goal_ids').map(Number);
@@ -441,7 +444,7 @@ function plannerEntry(entry, date, compact = false) {
   const isHabit = entry.kind === 'habit', color = plannerEntryColor(entry);
   return `<article class="planner-entry ${entry.completed ? 'is-done' : ''} ${isHabit ? 'is-habit' : 'is-task'} ${compact ? 'compact' : ''}" style="--planner-color:${color}">
     ${compact ? '' : `<button class="planner-check" data-action="${isHabit ? 'toggle-habit' : 'planner-complete'}" data-id="${entry.id}" data-date="${date}" aria-label="${esc(t('record_progress') + ': ' + entry.name)}" aria-pressed="${entry.completed}" ${date > today() ? 'disabled' : ''}>${entry.completed ? icon('check') : ''}</button>`}
-    <button class="planner-entry-content" data-action="${isHabit ? (entry.permission === 'owner' ? 'planner-edit-habit' : 'habit-detail') : 'planner-edit'}" data-id="${entry.id}" data-date="${date}"><strong>${esc(entry.name)}</strong><span>${entry.scheduled_time ? entry.scheduled_time.slice(0,5) + ' · ' : ''}${t('planner_'+entry.kind)}</span></button>
+    <button class="planner-entry-content" data-action="${isHabit ? (entry.permission === 'owner' ? 'planner-edit-habit' : 'habit-detail') : 'planner-edit'}" data-id="${entry.id}" data-date="${date}"><strong>${esc(entry.name)}</strong><span>${entry.scheduled_time ? entry.scheduled_time.slice(0,5) + ' · ' : ''}${t('planner_'+entry.kind)}</span></button>${activityPriorityFlags(entry)}
   </article>`;
 }
 
@@ -490,6 +493,7 @@ function plannerNoteRow(entry, date, lines = 1, measure = false) {
     <span class="planner-note-category">${measure ? '' : `<button type="button" class="planner-note-flag" aria-label="${esc(t('category'))}" aria-describedby="${tooltipId}">${plannerFlagIcon()}</button><span class="planner-note-category-tooltip" role="tooltip" id="${tooltipId}">${esc(category.name)}</span>`}</span>
     ${measure ? `<span class="planner-note-name">${esc(entry.name)}</span>` : `<button class="planner-note-name" data-action="${edit}" data-id="${entry.id}" data-date="${date}" title="${esc(t('planner_drag_hint'))}">${esc(entry.name)}</button>`}
     ${plannerNoteSchedule(entry,measure)}
+    ${activityPriorityFlags(entry,!measure)}
     ${measure ? '<span class="planner-drag-handle"></span>' : `<button type="button" class="planner-drag-handle" data-planner-drag aria-label="${esc(t('planner_reorder', {name:entry.name}))}" title="${esc(t('planner_drag_hint'))}"><span aria-hidden="true">⠿</span></button>`}
   </div>`;
 }
@@ -552,7 +556,7 @@ function plannerPendingsPage() {
     heading:heading(t('planner_pendings'),t('planner_pendings_intro'),add),
     content:groups.size ? [...groups.values()].sort((a,b) => a.name.localeCompare(b.name,S.language)).map(group => `<section class="planner-pending-group" style="--planner-color:${group.color}"><h2>${plannerFlagIcon()}<span>${esc(group.name)}</span><small>${group.entries.length}</small></h2><div class="planner-pending-list">${group.entries.map(entry => {
       const edit = entry.kind === 'task' ? 'planner-edit' : entry.permission === 'owner' ? 'planner-edit-habit' : 'habit-detail';
-      return `<button type="button" class="planner-pending-entry" data-action="${edit}" data-id="${entry.id}">${icon(entry.kind === 'habit' ? 'habits' : 'calendar')}<span><strong>${esc(entry.name)}</strong><small>${t('planner_'+entry.kind)}</small></span>${icon('chevron')}</button>`;
+      return `<button type="button" class="planner-pending-entry" data-action="${edit}" data-id="${entry.id}">${icon(entry.kind === 'habit' ? 'habits' : 'calendar')}<span><strong>${esc(entry.name)}</strong><small>${t('planner_'+entry.kind)}</small></span>${activityPriorityFlags(entry,false)}${icon('chevron')}</button>`;
     }).join('')}</div></section>`).join('') : empty('planner_no_pendings','planner_no_pendings_hint',add),
   });
 }

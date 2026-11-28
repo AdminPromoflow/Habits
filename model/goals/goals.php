@@ -27,13 +27,14 @@ final class GoalsModel extends BaseModel
     public function save(array $data): array
     {
         $id = (int) ($data['id'] ?? 0);
-        if ($id) $this->owned($id);
+        $old = $id ? $this->owned($id) : [];
         $values = [Validate::text($data,'name'), Validate::text($data,'description',5000,false), Validate::choice($data['status'] ?? 'active',['active','completed']), empty($data['target_date']) ? null : Validate::date($data['target_date'])];
         if ($id) $this->db->run('UPDATE goals SET name=?,description=?,status=?,target_date=? WHERE id=? AND owner_user_id=?', [...$values,$id,$this->uid()]);
         else {
             $this->db->run('INSERT INTO goals(name,description,status,target_date,owner_user_id) VALUES (?,?,?,?,?)', [...$values,$this->uid()]);
             $id = $this->db->id();
         }
+        (new ActivityPriority($this->db, $this->user))->save('goals', $id, $data, $old);
         return ['id'=>$id];
     }
 

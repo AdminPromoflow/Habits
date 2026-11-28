@@ -1,6 +1,20 @@
 <?php
 declare(strict_types=1);
 return [
+    'priority_heading' => 'Importancia y urgencia',
+    'priority_importance' => 'Importante',
+    'priority_urgency' => 'Urgente',
+    'priority_importance_score' => 'Puntuación de importancia',
+    'priority_urgency_score' => 'Puntuación de urgencia',
+    'priority_hint' => 'Marca una, ambas o ninguna. Puntúa cada opción de 1 a {max}.',
+    'priority_binary_hint' => 'Marcado significa sí (1); sin marcar significa no (0).',
+    'priority_settings_hint' => 'Elige cómo valorar la importancia y la urgencia de tus tareas, hábitos y metas.',
+    'priority_scale' => 'Escala de puntuación',
+    'priority_binary' => '0–1 · No / Sí',
+    'priority_range' => '1–{max}',
+    'priority_custom' => 'Personalizada',
+    'priority_max' => 'Puntuación máxima',
+    'priority_scale_hint' => 'La escala se aplica a ambas opciones. Las puntuaciones existentes se adaptan proporcionalmente. En modo sí/no, cualquier opción marcada sigue marcada.',
     'ms_link_sources' => 'Enlaces desde',
     'ms_link_choose_part' => 'Elige un destino dentro de este elemento',
     'ms_link_cell_invalid' => 'Elige una celda dentro de esta hoja de cálculo.',

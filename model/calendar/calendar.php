@@ -62,6 +62,7 @@ final class CalendarModel extends BaseModel
             }
             $id = (new Habits($this->db, $this->user))->saveHabit($d);
             if ($source) $this->attachSource('habits', $id, $source);
+            if ($source) (new ActivityPriority($this->db, $this->user))->syncActivity('habits', $id, $d, !$old);
             if ($source) (new GoalsModel($this->db, $this->user))->saveActivity('habit', $id, $d);
             return ['id'=>$id, 'kind'=>'habit'];
         }
@@ -78,6 +79,9 @@ final class CalendarModel extends BaseModel
             $id = $this->db->id();
         }
         if ($source) $this->attachSource('calendar_tasks', $id, $source);
+        $priority = new ActivityPriority($this->db, $this->user);
+        $priority->save('calendar_tasks', $id, $d, $old ?? []);
+        $priority->syncActivity('calendar_tasks', $id, $d, !$old);
         (new GoalsModel($this->db, $this->user))->saveActivity('task', $id, $d);
         return ['id'=>$id, 'kind'=>'task'];
     }

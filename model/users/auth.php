@@ -13,7 +13,7 @@ final class Auth
             return null;
         }
         $u = $this->db->one(
-            'SELECT u.id,u.name,u.email,u.status,u.auth_version,s.language,s.timezone,s.theme,s.notifications_enabled FROM users u JOIN user_settings s ON s.user_id=u.id WHERE u.id=?',
+            'SELECT u.id,u.name,u.email,u.status,u.auth_version,s.language,s.timezone,s.theme,s.notifications_enabled,s.priority_scale FROM users u JOIN user_settings s ON s.user_id=u.id WHERE u.id=?',
             [$_SESSION['user_id']],
         );
         if (

@@ -89,7 +89,8 @@ function goalsPage() {
 }
 
 function goalForm(goal = null) {
-  openModal(goal ? 'goals_edit' : 'goals_new',`<form data-form="saveGoal">${goal ? `<input type="hidden" name="id" value="${goal.id}">` : ''}${field('name','goals_name','text',goal?.name || '',{required:true,maxlength:190})}${textarea('description','description',goal?.description || '')}<div class="form-grid">${field('target_date','goals_target','date',goal?.target_date || '')}${selectField('status','status',[['active',t('goals_active')],['completed',t('goals_achieved')]],goal?.status || 'active')}</div><p class="field-help">${t('goals_status_hint')}</p>${formFooter('save',goal ? `<button type="button" class="text-btn danger" data-action="goal-delete" data-id="${goal.id}">${icon('trash')}${t('delete')}</button>` : '')}</form>`);
+  openModal(goal ? 'goals_edit' : 'goals_new',`<form data-form="saveGoal">${goal ? `<input type="hidden" name="id" value="${goal.id}">` : ''}${field('name','goals_name','text',goal?.name || '',{required:true,maxlength:190})}${textarea('description','description',goal?.description || '')}${activityPriorityFields(goal || {})}<div class="form-grid">${field('target_date','goals_target','date',goal?.target_date || '')}${selectField('status','status',[['active',t('goals_active')],['completed',t('goals_achieved')]],goal?.status || 'active')}</div><p class="field-help">${t('goals_status_hint')}</p>${formFooter('save',goal ? `<button type="button" class="text-btn danger" data-action="goal-delete" data-id="${goal.id}">${icon('trash')}${t('delete')}</button>` : '')}</form>`);
+  bindActivityPriority($('#modal form'));
 }
 
 class GoalsPage extends PageController {

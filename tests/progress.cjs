@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const fs = require('node:fs');
 const context = vm.createContext({ Intl, Date, document: { addEventListener() {} } });
-vm.runInContext(fs.readFileSync('view/global/ui.js', 'utf8') + '\nclass PageController {}\n' + fs.readFileSync('view/calendar/calendar.js', 'utf8') + '\n' + fs.readFileSync('view/progress/progress.js', 'utf8') + '\nthis.api={S,progressRange,progressMoveDate,progressReport,progressSeries,progressLinePath,progressChart,progressDetail,progressPage,ProgressPage};', context);
+vm.runInContext(fs.readFileSync('view/global/ui.js', 'utf8') + '\n' + fs.readFileSync('view/global/priority.js','utf8') + '\nclass PageController {}\n' + fs.readFileSync('view/calendar/calendar.js', 'utf8') + '\n' + fs.readFileSync('view/progress/progress.js', 'utf8') + '\nthis.api={S,progressRange,progressMoveDate,progressReport,progressSeries,progressLinePath,progressChart,progressDetail,progressPage,ProgressPage};', context);
 const { S, progressRange, progressMoveDate, progressReport, progressSeries, progressLinePath, progressChart, progressDetail } = context.api;
 const activity = (id, extra = {}) => ({ id, name: `Activity ${id}`, start_date: '2024-02-01', end_date: null, recurrence: 'once', schedule_days: [], category_id: 1, ...extra });
 function setup() {

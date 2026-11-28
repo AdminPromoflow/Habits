@@ -1,0 +1,26 @@
+.activity-priority { margin:18px 0; padding:14px 16px; border:1px solid var(--line); border-radius:12px; }
+.activity-priority legend { padding:0 5px; font-size:.9375rem; }
+.activity-priority legend small { font-weight:400; color:var(--muted); }
+.priority-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+.priority-toggle { display:flex; align-items:center; gap:9px; cursor:pointer; font-size:.9375rem; }
+.priority-toggle input { width:18px; height:18px; margin:0; accent-color:var(--purple); }
+.priority-rating { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:10px; }
+.priority-rating[hidden],.priority-settings [hidden] { display:none; }
+.priority-rating input[type=range] { flex:1; min-width:65px; width:80px; padding:0; accent-color:var(--purple); }
+.priority-rating label { display:flex; align-items:center; gap:4px; font-size:.8rem; white-space:nowrap; color:var(--muted); }
+.priority-rating input[type=number] { width:80px; padding:7px; }
+.activity-priority .field-help { margin:12px 0 0; }
+.priority-settings { margin:22px 0; padding:22px; }
+.priority-settings h2 { margin:0 0 8px; }
+.priority-settings > p { color:var(--muted); }
+.priority-flags { display:inline-flex; align-items:center; gap:4px; flex:none; }
+.priority-flag { display:inline-flex; position:relative; align-items:center; justify-content:center; width:19px; height:25px; border-radius:3px; }
+.priority-flag-urgency { color:#c83737; }
+.priority-flag-importance { color:#278347; }
+.priority-flag svg { width:17px; height:17px; fill:currentColor; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+.priority-flag:focus-visible { outline:2px solid currentColor; outline-offset:2px; }
+.priority-flag-tooltip { display:none; position:absolute; right:0; bottom:100%; z-index:12; padding:7px 9px; background:var(--ink); color:var(--paper,#fff); border-radius:7px; font:12px/1.4 var(--font-body, sans-serif); white-space:nowrap; pointer-events:none; }
+.priority-flag:hover .priority-flag-tooltip,.priority-flag:focus-visible .priority-flag-tooltip { display:block; }
+.planner-note-row > .priority-flags { height:var(--note-rule); }
+.planner-pending-entry > .priority-flags { flex:none; }
+@media(max-width:480px) { .priority-options { gap:12px; } .priority-rating input[type=number] { width:70px; } }

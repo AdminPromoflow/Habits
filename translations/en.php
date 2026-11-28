@@ -1,6 +1,20 @@
 <?php
 declare(strict_types=1);
 return [
+    'priority_heading' => 'Importance and urgency',
+    'priority_importance' => 'Important',
+    'priority_urgency' => 'Urgent',
+    'priority_importance_score' => 'Importance score',
+    'priority_urgency_score' => 'Urgency score',
+    'priority_hint' => 'Select either, both or neither. Rate each option from 1 to {max}.',
+    'priority_binary_hint' => 'Checked means yes (1); unchecked means no (0).',
+    'priority_settings_hint' => 'Choose how to rate the importance and urgency of your tasks, habits and goals.',
+    'priority_scale' => 'Rating scale',
+    'priority_binary' => '0–1 · No / Yes',
+    'priority_range' => '1–{max}',
+    'priority_custom' => 'Custom',
+    'priority_max' => 'Maximum score',
+    'priority_scale_hint' => 'The scale applies to both options. Existing scores adjust proportionally. In yes/no mode, any checked option stays checked.',
     'ms_link_sources' => 'Linked from',
     'ms_link_choose_part' => 'Choose a destination inside this element',
     'ms_link_cell_invalid' => 'Choose a cell within this spreadsheet.',

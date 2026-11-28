@@ -6,7 +6,7 @@ function fixture(storage=new Map()) {
   const context=vm.createContext({Intl,Date,URL,location:{href:'http://localhost/MyRemarkableMind/?view=calendar'},
     localStorage:{getItem:key=>storage.get(key)??null,setItem:(key,value)=>storage.set(key,value)},
     document:{addEventListener(){},querySelector(){return null;}}});
-  vm.runInContext(fs.readFileSync('view/global/ui.js','utf8')+'\nclass PageController {}\n'+fs.readFileSync('view/calendar/calendar.js','utf8')+'\nthis.api={S,CalendarPage,plannerEntries,plannerNoteEntries,plannerMovedOrder,plannerCategoryColors,plannerEntryCategory,plannerCategoryFilters,plannerNoteRow,restorePlannerCategorySelection};',context);
+  vm.runInContext(fs.readFileSync('view/global/ui.js','utf8') + '\n' + fs.readFileSync('view/global/priority.js','utf8')+'\nclass PageController {}\n'+fs.readFileSync('view/calendar/calendar.js','utf8')+'\nthis.api={S,CalendarPage,plannerEntries,plannerNoteEntries,plannerMovedOrder,plannerCategoryColors,plannerEntryCategory,plannerCategoryFilters,plannerNoteRow,restorePlannerCategorySelection};',context);
   const {S}=context.api;
   S.user={id:1};S.view='calendar';S.date='2026-11-26';
   S.data={today:S.date,categories:[{id:1,name:'Work',color:'#B8A4D4'},{id:2,name:'Home',color:'#B8A4D4'}],habits:[],completions:[],calendar:{tasks:[

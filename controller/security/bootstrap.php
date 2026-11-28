@@ -12,6 +12,7 @@ spl_autoload_register(static function (string $class): void {
         'AccessPolicy' => 'controller/security/access.php',
         'Habits' => 'model/habits/habits.php',
         'Schedule' => 'model/calendar/schedule.php',
+        'ActivityPriority' => 'model/calendar/priority.php',
         'CalendarModel' => 'model/calendar/calendar.php',
         'GoalsModel' => 'model/goals/goals.php',
         'GoalsController' => 'controller/goals/goals.php',

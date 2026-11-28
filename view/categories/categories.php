@@ -4,6 +4,7 @@
 } ?>
 <template id="view-categories">
   {{heading}}
+  {{prioritySettings}}
   <section class="category-settings-section">
     <div class="section-heading">
       <div>

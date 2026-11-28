@@ -55,7 +55,7 @@ test('a shared board schedules a personal activity without claiming the other ow
 
 test('board category defaults use its own folder and parent folder',()=>{
   const context=vm.createContext({document:{addEventListener(){}}});
-  vm.runInContext(fs.readFileSync('view/global/ui.js','utf8')+'\nclass PageController {}\n'+fs.readFileSync('view/calendar/calendar.js','utf8')+`
+  vm.runInContext(fs.readFileSync('view/global/ui.js','utf8') + '\n' + fs.readFileSync('view/global/priority.js','utf8')+'\nclass PageController {}\n'+fs.readFileSync('view/calendar/calendar.js','utf8')+`
     S.data={categories:[],category_catalog:[],mindspace:{spaces:[{id:1,name:'Home'}],items:[
       {id:10,kind:'folder',name:'Projects',mindspace_id:1,parent_id:null},
       {id:11,kind:'kanban',name:'Launch',mindspace_id:1,parent_id:10}]}};
