@@ -1210,10 +1210,10 @@ class HomePage extends PageController {
       if (event.button !== 0 || event.isPrimary === false || !root || this.editing || this.resizing ||
           this.layoutOpen || this.viewport.isInteracting() || !this.mindspace.can('edit')) return;
       const key = this.keyFor(root);
-      if (!this.selected || key !== this.selectedKey) return;
       const node = this.ensureTree().find((item) => item.id === key);
       const free = this.freePositioning(key);
       if (!free && (key === 'root' || !this.plan)) return;
+      this.selectNode(key);
       const position = this.plan?.nodes.find((item) => item.id === key);
       this.drag = {
         key, root, free, target:null, dropCache:{}, pointerId: event.pointerId,

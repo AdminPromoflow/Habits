@@ -1217,7 +1217,7 @@ test('moving or zooming the camera is not a diagram edit and survives a redraw',
   assert.equal(home.viewport.scale, 1);
 });
 
-test('preset dragging previews the branch without changing coordinates and commits only a valid parent', async () => {
+test('first-press dragging previews an unselected branch and commits only a valid parent', async () => {
   const {home,node,click,pointer,addNodeElement,addAlignmentLayer} = savedEditor();
   const layer=addAlignmentLayer();
   home.nodes=[{id:'root',parent_id:null,text:home.name,layout:{mode:'horizontal'}},
@@ -1229,14 +1229,21 @@ test('preset dragging previews the branch without changing coordinates and commi
   let saves=0;
   home.makeRequest=async(action,data)=>{saves++;return {...data,version:data.version+1};};
   const before=home.fingerprint(home.snapshot());
-  click(a.node); pointer('pointerdown',a.node); pointer('pointermove',a.node,{clientX:160,clientY:200});
+  assert.equal(home.selected,false);
+  pointer('pointerdown',a.node); pointer('pointermove',a.node,{clientX:160,clientY:200});
+  assert.equal(home.selectedKey,'a');
+  assert.equal(home.selected,true);
   assert.equal(home.fingerprint(home.snapshot()),before);
   assert.equal(layer.innerHTML,'','no red guides or measurements in a preset');
   assert.equal(saves,0);
   pointer('pointerup',a.node);
   assert.equal(home.fingerprint(home.snapshot()),before,'no target means no change');
   assert.equal(saves,0);
-  click(a.node); pointer('pointerdown',a.node); pointer('pointermove',a.node,{clientX:160,clientY:200});
+  assert.equal(click(a.node).prevented,true,'the post-drag click is consumed');
+  click(node);
+  assert.equal(home.selectedKey,'root');
+  pointer('pointerdown',a.node); pointer('pointermove',a.node,{clientX:160,clientY:200});
+  assert.equal(home.selectedKey,'a','dragging another node selects it in the same gesture');
   home.drag.target={kind:'parent',parentId:'b',index:0};
   pointer('pointerup',a.node); await new Promise(setImmediate);
   assert.equal(saves,1);
@@ -1274,8 +1281,8 @@ test('all preset layouts suppress red guides during resizing as well as dragging
   }
 });
 
-test('a node must be selected before dragging, and a click without movement never saves', () => {
-  const { home, node, root, pointer, click } = savedEditor();
+test('a first press selects a movable node, and a click without movement never saves', () => {
+  const { home, node, root, pointer } = savedEditor();
   home.makeRequest = () => { throw new Error('Selection and clicks must not save'); };
   pointer('pointerdown');
   pointer('pointermove', node, { clientX: 180, clientY: 150 });
@@ -1283,9 +1290,10 @@ test('a node must be selected before dragging, and a click without movement neve
   assert.equal(home.nodes[0].x, null);
   home.nodes.find(node=>node.id==='root').layout = {mode:'free'};
   home.active.nodes = JSON.parse(JSON.stringify(home.nodes));
-  click();
+  assert.equal(home.selected,false);
   pointer('pointerdown');
   assert.equal(home.drag.key, 'root');
+  assert.equal(home.selected,true);
   pointer('pointermove', node, { clientX: 102, clientY: 101 });
   assert.equal(home.drag.moving, false);
   pointer('pointerup');
@@ -1347,8 +1355,8 @@ test('drag guides ignore the full moving branch and vanish when alignment is los
   home.finishNodeDrag(false);
 });
 
-test('a selected root moves by screen distance divided by zoom and persists after reload', async () => {
-  const { home, state, node, root, field, click, pointer } = savedEditor();
+test('an unselected free root drags on the first press, respects zoom and persists after reload', async () => {
+  const { home, state, node, root, field, pointer } = savedEditor();
   home.viewport.scale = 2;
   home.positionTree = () => {};
   let requests = 0;
@@ -1357,7 +1365,7 @@ test('a selected root moves by screen distance divided by zoom and persists afte
     return { id: data.id, name: data.name, nodes: JSON.parse(JSON.stringify(data.nodes)), version: data.version + 1 };
   };
   home.nodes.find(node=>node.id==='root').layout = {mode:'free'};
-  click();
+  assert.equal(home.selected,false);
   pointer('pointerdown');
   pointer('pointermove', node, { clientX: 180, clientY: 60 });
   assert.equal(root.classList.contains('is-dragging'), true);

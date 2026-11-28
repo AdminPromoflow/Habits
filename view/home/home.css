@@ -693,7 +693,7 @@ button.diagram-handle-arrows { cursor: ew-resize; touch-action: none; }
 .diagram-connection-label-actions { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 4px; }
 .diagram-connection-label-actions button { width: auto; min-width: 68px; min-height: 30px; padding: 6px 10px; font-size: 12px; line-height: 1.25; text-align: center; }
 .mindmap-stage:focus { outline: none; }
-.diagram-root.is-selected:not(.is-editing) .diagram-node { cursor: grab; touch-action: none; }
+.diagram-root:not(.is-editing) .diagram-node { cursor: grab; touch-action: none; }
 .diagram-root.is-dragging .diagram-node { cursor: grabbing; }
 
 .mindmap-stage.has-diagram {
