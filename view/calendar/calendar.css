@@ -211,6 +211,9 @@ body.planner-is-dragging, body.planner-is-dragging * { cursor:grabbing !importan
 :is(.planner-frequency,.planner-month-mode,.planner-choices) input:checked + span { border-color:var(--purple); background:var(--lavender-wash); color:var(--purple-dark); }
 :is(.planner-kind,.planner-frequency,.planner-month-mode,.planner-choices) input:focus-visible + span { outline:2px solid var(--purple); outline-offset:2px; }
 .planner-number-choices > div, .planner-weekday-choices > div { grid-template-columns:repeat(7,minmax(0,1fr)); }
+.planner-month-reference { margin:0 0 12px; color:var(--muted); font-size:.8125rem; }
+.planner-date-weekday { padding:4px 0; color:var(--muted); font-size:.75rem; font-weight:600; text-align:center; text-decoration:none; text-transform:capitalize; }
+.planner-extra-dates-label { margin:14px 0 8px; }
 .planner-position-choices > div { grid-template-columns:repeat(3,minmax(0,1fr)); }
 .planner-month-choices span { text-transform:capitalize; }
 .planner-schedule details, .planner-description { margin:18px 0; }

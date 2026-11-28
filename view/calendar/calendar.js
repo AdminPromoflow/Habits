@@ -11,6 +11,18 @@ function plannerChoices(name, label, options, selected, cls = '') {
   return `<fieldset class="planner-choices ${cls}"><legend>${esc(t(label))}</legend><div>${options.map(([value,text]) => `<label><input type="checkbox" name="${name}" value="${value}" ${selected.includes(value) ? 'checked' : ''}><span>${esc(text)}</span></label>`).join('')}</div></fieldset>`;
 }
 
+function plannerMonthDates(start, selected) {
+  const first = start.slice(0,7)+'-01', end = dateObj(first);
+  end.setUTCMonth(end.getUTCMonth()+1,0);
+  const last = end.getUTCDate();
+  const choice = day => `<label${day === 1 ? ` style="grid-column:${dayNum(first)}"` : ''}><input type="checkbox" name="rule_month_days" value="${day}" ${selected.includes(day) ? 'checked' : ''}><span>${day}</span></label>`;
+  return `<fieldset class="planner-choices planner-number-choices"><legend>${esc(t('planner_month_days'))}</legend>
+    <p class="planner-month-reference">${esc(t('planner_month_reference',{month:fmt(first,{month:'long',year:'numeric'})}))}</p>
+    <div>${[1,2,3,4,5,6,7].map(day=>`<abbr class="planner-date-weekday" title="${esc(dayLabel(day,true))}">${esc(dayLabel(day))}</abbr>`).join('')}${Array.from({length:last},(_,i)=>choice(i+1)).join('')}</div>
+    ${last < 31 ? `<p class="field-help planner-extra-dates-label">${esc(t('planner_other_dates'))}</p><div>${Array.from({length:31-last},(_,i)=>choice(last+i+1)).join('')}</div>` : ''}
+  </fieldset>`;
+}
+
 function plannerMonthInterval(count) {
   return count === 1 ? t('planner_monthly') : t('planner_every_months',{count});
 }
@@ -206,7 +218,7 @@ function plannerScheduleFields(entry = {}, kind = null) {
       <div data-month-interval>${selectField('rule_interval','planner_month_spacing',Array.from({length:12},(_,i)=>[i+1,plannerMonthInterval(i+1)]),rule.interval || 1)}</div>
       <div data-month-fields>
         <fieldset class="planner-month-mode"><legend>${t('planner_month_pattern')}</legend><div>${['dates','weekdays'].map(v => `<label><input type="radio" name="month_mode" value="${v}" ${(rule.month_mode || 'dates') === v ? 'checked' : ''}><span>${t('planner_month_'+v)}</span></label>`).join('')}</div></fieldset>
-        <div data-month-dates>${plannerChoices('rule_month_days','planner_month_days',Array.from({length:31},(_,i)=>[i+1,String(i+1)]),rule.month_days || [Number(start.slice(8))],'planner-number-choices')}<p class="field-help">${t('planner_short_month')}</p></div>
+        <div data-month-dates>${plannerMonthDates(start,rule.month_days || [Number(start.slice(8))])}<p class="field-help">${t('planner_short_month')}</p></div>
         <div data-month-weekdays>${plannerChoices('rule_positions','planner_which_weeks',[1,2,3,4,5,-1].map(n=>[n,t('planner_position_'+n)]),rule.positions || [Math.ceil(Number(start.slice(8))/7)],'planner-position-choices')}${plannerChoices('rule_weekdays','days',[1,2,3,4,5,6,7].map(n=>[n,dayLabel(n)]),rule.weekdays || [dayNum(start)],'planner-weekday-choices')}</div>
       </div>
     </div>
@@ -243,6 +255,10 @@ function bindPlannerSchedule(form) {
   };
   form.addEventListener('change',event => {
     if (event.target.closest('[data-planner-picker-panel]')) return;
+    if (event.target.name === 'start_date' && event.target.value && event.target.validity.valid) {
+      const selected = $$('[name=rule_month_days]:checked',form).map(input=>Number(input.value));
+      $('.planner-number-choices',form).outerHTML = plannerMonthDates(event.target.value,selected);
+    }
     if (event.target.name === 'month_preset' && Number(event.target.value)) {
       const interval = Number(event.target.value), startMonth = Number($('[name=start_date]',form).value.slice(5,7));
       $$('[name=rule_months]',form).forEach(input => { input.checked = ((Number(input.value)-startMonth+12)%12)%interval === 0; });

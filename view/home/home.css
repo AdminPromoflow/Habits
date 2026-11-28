@@ -275,6 +275,28 @@
 .diagram-link-detail-label { color: var(--purple-dark); font-size: .7rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
 .diagram-link-detail-topic { white-space: pre-wrap; }
 .diagram-link-detail-label:not(:first-child) { margin-top: 6px; }
+.diagram-link-destination-trigger { display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; min-height:44px; padding:11px 12px; border:1px solid #e2dce7; border-radius:9px; background:var(--surface); font-size:.9375rem; text-align:left; }
+.diagram-link-destination-trigger > span { min-width:0; overflow-wrap:anywhere; }
+.diagram-link-destination-trigger > .icon { flex:none; width:20px; height:20px; }
+.diagram-link-destination-trigger[aria-expanded="true"] { border-color:var(--purple); }
+#diagram-link-tree-panel { border:1px solid var(--line); border-radius:10px; background:var(--surface); overflow:hidden; }
+.diagram-link-tree-actions { display:flex; flex-wrap:wrap; gap:8px 20px; padding:8px 12px; border-bottom:1px solid var(--line); }
+.diagram-link-tree-actions .text-btn { min-height:32px; }
+.diagram-link-tree { max-height:320px; overflow:auto; overscroll-behavior:contain; padding:6px; }
+.diagram-link-tree ul { list-style:none; margin:0; padding:0; }
+.diagram-link-tree details > ul { margin-left:14px; padding-left:12px; border-left:1px solid var(--line); }
+.diagram-link-tree summary { display:flex; align-items:center; min-height:42px; cursor:pointer; list-style:none; border-radius:6px; }
+.diagram-link-tree summary::-webkit-details-marker { display:none; }
+.diagram-link-tree summary:focus-visible { outline:2px solid var(--purple); outline-offset:-2px; }
+.diagram-link-tree-arrow { flex:0 0 28px; text-align:center; font-size:22px; color:var(--purple-dark); }
+.diagram-link-tree details[open] > summary > .diagram-link-tree-arrow { transform:rotate(90deg); }
+.diagram-link-tree-choice, .diagram-link-tree-space { display:flex; align-items:center; gap:8px; min-width:0; min-height:42px; width:100%; padding:8px; border-radius:6px; text-align:left; }
+.diagram-link-tree-choice > span, .diagram-link-tree-space > span { flex:1; overflow-wrap:anywhere; }
+.diagram-link-tree .icon { flex:none; width:18px; height:18px; color:var(--purple-dark); }
+.diagram-link-tree-choice small { color:var(--muted); font-size:.7rem; }
+.diagram-link-tree-choice:hover { background:var(--canvas); }
+.diagram-link-tree-choice[aria-pressed="true"] { background:var(--lavender-wash); color:var(--purple-dark); }
+.diagram-link-tree-leaf { padding-left:28px; }
 .diagram-link-scope { display: flex; flex-wrap: wrap; gap: 12px 24px; border: 0; margin: 16px 0; padding: 0; }
 .diagram-link-scope legend { font-weight: 600; margin-bottom: 8px; }
 .diagram-link-scope label { display: flex; gap: 8px; align-items: center; cursor: pointer; }

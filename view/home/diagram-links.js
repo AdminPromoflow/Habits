@@ -140,6 +140,41 @@ class DiagramLinks {
     } finally { this.busy = false; }
   }
 
+  static destinationTree(documents, items, spaces) {
+    const roots = [], groups = new Map(spaces.map(space => [space.id, {...space, kind:'space', key:`space:${space.id}`, children:[]}]));
+    const entries = new Map(items.map(item => [item.kind === 'diagram' ? `diagram:${item.diagram_id}` : `item:${item.id}`, item]));
+    const folders = new Map(), nodes = documents.map(document => {
+      const entry = entries.get(document.key), node = {...document, entry, children:[]};
+      if (entry?.kind === 'folder') folders.set(entry.id, node);
+      return node;
+    });
+    for (const node of nodes) {
+      let parent = folders.get(node.entry?.parent_id);
+      if (parent?.entry.mindspace_id !== node.entry?.mindspace_id) parent = null;
+      // An unavailable ancestor or malformed cycle must not hide a valid destination.
+      const seen = new Set([node.key]);
+      for (let ancestor = parent; ancestor; ancestor = folders.get(ancestor.entry.parent_id)) {
+        if (seen.has(ancestor.key)) { parent = null; break; }
+        seen.add(ancestor.key);
+      }
+      if (parent) parent.children.push(node);
+      else if (groups.has(node.entry?.mindspace_id)) groups.get(node.entry.mindspace_id).children.push(node);
+      else roots.push(node);
+    }
+    const sort = branch => branch.sort((a,b) => Number(['space','folder'].includes(b.kind)) - Number(['space','folder'].includes(a.kind)) || a.name.localeCompare(b.name))
+      .map(node => ({...node, children:sort(node.children)}));
+    return sort([...groups.values()].filter(group => group.children.length).concat(roots));
+  }
+
+  destinationTreeHtml(branch, selected, label) {
+    return `<ul>${branch.map(item => {
+      const name = `${this.home.mindspace.kindIcon(item.kind === 'space' ? 'folder' : item.kind)}<span>${esc(item.name)}</span>`;
+      const choice = item.kind === 'space' ? `<span class="diagram-link-tree-space">${name}</span>`
+        : `<button type="button" class="diagram-link-tree-choice" data-link-document="${esc(item.key)}" aria-pressed="${item.key === selected}" title="${esc(label(item))}">${name}<small>${esc(t(`ms_kind_${item.kind}`))}</small></button>`;
+      return `<li>${item.children.length ? `<details data-link-branch><summary><span class="diagram-link-tree-arrow" aria-hidden="true">›</span>${choice}</summary>${this.destinationTreeHtml(item.children,selected,label)}</details>` : `<div class="diagram-link-tree-leaf">${choice}</div>`}</li>`;
+    }).join('')}</ul>`;
+  }
+
   showPicker(node, diagrams, generation, items = []) {
     this.disposePreview?.();
     const home = this.home;
@@ -160,9 +195,15 @@ class DiagramLinks {
       const path = entry && home.mindspace.enabled() ? [home.mindspace.spaceName(entry.mindspace_id), ...home.mindspace.pathTo(entry.parent_id, entry.mindspace_id).map(folder => folder.name)].join(' / ') : '';
       return [path, t(`ms_kind_${item.kind}`), item.name].filter(Boolean).join(' · ');
     };
+    const tree = DiagramLinks.destinationTree(documents,items,home.mindspace.spaces());
     openModal('diagram_option_link', `<form id="diagram-link-form">
-      <label class="field"><span>${esc(t('ms_link_element'))}</span><select id="diagram-link-diagram">
-        ${documents.map(item => `<option value="${item.key}">${esc(optionLabel(item))}</option>`).join('')}</select></label>
+      <div class="field diagram-link-destination"><span id="diagram-link-element-label">${esc(t('ms_link_element'))}</span>
+        <button type="button" id="diagram-link-diagram" class="diagram-link-destination-trigger" aria-labelledby="diagram-link-element-label diagram-link-element-value" aria-expanded="false" aria-controls="diagram-link-tree-panel"><span id="diagram-link-element-value"></span>${icon('chevronDown')}</button>
+        <div id="diagram-link-tree-panel" hidden>
+          <div class="diagram-link-tree-actions"><button type="button" class="text-btn" data-link-expand="true">${esc(t('ms_link_expand_all'))}</button><button type="button" class="text-btn" data-link-expand="false">${esc(t('ms_link_collapse_all'))}</button></div>
+          <nav class="diagram-link-tree" aria-label="${esc(t('ms_link_element'))}">${this.destinationTreeHtml(tree,target.key,optionLabel)}</nav>
+        </div>
+      </div>
       <fieldset class="diagram-link-scope"><legend>${esc(t('diagram_link_destination'))}</legend>
         <label><input type="radio" name="link-scope" value="whole"><span id="diagram-link-whole-label"></span></label>
         <label id="diagram-link-column-option" hidden><input type="radio" name="link-scope" value="column"><span>${esc(t('ms_link_column'))}</span></label>
@@ -181,7 +222,8 @@ class DiagramLinks {
       <p class="diagram-link-selection" role="status"></p>
       ${formFooter('save', node.link ? `<button type="button" class="btn danger" id="diagram-link-remove">${esc(t('diagram_link_remove'))}</button>` : '')}
     </form>`, true);
-    const form = document.getElementById('diagram-link-form'), select = form.querySelector('#diagram-link-diagram');
+    const form = document.getElementById('diagram-link-form'), trigger = form.querySelector('#diagram-link-diagram');
+    const treePanel = form.querySelector('#diagram-link-tree-panel');
     const topic = form.querySelector('#diagram-link-node'), cell = form.querySelector('#diagram-link-cell'), preview = form.querySelector('.diagram-link-preview');
     const valid = () => generation === home.generation && home.nodes.includes(node) && form.isConnected;
     const camera = new DiagramViewport({canInteract: () => valid() && target.kind === 'diagram',
@@ -200,6 +242,8 @@ class DiagramLinks {
     if (modal) removal.observe(modal, {childList:true});
     resize.observe(preview);
     const update = () => {
+      form.querySelector('#diagram-link-element-value').textContent = optionLabel(target);
+      treePanel.querySelectorAll('[data-link-document]').forEach(button => button.setAttribute('aria-pressed',String(button.dataset.linkDocument === target.key)));
       const type = targetType(), selected = choices().find(item => item.id === key);
       if (!type) scope = 'whole';
       form.querySelectorAll('[name="link-scope"]').forEach(radio => { radio.checked = radio.value === scope; });
@@ -240,8 +284,32 @@ class DiagramLinks {
       }
       fit(); update(); preview.scrollLeft = 0; preview.scrollTop = 0;
     };
-    select.value = target.key;
-    select.addEventListener('change', () => { target = documents.find(item => item.key === select.value); key = null; scope = 'whole'; draw(); });
+    const toggleTree = (open, focus = false) => {
+      treePanel.hidden = !open; trigger.setAttribute('aria-expanded',String(open));
+      if (open) {
+        const selected = treePanel.querySelector('[data-link-document][aria-pressed="true"]');
+        for (let parent = selected?.parentElement; parent && parent !== treePanel; parent = parent.parentElement) {
+          if (parent.matches('details')) parent.open = true;
+        }
+        selected?.scrollIntoView({block:'nearest'});
+      } else if (focus) trigger.focus();
+    };
+    trigger.addEventListener('click', () => toggleTree(treePanel.hidden));
+    treePanel.addEventListener('click', event => {
+      const expand = event.target.closest('[data-link-expand]');
+      if (expand) treePanel.querySelectorAll('details').forEach(branch => { branch.open = expand.dataset.linkExpand === 'true'; });
+      const choice = event.target.closest('[data-link-document]');
+      if (!choice) return;
+      event.preventDefault();
+      target = documents.find(item => item.key === choice.dataset.linkDocument); key = null; scope = 'whole';
+      toggleTree(false,true); draw();
+    });
+    form.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !treePanel.hidden) { event.preventDefault(); event.stopPropagation(); toggleTree(false,true); }
+    });
+    form.addEventListener('click', event => {
+      if (!treePanel.hidden && !event.target.closest('.diagram-link-destination')) toggleTree(false);
+    });
     form.querySelectorAll('[name="link-scope"]').forEach(radio => radio.addEventListener('change', () => { scope = radio.value; update(); }));
     topic.addEventListener('change', () => { key = topic.value || null; update(); });
     cell.addEventListener('input', () => { key = cell.value.trim().toUpperCase(); update(); });
